@@ -167,6 +167,27 @@
   .hist-status { font-size: 10px; margin-top: 1px; }
   .hist-empty { text-align: center; padding: 40px 20px; color: #2a2a2a; font-size: 13px; }
 
+  /* TRAINING TAB */
+  .ex-card { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 14px; padding: 14px; margin-bottom: 8px; }
+  .ex-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .ex-icon { font-size: 22px; }
+  .ex-name { font-size: 15px; font-weight: 700; }
+  .ex-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ex-input-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .ex-input-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .ex-input { width: 62px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; color: var(--text); padding: 8px 6px; font-size: 16px; font-family: var(--mono); font-weight: 700; text-align: center; outline: none; }
+  .ex-sep { font-size: 18px; color: #333; margin-top: 14px; }
+  .ex-add-btn { margin-left: auto; background: var(--green); color: #0a0a0a; border: none; border-radius: 10px; padding: 10px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: var(--mono); white-space: nowrap; }
+  .ex-add-btn:active { opacity: 0.8; }
+  .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a1a1a; }
+  .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; padding: 3px 0; }
+  .ex-done-kcal { color: var(--blue); font-family: var(--mono); font-weight: 700; }
+  .ex-done-del { background: none; border: none; color: #333; cursor: pointer; font-size: 15px; padding: 0 2px; }
+  .custom-ex-card { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 14px; padding: 14px; margin-bottom: 8px; border-style: dashed; }
+  .workout-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 4px; }
+  .workout-total-label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .workout-total-val { font-family: var(--mono); font-size: 20px; font-weight: 800; color: var(--blue); }
+
   /* BOTTOM NAV placeholder */
   .spacer { height: 20px; }
 </style>
@@ -192,7 +213,25 @@ const state = {
   weightInput: '',
   heightInput: '',
   editHeight: false,
+  // Training inputs state per exercise
+  trainingInputs: {
+    cucnjevi:  { sets: 3, reps: 10 },
+    sklekovi:  { sets: 3, reps: 8  },
+    plank:     { sets: 3, secs: 15 },
+    iskoraci:  { sets: 3, reps: 8  },
+    podizanje: { sets: 3, reps: 8  },
+    custom:    { name: '', sets: 3, reps: 10 },
+  },
 };
+
+// Predefined exercises: kcal/rep/kg or kcal/sec/kg
+const EXERCISES = [
+  { id: 'cucnjevi',  name: 'Čučnjevi',          icon: '🦵', type: 'reps', kcalPerRepPerKg: 0.0033 },
+  { id: 'sklekovi',  name: 'Sklekovi od zida',   icon: '🤲', type: 'reps', kcalPerRepPerKg: 0.0020 },
+  { id: 'plank',     name: 'Plank',              icon: '🧱', type: 'secs', kcalPerSecPerKg: 0.00083 },
+  { id: 'iskoraci',  name: 'Bočni iskoraci',     icon: '⚡', type: 'reps', kcalPerRepPerKg: 0.0028 },
+  { id: 'podizanje', name: 'Podizanje nogu',     icon: '🦶', type: 'reps', kcalPerRepPerKg: 0.0018 },
+];
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -228,6 +267,25 @@ function saveWeightEntry(date, weight) {
   // Sort descending
   log.sort((a, b) => b.date.localeCompare(a.date));
   localStorage.setItem('fitlog_weightlog', JSON.stringify(log));
+}
+
+// Workout log per day: [{id, name, sets, reps, secs, calories, time}]
+function loadWorkout(date) {
+  try {
+    const raw = localStorage.getItem('fitlog_workout_' + date);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveWorkout(date, entries) {
+  localStorage.setItem('fitlog_workout_' + date, JSON.stringify(entries));
+}
+
+function calcExerciseKcal(ex, sets, reps, secs) {
+  const w = state.weight || 80;
+  if (ex.type === 'reps') return Math.round(sets * reps * ex.kcalPerRepPerKg * w);
+  if (ex.type === 'secs') return Math.round(sets * secs * ex.kcalPerSecPerKg * w);
+  return 0;
 }
 
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
@@ -633,6 +691,131 @@ function historyTabHTML() {
   return html;
 }
 
+function trainingTabHTML() {
+  const workout = loadWorkout(state.date);
+  const totalKcal = workout.reduce((s, e) => s + (e.calories || 0), 0);
+
+  // Group done entries by exercise id
+  const doneByEx = {};
+  workout.forEach(e => {
+    if (!doneByEx[e.exId]) doneByEx[e.exId] = [];
+    doneByEx[e.exId].push(e);
+  });
+
+  // Predefined exercise cards
+  const exCards = EXERCISES.map(ex => {
+    const inp = state.trainingInputs[ex.id];
+    const done = doneByEx[ex.id] || [];
+    const preview = ex.type === 'reps'
+      ? calcExerciseKcal(ex, inp.sets, inp.reps, 0)
+      : calcExerciseKcal(ex, inp.sets, 0, inp.secs);
+
+    const doneHTML = done.length ? `
+      <div class="ex-done-list">
+        ${done.map(e => `
+          <div class="ex-done-item">
+            <span>${e.sets}×${e.reps || e.secs + 's'}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="ex-done-kcal">-${e.calories} kcal</span>
+              <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const inputsHTML = ex.type === 'reps' ? `
+      <div class="ex-input-group">
+        <div class="ex-input-label">Serije</div>
+        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
+          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
+      </div>
+      <div class="ex-sep">×</div>
+      <div class="ex-input-group">
+        <div class="ex-input-label">Ponavljanja</div>
+        <input class="ex-input" type="number" min="1" max="200" value="${inp.reps}"
+          oninput="updateTrainingInput('${ex.id}','reps',this.value)" />
+      </div>` : `
+      <div class="ex-input-group">
+        <div class="ex-input-label">Serije</div>
+        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
+          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
+      </div>
+      <div class="ex-sep">×</div>
+      <div class="ex-input-group">
+        <div class="ex-input-label">Sekunde</div>
+        <input class="ex-input" type="number" min="5" max="600" value="${inp.secs}"
+          oninput="updateTrainingInput('${ex.id}','secs',this.value)" />
+      </div>`;
+
+    return `<div class="ex-card">
+      <div class="ex-header">
+        <span class="ex-icon">${ex.icon}</span>
+        <span class="ex-name">${ex.name}</span>
+      </div>
+      <div class="ex-inputs">
+        ${inputsHTML}
+        <button class="ex-add-btn" onclick="addWorkoutEntry('${ex.id}')">
+          +${preview} kcal
+        </button>
+      </div>
+      ${doneHTML}
+    </div>`;
+  }).join('');
+
+  // Custom exercise
+  const ci = state.trainingInputs.custom;
+  const customCard = `
+    <div class="custom-ex-card">
+      <div class="ex-header">
+        <span class="ex-icon">✏️</span>
+        <span class="ex-name" style="color:var(--muted)">Custom vežba</span>
+      </div>
+      <input style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;font-family:var(--sans);outline:none;margin-bottom:10px"
+        type="text" placeholder="Naziv vežbe..." value="${ci.name}"
+        oninput="updateTrainingInput('custom','name',this.value)" />
+      <div class="ex-inputs">
+        <div class="ex-input-group">
+          <div class="ex-input-label">Serije</div>
+          <input class="ex-input" type="number" min="1" max="20" value="${ci.sets}"
+            oninput="updateTrainingInput('custom','sets',this.value)" />
+        </div>
+        <div class="ex-sep">×</div>
+        <div class="ex-input-group">
+          <div class="ex-input-label">Ponavljanja</div>
+          <input class="ex-input" type="number" min="1" max="200" value="${ci.reps}"
+            oninput="updateTrainingInput('custom','reps',this.value)" />
+        </div>
+        <button class="ex-add-btn" style="background:#47c8ff" onclick="addCustomWorkoutEntry()">Dodaj</button>
+      </div>
+      ${(doneByEx['custom'] || []).length ? `
+        <div class="ex-done-list">
+          ${(doneByEx['custom'] || []).map(e => `
+            <div class="ex-done-item">
+              <span>${e.name} · ${e.sets}×${e.reps}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="ex-done-kcal" style="color:var(--blue)">~${e.calories} kcal</span>
+                <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+
+  const totalHTML = totalKcal > 0 ? `
+    <div class="card">
+      <div class="workout-total">
+        <span class="workout-total-label">Ukupno sagoreno</span>
+        <span class="workout-total-val">-${totalKcal} kcal</span>
+      </div>
+    </div>` : '';
+
+  return `
+    ${totalHTML}
+    <div class="card">
+      <div class="card-label">Trening — ${state.date === todayStr() ? 'danas' : state.date}</div>
+      ${exCards}
+      ${customCard}
+    </div>`;
+}
+
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 
 function render() {
@@ -780,14 +963,16 @@ function render() {
       ${weightRow}
     </div>
 
-    <div class="tabs">
+    <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
       <button class="tab ${state.activeTab === 'log' ? 'active' : 'inactive'}" onclick="setTab('log')">📋 Dnevnik</button>
+      <button class="tab ${state.activeTab === 'training' ? 'active' : 'inactive'}" onclick="setTab('training')">🏋️ Trening</button>
       <button class="tab ${state.activeTab === 'stats' ? 'active' : 'inactive'}" onclick="setTab('stats')">📊 Pregled</button>
       <button class="tab ${state.activeTab === 'history' ? 'active' : 'inactive'}" onclick="setTab('history')">📅 Istorija</button>
     </div>
 
     ${state.activeTab === 'stats' ? statsContent : ''}
     ${state.activeTab === 'history' ? historyTabHTML() : ''}
+    ${state.activeTab === 'training' ? trainingTabHTML() : ''}
 
     ${state.activeTab === 'log' ? `
       <div class="card">
@@ -887,7 +1072,63 @@ function setMode(mode) {
   document.getElementById('msgInput')?.focus();
 }
 
-function updateGoal(val) {
+function updateTrainingInput(exId, field, value) {
+  if (field === 'name') state.trainingInputs[exId][field] = value;
+  else state.trainingInputs[exId][field] = parseInt(value) || 0;
+  // Re-render only the button preview without full render for smoothness
+  render();
+}
+
+function addWorkoutEntry(exId) {
+  const ex = EXERCISES.find(e => e.id === exId);
+  if (!ex) return;
+  const inp = state.trainingInputs[exId];
+  const calories = calcExerciseKcal(ex, inp.sets, inp.reps || 0, inp.secs || 0);
+  const entry = {
+    uid: Date.now() + '_' + exId,
+    exId,
+    name: ex.name,
+    sets: inp.sets,
+    reps: ex.type === 'reps' ? inp.reps : null,
+    secs: ex.type === 'secs' ? inp.secs : null,
+    calories,
+    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+  };
+  const workout = loadWorkout(state.date);
+  workout.push(entry);
+  saveWorkout(state.date, workout);
+  showToast(`${ex.name} dodato · -${calories} kcal`);
+  render();
+}
+
+function addCustomWorkoutEntry() {
+  const ci = state.trainingInputs.custom;
+  if (!ci.name.trim()) { showToast('Unesi naziv vežbe', 'err'); return; }
+  // Estimate ~0.002 kcal/rep/kg for unknown exercises
+  const w = state.weight || 80;
+  const calories = Math.round(ci.sets * ci.reps * 0.002 * w);
+  const entry = {
+    uid: Date.now() + '_custom',
+    exId: 'custom',
+    name: ci.name.trim(),
+    sets: ci.sets,
+    reps: ci.reps,
+    secs: null,
+    calories,
+    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+  };
+  const workout = loadWorkout(state.date);
+  workout.push(entry);
+  saveWorkout(state.date, workout);
+  showToast(`${entry.name} dodato · ~-${calories} kcal`);
+  render();
+}
+
+function deleteWorkoutEntry(uid) {
+  const workout = loadWorkout(state.date).filter(e => e.uid !== uid);
+  saveWorkout(state.date, workout);
+  render();
+}
   const v = parseInt(val);
   if (!isNaN(v) && v > 0) {
     state.calorieGoal = v;
