@@ -304,6 +304,14 @@
   .weight-chart-wrap { width: 100%; overflow: hidden; }
   .weight-chart-svg { width: 100%; overflow: visible; }
 
+  /* NUTRITION SCORE */
+  .score-btn { width: 100%; padding: 12px; background: #111; border: 1px solid #2a2a2a; border-radius: 12px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .score-btn:active { background: #1a1a1a; }
+  .score-card { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 12px; padding: 14px 16px; margin-top: 8px; }
+  .score-num { font-size: 42px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+  .score-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #161616; font-size: 12px; }
+  .score-row:last-child { border-bottom: none; }
+
   /* BOTTOM NAV placeholder */
   .spacer { height: 20px; }
 </style>
@@ -325,6 +333,8 @@ const state = {
   mode: 'food',
   activeTab: 'log',
   zdravljeSubTab: 'tezina',
+  nutritionScore: null,
+  nutritionScoreLoading: false,
   loading: false,
   editWeight: false,
   weightInput: '',
@@ -339,7 +349,7 @@ const state = {
   age: parseInt(localStorage.getItem('fitlog_age')) || 30,
   gender: localStorage.getItem('fitlog_gender') || 'male',
   activity: localStorage.getItem('fitlog_activity') || 'sedentary',
-  waterGoal: parseInt(localStorage.getItem('fitlog_water_goal')) || 2000,
+  waterGoal: parseInt(localStorage.getItem('fitlog_water_goal')) || (parseFloat(localStorage.getItem('fitlog_weight')) ? Math.round(parseFloat(localStorage.getItem('fitlog_weight')) * 30) : 2000),
   // Training inputs state per exercise
   trainingInputs: {
     cucnjevi:  { sets: 3, reps: 10 },
@@ -1281,18 +1291,33 @@ function weightChartHTML(log) {
     const y = H - ((e.weight - minW) / (maxW - minW)) * H;
     return `<circle cx="${x}" cy="${y}" r="3" fill="var(--green)"/>`;
   }).join('');
+
+  // Linear regression trend line
+  const n = entries.length;
+  const sumX = entries.reduce((s, _, i) => s + i, 0);
+  const sumY = entries.reduce((s, e) => s + e.weight, 0);
+  const sumXY = entries.reduce((s, e, i) => s + i * e.weight, 0);
+  const sumX2 = entries.reduce((s, _, i) => s + i * i, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const trendY0 = H - ((intercept - minW) / (maxW - minW)) * H;
+  const trendY1 = H - ((intercept + slope * (n - 1) - minW) / (maxW - minW)) * H;
+  const trendColor = slope < -0.01 ? 'var(--green)' : slope > 0.01 ? 'var(--red)' : 'var(--muted)';
+  const trendLabel = slope < -0.01 ? '↘ trend pada' : slope > 0.01 ? '↗ trend raste' : '→ stabilan';
+
   const diff = entries[entries.length-1].weight - entries[0].weight;
   const diffColor = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
   return `
     <div class="weight-chart-wrap">
       <svg class="weight-chart-svg" viewBox="-10 -10 ${W+20} ${H+20}" height="90">
-        <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+        <line x1="0" y1="${trendY0}" x2="${W}" y2="${trendY1}" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+        <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
         ${dots}
       </svg>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:2px">
         <span>${entries[0].date.slice(5)}</span>
-        <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg ukupno</span>
-        <span>${entries[entries.length-1].date.slice(5)}</span>
+        <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
+        <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
       </div>
     </div>`;
 }
@@ -1760,6 +1785,27 @@ function render() {
       ${mealsHTML}
       ${exHTML}
       ${emptyHTML}
+      ${d.meals.length ? `
+        <div style="padding: 0 0 4px">
+          ${state.nutritionScoreLoading ? `
+            <div class="score-card" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+              🤖 AI analizira tvoj unos...
+            </div>` :
+          state.nutritionScore ? `
+            <div class="score-card">
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+                <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
+                <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
+                <button onclick="state.nutritionScore=null;render()" style="margin-left:auto;background:none;border:none;color:#333;cursor:pointer;font-size:18px">×</button>
+              </div>
+              <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)">${state.nutritionScore.tip}</div>
+            </div>` : `
+            <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
+        </div>` : ''}
     ` : ''}
     <div class="spacer"></div>
 
@@ -1811,6 +1857,7 @@ function updateWaterGoal(val) {
   if (!isNaN(v) && v > 0) {
     state.waterGoal = v;
     localStorage.setItem('fitlog_water_goal', v);
+    localStorage.setItem('fitlog_water_goal_manual', '1');
   }
 }
 
@@ -1945,8 +1992,12 @@ function saveWeight() {
   if (!isNaN(v) && v > 0) {
     state.weight = v;
     localStorage.setItem('fitlog_weight', v);
-    // Save to weight log with today's date
     saveWeightEntry(todayStr(), v);
+    // Auto-update water goal only if user hasn't manually set it
+    const manualGoal = localStorage.getItem('fitlog_water_goal_manual');
+    if (!manualGoal) {
+      state.waterGoal = Math.round(v * 30);
+    }
   }
   state.editWeight = false;
   render();
@@ -1974,6 +2025,7 @@ function changeDate(val) {
   state.dayData = loadDay(val);
   state.imageBase64 = null;
   state.imageMime = null;
+  state.nutritionScore = null;
   render();
 }
 
@@ -1983,6 +2035,42 @@ function openDay(date) {
   state.dayData = loadDay(date);
   state.activeTab = 'log';
   render();
+}
+
+async function scoreNutrition() {
+  const d = state.dayData;
+  if (!d.meals.length) { showToast('Nema unesenih obroka za danas', 'err'); return; }
+  state.nutritionScoreLoading = true;
+  state.nutritionScore = null;
+  render();
+  try {
+    const t = totals();
+    const mealsSummary = d.meals.map(m =>
+      m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
+    ).join(' | ');
+    const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
+Obroci: ${mealsSummary}
+Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
+Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: 130g.
+
+Vrati SAMO validan JSON bez markdown oznaka:
+{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
+    });
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    state.nutritionScore = JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch(e) {
+    showToast('Greška pri oceni ishrane', 'err');
+  } finally {
+    state.nutritionScoreLoading = false;
+    render();
+  }
 }
 
 function setZdravljeTab(sub) {
