@@ -453,7 +453,7 @@ function debounceRender() {
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
 async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${state.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -503,7 +503,7 @@ Unos korisnika: ${text}`;
 
 async function parseFoodFromImage(base64, mimeType) {
   const w = state.weight || 75;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${state.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
 Korisnikova telesna masa je ${w} kg.
 Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.
