@@ -321,6 +321,18 @@
   .weight-chart-svg { width: 100%; overflow: visible; }
 
   /* NUTRITION SCORE */
+  /* COLLAPSIBLE MEAL */
+  .meal-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; cursor: pointer; user-select: none; }
+  .meal-header:active { background: var(--s4); }
+  .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
+  .meal-summary { flex: 1; font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
+  .meal-chevron { font-size: 11px; color: var(--muted); margin-left: 4px; transition: transform 0.2s; }
+  .meal-chevron.open { transform: rotate(180deg); }
+  .meal-details { padding: 0 16px 12px; border-top: 1px solid var(--s3); }
+  .meal-item { font-size: 12px; color: var(--muted); padding: 3px 0; }
+  .meal-item-name { color: var(--text); font-weight: 600; }
+
   /* SWIPE TO DELETE */
   .log-item { position: relative; overflow: hidden; }
   .log-item-inner { transition: transform 0.25s ease; will-change: transform; }
@@ -370,6 +382,7 @@ const state = {
   nutritionScore: null,
   nutritionScoreLoading: false,
   expandedScoreDate: null,
+  expandedMealIds: new Set(),
   loading: false,
   editWeight: false,
   weightInput: '',
@@ -1014,24 +1027,28 @@ function historyTabHTML() {
       const consumedPct = Math.min(100, (e.consumed / maxConsumed) * 100);
       const burnedPct = Math.min(100, (e.burned / maxConsumed) * 100);
       const dayObj = new Date(e.date + 'T12:00:00');
-      const dayLabel = isToday ? 'danas' : `${dayNames[dayObj.getDay()]} ${e.date.slice(8)}.`;
+      const dayShort = ['Ne','Po','Ut','Sr','Če','Pe','Su'][dayObj.getDay()];
+      const dayNum = e.date.slice(8).replace(/^0/, '');
+      const dayLabel = isToday ? 'danas' : `${dayShort} ${dayNum}.${e.date.slice(5,7)}.`;
+      const score = loadNutritionScore(e.date);
 
       return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
         <div class="hist-dot" style="background:${dotColor}"></div>
-        <div class="hist-date ${isToday ? 'today' : ''}">${dayLabel}</div>
-        <div class="hist-bars">
+        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:68px;font-size:13px">${dayLabel}</div>
+        <div class="hist-bars" style="flex:1">
           <div class="hist-bar-row">
-            <div class="hist-bar-track"><div class="hist-bar-fill" style="width:${consumedPct}%;background:var(--green)66"></div></div>
-            <div class="hist-bar-label" style="color:var(--s11)">${Math.round(e.consumed)}</div>
+            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${consumedPct}%;height:4px;background:var(--green)88"></div></div>
+            <div class="hist-bar-label" style="color:var(--s11);font-size:11px">${Math.round(e.consumed)}</div>
           </div>
           ${e.burned > 0 ? `<div class="hist-bar-row">
-            <div class="hist-bar-track"><div class="hist-bar-fill" style="width:${burnedPct}%;background:var(--blue)44"></div></div>
-            <div class="hist-bar-label" style="color:var(--blue)88">-${Math.round(e.burned)}</div>
+            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${burnedPct}%;height:4px;background:var(--blue)88"></div></div>
+            <div class="hist-bar-label" style="color:var(--blue);font-size:11px">-${Math.round(e.burned)}</div>
           </div>` : ''}
         </div>
-        <div class="hist-right">
-          <div class="hist-net" style="color:${netColor}">${Math.round(e.net)}</div>
-          <div class="hist-status" style="color:${dotColor}">${inDeficit ? '↓' : '↑'}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
+          <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
+          <span style="font-size:10px;color:var(--muted)">▶</span>
         </div>
       </div>`;
     }).join('');
@@ -1215,7 +1232,7 @@ function weeklyReportHTML(weekData) {
     </div>`;
     const pct = Math.min(100, (d.net / maxNet) * 100);
     const color = d.net < goal ? 'var(--green)' : 'var(--red)';
-    return `<div class="report-day-row" onclick="openDay('${d.date}')" style="cursor:pointer">
+    return `<div class="report-day-row" onclick="setTab('history');state.selectedHistoryDate='${d.date}';render()" style="cursor:pointer">
       <span class="report-day-name" style="color:${d.net < goal ? 'var(--green)' : 'var(--muted)'}">${name}</span>
       <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:${pct}%;background:${color}55"></div></div>
       <span class="report-day-val" style="color:${color}">${Math.round(d.net)}</span>
@@ -1716,32 +1733,41 @@ function render() {
 
   // Meals
   const mealsHTML = d.meals.length ? `
-    <div class="card">
-      <div class="card-label">Obroci · ${Math.round(t.consumed)} kcal</div>
-      ${d.meals.map(m => `
-        <div class="log-item" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
-          <div class="swipe-delete-bg">🗑</div>
-          <div class="log-item-inner" id="swipe-meal-${m.id}">
-          <button class="del-btn" onclick="deleteMeal(${m.id})">×</button>
-          <div class="log-time">${m.time}</div>
-          <div class="log-row">
-            <div class="log-items-list">
-              ${m.items.map(it => `<div class="food-line"><span class="food-amount">${it.amount} </span>${it.name}<span class="food-kcal"> · ${it.calories} kcal</span></div>`).join('')}
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
+        <div class="card-label" style="margin:0">Obroci · ${Math.round(t.consumed)} kcal</div>
+      </div>
+      ${d.meals.map(m => {
+        const isOpen = state.expandedMealIds.has(m.id);
+        const mainName = m.items[0]?.name || 'Obrok';
+        const extraCount = m.items.length > 1 ? ` +${m.items.length - 1}` : '';
+        const score = loadNutritionScore(state.date);
+        return `
+          <div class="log-item" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
+            <div class="swipe-delete-bg">🗑</div>
+            <div class="log-item-inner" id="swipe-meal-${m.id}" style="background:var(--card)">
+              <div class="meal-header" onclick="toggleMeal(${m.id})">
+                <span class="meal-time-badge">${m.time}</span>
+                <span class="meal-summary">${mainName}${extraCount}</span>
+                <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
+                <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
+              </div>
+              ${isOpen ? `
+              <div class="meal-details">
+                ${m.items.map(it => `
+                  <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.amount} · ${it.calories} kcal</div>`).join('')}
+                <div class="pills" style="margin-top:8px">
+                  <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein)}g</span>
+                  <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
+                  <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat)}g</span>
+                  ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+                </div>
+                ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
+                <button onclick="deleteMeal(${m.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
+              </div>` : ''}
             </div>
-            <div class="log-kcal">
-              <div class="log-kcal-num" style="color:var(--green)">${Math.round(m.calories)}</div>
-              <div class="log-kcal-unit">kcal</div>
-            </div>
-          </div>
-          <div class="pills">
-            <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein)}g</span>
-            <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
-            <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat)}g</span>
-            ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
-          </div>
-          ${m.note ? `<div class="log-note">${m.note}</div>` : ''}
-          </div>
-        </div>`).join('')}
+          </div>`;
+      }).join('')}
     </div>` : '';
 
   // Exercises
@@ -2238,6 +2264,15 @@ function saveOnboarding() {
   autoCalorieGoal();
 
   showToast('Profil sačuvan! 🎉');
+  render();
+}
+
+function toggleMeal(id) {
+  if (state.expandedMealIds.has(id)) {
+    state.expandedMealIds.delete(id);
+  } else {
+    state.expandedMealIds.add(id);
+  }
   render();
 }
 
