@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FitLog">
+<title>FitLog</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #8fd42e;
+    --blue: #47c8ff;
+    --orange: #ffb347;
+    --red: #ff4f4f;
+    --pink: #ff6b9d;
+    --bg: #0a0a0a;
+    --card: #111111;
+    --border: #1e1e1e;
+    --text: #f0f0f0;
+    --muted: #555;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --s0: #0a0a0a;
+    --s1: #0d0d0d;
+    --s2: #111;
+    --s3: #161616;
+    --s4: #1a1a1a;
+    --s5: #1e1e1e;
+    --s6: #2a2a2a;
+    --s7: #333;
+    --s8: #3a3a3a;
+    --s9: #444;
+    --s10: #555;
+    --s11: #666;
+    --tc: #ccc;
+    --white: #fff;
+    --red-dark: #900;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
+
+  /* HEADER — slim, just logo + date */
+  .header { padding: 14px 16px 0; border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-family: var(--mono); font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--green), #47ffb5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* HEADER PROGRESS BAR */
+  .header-progress-wrap { padding: 10px 16px 0; }
+  .header-progress-track { height: 3px; background: var(--s4); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
+  .header-progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease, background 0.3s; }
+  .header-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  /* ZDRAVLJE SUBTABS */
+  .sub-tabs { display: flex; gap: 4px; margin: 12px 16px 0; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
+  .sub-tab { flex: 1; padding: 8px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; }
+  .sub-tab.active { background: var(--green); color: #0a0a0a; font-weight: 800; }
+  .sub-tab.inactive { background: transparent; color: var(--s11); }
+  .weight-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--green); padding: 4px 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--sans); }
+  .weight-input { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 4px 8px; font-size: 13px; width: 65px; font-family: var(--mono); outline: none; }
+  .save-btn { background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  /* API KEY SCREEN */
+  .api-screen { padding: 40px 20px; text-align: center; }
+  .api-screen h2 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; font-size: 18px; }
+  .api-screen p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+  .api-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 16px; font-size: 13px; font-family: var(--mono); outline: none; margin-bottom: 10px; }
+  .api-save-btn { width: 100%; background: var(--green); color: var(--bg); border: none; border-radius: 12px; padding: 16px; font-size: 15px; font-weight: 800; cursor: pointer; font-family: var(--mono); letter-spacing: 1px; }
+  .api-hint { font-size: 11px; color: var(--s7); margin-top: 8px; }
+  .api-hint a { color: var(--muted); }
+
+  /* WEEKLY REPORT */
+  .report-stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--s3); }
+  .report-stat:last-child { border-bottom: none; }
+  .report-stat-label { font-size: 13px; color: var(--muted); }
+  .report-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .report-day-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
+  .report-day-row:last-child { border-bottom: none; }
+  .report-day-name { color: var(--muted); min-width: 28px; font-family: var(--mono); }
+  .report-day-bar-wrap { flex: 1; height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; }
+  .report-day-bar { height: 100%; border-radius: 3px; }
+  .report-day-val { min-width: 50px; text-align: right; font-family: var(--mono); font-weight: 700; font-size: 11px; }
+  .report-grade { font-size: 48px; text-align: center; margin: 8px 0 4px; }
+  .report-grade-label { text-align: center; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .report-grade-sub { text-align: center; font-size: 13px; color: var(--muted); }
+
+  /* SKELETON LOADER */
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  .skeleton { background: linear-gradient(90deg, var(--s4) 25%, #252525 50%, var(--s4) 75%); background-size: 800px 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }
+  .skeleton-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 12px 16px 0; }
+  .skeleton-time { height: 10px; width: 40px; margin-bottom: 10px; }
+  .skeleton-line { height: 14px; margin-bottom: 8px; border-radius: 4px; }
+  .skeleton-pills { display: flex; gap: 6px; margin-top: 10px; }
+  .skeleton-pill { height: 20px; width: 55px; border-radius: 8px; }
+  .skeleton-kcal { height: 28px; width: 50px; border-radius: 4px; }
+
+  /* ZDRAVLJE TAB */
+  .bmi-scale-wrap { margin: 12px 0 8px; }
+  .bmi-scale-track { height: 10px; border-radius: 5px; background: linear-gradient(to right, var(--blue) 0%, var(--green) 30%, var(--orange) 55%, var(--red) 75%, #900 100%); position: relative; margin-bottom: 6px; }
+  .bmi-scale-marker { position: absolute; top: -4px; width: 4px; height: 18px; background: var(--white); border-radius: 2px; transform: translateX(-50%); }
+  .bmi-scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--s9); font-family: var(--mono); }
+  .zdravlje-stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--s3); }
+  .zdravlje-stat:last-child { border-bottom: none; }
+  .zdravlje-stat-label { font-size: 13px; color: var(--muted); }
+  .zdravlje-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .target-input-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .target-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 7px 10px; font-size: 13px; font-family: var(--mono); width: 75px; outline: none; text-align: center; }
+  .prognoza-bar { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+  .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
+
+  /* BOTTOM NAV — replaces top tabs */
+  .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--bg); border-top: 1px solid var(--s4); display: flex; z-index: 100; padding: 6px 0 10px; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; padding: 6px 0; transition: color 0.15s; }
+  .nav-icon { font-size: 18px; line-height: 1; }
+  .nav-label { font-size: 11px; font-weight: 600; font-family: var(--sans); letter-spacing: 0.3px; }
+  .nav-btn.active .nav-label { color: var(--green); }
+  .nav-btn.inactive .nav-label { color: var(--s8); }
+  .nav-btn.active .nav-icon { filter: none; }
+  .nav-btn.inactive .nav-icon { opacity: 0.35; }
+
+  /* CARD */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 16px 0; }
+  .card-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+
+  /* MODE TOGGLE */
+  .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .mode-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; }
+  .mode-btn.active { background: var(--green); color: var(--bg); }
+  .mode-btn.inactive { background: var(--s4); color: var(--s11); }
+
+  /* INPUT */
+  .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--sans); resize: none; outline: none; line-height: 1.5; }
+  .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
+
+  /* SEND BUTTON — smaller, less aggressive */
+  .send-btn { padding: 11px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 8px; transition: opacity 0.2s; }
+  .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .send-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .send-row .send-btn { flex: 1; margin-top: 0; }
+
+  /* INLINE IMAGE BUTTON */
+  .img-btn { position: relative; padding: 11px 14px; background: var(--s4); color: var(--muted); border: 1px solid var(--s6); border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
+  .img-btn.has-image { background: var(--blue)22; border-color: var(--blue)55; color: var(--blue); }
+  .img-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .img-preview { width: 100%; max-height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; display: none; }
+  .img-preview.show { display: block; }
+  .img-analyze-btn { width: 100%; padding: 8px; background: var(--blue)22; color: var(--blue); border: 1px solid var(--blue)44; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); margin-bottom: 8px; transition: opacity 0.2s; }
+  .img-analyze-btn:disabled { opacity: 0.5; }
+
+  /* STATS */
+  .ring-wrap { position: relative; flex-shrink: 0; }
+  .ring-wrap svg { display: block; }
+  .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-kcal { font-size: 22px; font-weight: 800; font-family: var(--mono); }
+  .ring-label { font-size: 11px; color: var(--s11); letter-spacing: 1px; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+  .stat-label { color: var(--muted); }
+  .stat-val { font-family: var(--mono); font-weight: 700; }
+  .goal-row { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 3px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; }
+
+  /* MACRO BAR */
+  .macro-row { margin-bottom: 8px; }
+  .macro-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .macro-track { height: 5px; background: var(--s2); border-radius: 3px; overflow: hidden; }
+  .macro-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+  /* LOG ITEMS — better hierarchy */
+  .log-item { position: relative; overflow: hidden; border-bottom: 1px solid var(--s3); }
+  .log-item:last-child { border-bottom: none; }
+  .pills { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+  .log-note { margin-top: 6px; font-size: 11px; color: var(--muted); font-style: italic; }
+  .del-btn:active { color: var(--red); background: var(--red)11; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* TOAST — above bottom nav */
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 13px; z-index: 999; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.4); transition: opacity 0.3s; font-family: var(--sans); }
+  .toast.ok { background: var(--green); color: var(--bg); }
+  .toast.err { background: var(--red); color: var(--white); }
+  .toast.hide { opacity: 0; }
+
+  /* SETTINGS */
+  .settings-link { font-size: 11px; color: var(--s7); text-align: center; margin-top: 8px; cursor: pointer; }
+  .settings-link:hover { color: var(--muted); }
+
+  /* STREAK */
+  .streak-wrap { display: flex; align-items: center; gap: 16px; }
+  .streak-num { font-family: var(--mono); font-size: 48px; font-weight: 700; line-height: 1; color: var(--green); }
+  .streak-num.zero { color: var(--s7); }
+  .streak-info { flex: 1; }
+  .streak-title { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .streak-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* WEEK CHART */
+  .week-chart { width: 100%; overflow: hidden; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; margin-bottom: 6px; }
+  .chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+  .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; transition: height 0.4s ease; }
+  .chart-day { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .chart-day.today { color: var(--green); }
+  .chart-kcal { font-size: 11px; color: var(--s9); font-family: var(--mono); }
+  .week-avg { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; }
+  .week-avg-item { text-align: center; }
+  .week-avg-val { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .week-avg-label { color: var(--muted); margin-top: 2px; }
+
+  /* WEIGHT LOG */
+  .weight-log-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--s4); }
+  .weight-log-item:last-child { border-bottom: none; }
+  .weight-log-date { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+  .weight-log-val { font-size: 15px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .weight-log-diff { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
+
+  /* HISTORY */
+  .hist-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--s3); cursor: pointer; transition: background 0.15s; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item:active { background: var(--s3); }
+  .hist-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 90px; }
+  .hist-date.today { color: var(--green); }
+  .hist-bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .hist-bar-row { display: flex; align-items: center; gap: 6px; }
+  .hist-bar-track { flex: 1; height: 4px; background: var(--s4); border-radius: 2px; overflow: hidden; }
+  .hist-bar-fill { height: 100%; border-radius: 2px; }
+  .hist-bar-label { font-size: 11px; font-family: var(--mono); min-width: 38px; text-align: right; }
+  .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
+
+  /* TRAINING TAB */
+  .ex-card { background: var(--s1); border: 1px solid var(--s4); border-radius: 12px; padding: 16px; margin-bottom: 8px; }
+  .ex-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .ex-icon { font-size: 22px; }
+  .ex-name { font-size: 15px; font-weight: 700; }
+  .ex-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ex-input-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .ex-input-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .ex-input { width: 62px; background: var(--s4); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 8px 6px; font-size: 15px; font-family: var(--mono); font-weight: 700; text-align: center; outline: none; }
+  .ex-sep { font-size: 18px; color: var(--s7); margin-top: 14px; }
+  .ex-add-btn { margin-left: auto; background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: var(--mono); white-space: nowrap; }
+  .ex-add-btn:active { opacity: 0.8; }
+  .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--s4); }
+  .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 3px 0; }
+  .ex-done-kcal { color: var(--blue); font-family: var(--mono); font-weight: 700; }
+  .ex-done-del { background: none; border: none; color: var(--s7); cursor: pointer; font-size: 15px; padding: 0 2px; }
+  .custom-ex-card { background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; padding: 16px; margin-bottom: 8px; border-style: dashed; }
+  .workout-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 4px; }
+  .workout-total-label { font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .workout-total-val { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--blue); }
+
+  /* IMAGE UPLOAD */
+  .img-upload-area:active { border-color: var(--green); }
+  .img-upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .img-preview { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; display: none; }
+  .img-preview.show { display: block; }
+
+  /* HISTORY DETAIL */
+  .hist-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .hist-back-btn { background: var(--s4); border: none; border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+  .hist-detail-date { font-family: var(--mono); font-size: 13px; color: var(--green); font-weight: 700; }
+  .hist-progress-track { height: 10px; background: var(--s4); border-radius: 5px; overflow: hidden; margin: 6px 0; }
+  .hist-progress-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+  .hist-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  .hist-meal-entry { padding: 10px 0; border-bottom: 1px solid var(--s3); }
+  .hist-meal-entry:last-child { border-bottom: none; }
+  .hist-meal-time { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 4px; }
+  .hist-meal-name { font-size: 13px; color: var(--tc); }
+  .hist-meal-kcal { font-size: 13px; font-family: var(--mono); font-weight: 700; }
+  .hist-section-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 12px 0 6px; }
+  .hist-workout-entry { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
+  .hist-workout-entry:last-child { border-bottom: none; }
+
+  /* WATER TRACKER */
+  .water-drops { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .water-drop { width: 36px; height: 36px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: background 0.2s, border-color 0.2s; border: 1px solid var(--s5); }
+  .water-drop.filled { background: var(--blue)22; border-color: var(--blue)55; }
+  .water-drop.empty { background: var(--s2); }
+  .water-btns { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .water-btn { flex: 1; padding: 10px 8px; border: 1px solid var(--s6); border-radius: 8px; background: var(--s2); color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; min-width: 70px; }
+  .water-btn:active { background: var(--blue)22; }
+  .water-custom-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .water-custom-input { flex: 1; background: var(--s1); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 10px 12px; font-size: 13px; font-family: var(--mono); outline: none; text-align: center; }
+  .water-add-btn { padding: 10px 16px; background: var(--blue); color: var(--bg); border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+  .water-hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--s2); }
+  .water-hist-row:last-child { border-bottom: none; }
+  .water-hist-date { font-size: 11px; color: var(--muted); font-family: var(--mono); min-width: 50px; }
+  .water-hist-bar-wrap { flex: 1; height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; }
+  .water-hist-bar { height: 100%; border-radius: 3px; background: var(--blue); }
+  .water-hist-val { font-size: 11px; font-family: var(--mono); min-width: 55px; text-align: right; }
+
+  /* WEIGHT CHART */
+  .weight-chart-wrap { width: 100%; overflow: hidden; }
+  .weight-chart-svg { width: 100%; overflow: visible; }
+
+  /* NUTRITION SCORE */
+  /* COLLAPSIBLE MEAL */
+  .meal-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; cursor: pointer; user-select: none; }
+  .meal-header:active { background: var(--s4); }
+  .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
+  .meal-summary { flex: 1; font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
+  .meal-chevron { font-size: 11px; color: var(--muted); margin-left: 4px; transition: transform 0.2s; }
+  .meal-chevron.open { transform: rotate(180deg); }
+  .meal-details { padding: 0 16px 12px; border-top: 1px solid var(--s3); }
+  .meal-item { font-size: 12px; color: var(--muted); padding: 3px 0; }
+  .meal-item-name { color: var(--text); font-weight: 600; }
+
+  /* SWIPE TO DELETE */
+  .log-item { position: relative; overflow: hidden; }
+  .log-item-inner { transition: transform 0.25s ease; will-change: transform; }
+  .swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 72px; background: var(--red); display: flex; align-items: center; justify-content: center; color: var(--white); font-size: 18px; border-radius: 0 12px 12px 0; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+
+  .score-btn { width: 100%; padding: 12px; background: var(--s2); border: 1px solid var(--s6); border-radius: 12px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; margin-top: 8px; }
+  .score-btn:active { background: var(--s4); }
+  .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--s10); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; }
+  .meal-score-btn:active { background: var(--s4); }
+  .meal-score-inline { margin-top: 8px; padding: 8px 10px; background: var(--s3); border-radius: 8px; font-size: 12px; color: var(--muted); display: flex; align-items: flex-start; gap: 8px; }
+  .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .score-card { background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; padding: 14px 16px; margin: 8px 16px 0; }
+  .score-num { font-size: 48px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+  .score-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
+  .score-row:last-child { border-bottom: none; }
+
+  /* ONBOARDING */
+  .onboard-screen { padding: 32px 20px; }
+  .onboard-title { font-family: var(--mono); color: var(--green); font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .onboard-sub { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 24px; }
+  .onboard-field { margin-bottom: 16px; }
+  .onboard-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .onboard-input { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 12px 14px; font-size: 15px; font-family: var(--mono); outline: none; box-sizing: border-box; }
+  .onboard-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
+  .onboard-btn { width: 100%; padding: 16px; background: var(--green); color: var(--bg); border: none; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: var(--sans); cursor: pointer; margin-top: 8px; }
+
+  /* BOTTOM NAV placeholder */
+  .spacer { height: 20px; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+const SCORE_KEY = 'fitlog_score_';
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
+const state = {
+  apiKey: localStorage.getItem('fitlog_apikey') || '',
+  weight: parseFloat(localStorage.getItem('fitlog_weight')) || null,
+  height: parseFloat(localStorage.getItem('fitlog_height')) || null,
+  calorieGoal: parseInt(localStorage.getItem('fitlog_goal')) || 2000,
+  calorieGoalManual: !!localStorage.getItem('fitlog_goal_manual'),
+  date: todayStr(),
+  dayData: { meals: [], exercises: [] },
+  mode: 'food',
+  activeTab: 'log',
+  zdravljeSubTab: 'tezina',
+  nutritionScore: null,
+  nutritionScoreLoading: false,
+  expandedScoreDate: null,
+  mealScores: {},
+  mealScoreLoading: null,
+  expandedMealIds: new Set(),
+  expandedExIds: new Set(),
+  loading: false,
+  editWeight: false,
+  weightInput: '',
+  heightInput: '',
+  editHeight: false,
+  selectedHistoryDate: null,
+  imageBase64: null,
+  imageMime: null,
+  targetWeight: parseFloat(localStorage.getItem('fitlog_target_weight')) || null,
+  targetWeightInput: '',
+  editTargetWeight: false,
+  age: parseInt(localStorage.getItem('fitlog_age')) || 30,
+  gender: localStorage.getItem('fitlog_gender') || 'male',
+  activity: localStorage.getItem('fitlog_activity') || 'sedentary',
+  waterGoal: parseInt(localStorage.getItem('fitlog_water_goal')) || (parseFloat(localStorage.getItem('fitlog_weight')) ? Math.round(parseFloat(localStorage.getItem('fitlog_weight')) * 30) : 2000),
+  // Training inputs state per exercise
+  trainingInputs: {
+    cucnjevi:  { sets: 3, reps: 10 },
+    sklekovi:  { sets: 3, reps: 8  },
+    plank:     { sets: 3, secs: 15 },
+    iskoraci:  { sets: 3, reps: 8  },
+    podizanje: { sets: 3, reps: 8  },
+    custom:    { name: '', sets: 3, reps: 10 },
+  },
+};
+
+// Predefined exercises: kcal/rep/kg or kcal/sec/kg
+const EXERCISES = [
+  { id: 'cucnjevi',  name: 'Čučnjevi',          icon: '🦵', type: 'reps', kcalPerRepPerKg: 0.0033 },
+  { id: 'sklekovi',  name: 'Sklekovi od zida',   icon: '🤲', type: 'reps', kcalPerRepPerKg: 0.0020 },
+  { id: 'plank',     name: 'Plank',              icon: '🧱', type: 'secs', kcalPerSecPerKg: 0.00083 },
+  { id: 'iskoraci',  name: 'Bočni iskoraci',     icon: '⚡', type: 'reps', kcalPerRepPerKg: 0.0028 },
+  { id: 'podizanje', name: 'Podizanje nogu',     icon: '🦶', type: 'reps', kcalPerRepPerKg: 0.0018 },
+];
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+
+function loadDay(date) {
+  try {
+    const raw = localStorage.getItem('fitlog_day_' + date);
+    return raw ? JSON.parse(raw) : { meals: [], exercises: [] };
+  } catch { return { meals: [], exercises: [] }; }
+}
+
+function saveDay(date, data) {
+  localStorage.setItem('fitlog_day_' + date, JSON.stringify(data));
+}
+
+// Weight log: [{date, weight}] sorted by date desc
+function loadWeightLog() {
+  try {
+    const raw = localStorage.getItem('fitlog_weightlog');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function loadWater(date) {
+  const raw = localStorage.getItem('fitlog_water_' + date);
+  return raw ? parseInt(raw) : 0;
+}
+
+function saveWater(date, ml) {
+  localStorage.setItem('fitlog_water_' + date, String(ml));
+}
+
+function loadWaterHistory(days) {
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    result.push({ date: dateStr, ml: parseInt(localStorage.getItem('fitlog_water_' + dateStr) || 0) });
+  }
+  return result;
+}
+
+function saveWeightEntry(date, weight) {
+  const log = loadWeightLog();
+  // Replace if same date exists, otherwise add
+  const idx = log.findIndex(e => e.date === date);
+  if (idx >= 0) log[idx].weight = weight;
+  else log.push({ date, weight });
+  // Sort descending
+  log.sort((a, b) => b.date.localeCompare(a.date));
+  localStorage.setItem('fitlog_weightlog', JSON.stringify(log));
+}
+
+// Workout log per day: [{id, name, sets, reps, secs, calories, time}]
+function loadWorkout(date) {
+  try {
+    const raw = localStorage.getItem('fitlog_workout_' + date);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveWorkout(date, entries) {
+  localStorage.setItem('fitlog_workout_' + date, JSON.stringify(entries));
+}
+
+function calcExerciseKcal(ex, sets, reps, secs) {
+  const w = state.weight || 80;
+  if (ex.type === 'reps') return Math.round(sets * reps * ex.kcalPerRepPerKg * w);
+  if (ex.type === 'secs') return Math.round(sets * secs * ex.kcalPerSecPerKg * w);
+  return 0;
+}
+
+// Safe JSON parse for localStorage — never crashes
+function safeParseLS(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+// Debounce helper for training inputs
+let trainingDebounceTimer = null;
+function debounceRender() {
+  clearTimeout(trainingDebounceTimer);
+  trainingDebounceTimer = setTimeout(render, 120);
+}
+
+// ─── GEMINI API ───────────────────────────────────────────────────────────────
+
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1 }
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'API greška');
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function parseFood(text) {
+  const w = state.weight || 75;
+  const prompt = `Ti si nutricionistički asistent. Korisnik opisuje šta je jeo.
+Korisnikova telesna masa je ${w} kg.
+Iz opisa izvuci namirnice i proceni kalorije, makronutrijente i šećer.
+Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
+Format:
+{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}
+Napomena: sugar je dodati i prirodni šećer u gramima.
+
+Unos korisnika: ${text}`;
+
+  const raw = await callGemini(prompt);
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+async function parseExercise(text) {
+  const w = state.weight || 75;
+  const prompt = `Ti si fitness asistent. Korisnik opisuje fizičke aktivnosti.
+Korisnikova telesna masa je ${w} kg.
+Iz opisa izvuci aktivnosti i proceni potrošnju kalorija.
+Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
+Format:
+{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}
+
+Unos korisnika: ${text}`;
+
+  const raw = await callGemini(prompt);
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+async function parseFoodFromImage(base64, mimeType) {
+  const w = state.weight || 75;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+  const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
+Korisnikova telesna masa je ${w} kg.
+Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.
+Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
+Format:
+{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena"}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: prompt },
+        { inline_data: { mime_type: mimeType, data: base64 } }
+      ]}],
+      generationConfig: { temperature: 0.1 }
+    })
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API greška'); }
+  const data = await res.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+
+let toastTimer = null;
+function showToast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type;
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.add('hide');
+    setTimeout(() => { el.style.display = 'none'; el.classList.remove('hide'); }, 300);
+  }, 3000);
+}
+
+// ─── TDEE / PROFILE HELPERS ───────────────────────────────────────────────────
+
+function calcTDEE(w, h, age, gender, activity) {
+  if (!w || !h) return null;
+  const actMults = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+  const genderOffset = gender === 'male' ? 5 : -161;
+  const bmr = 10 * w + 6.25 * h - 5 * age + genderOffset;
+  return Math.round(bmr * (actMults[activity] || 1.2));
+}
+
+function autoCalorieGoal() {
+  // Only auto-set if user hasn't manually overridden
+  if (state.calorieGoalManual) return;
+  const tdee = calcTDEE(state.weight, state.height, state.age, state.gender, state.activity);
+  if (tdee) {
+    state.calorieGoal = tdee - 500;
+    localStorage.setItem('fitlog_goal', state.calorieGoal);
+  }
+}
+
+function macroLimits() {
+  // Dynamic macro limits based on calorie goal
+  const kcal = state.calorieGoal || 2000;
+  return {
+    protMin: 130,
+    protMax: Math.round((kcal * 0.30) / 4),
+    carbMin: Math.round((kcal * 0.20) / 4),
+    carbMax: Math.round((kcal * 0.40) / 4),
+    fatMin: 50,
+    fatMax: Math.round((kcal * 0.30) / 9),
+    sugarMax: 50,
+  };
+}
+
+function loadNutritionScore(date) {
+  const raw = localStorage.getItem(SCORE_KEY + date);
+  try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+function saveNutritionScore(date, score) {
+  localStorage.setItem(SCORE_KEY + date, JSON.stringify(score));
+}
+
+// ─── RING SVG ─────────────────────────────────────────────────────────────────
+
+function ringHTML(consumed, burned, goal) {
+  const net = consumed - burned;
+  const pct = Math.min(1, Math.max(0, net / goal));
+  const r = 68, cx = 80, cy = 80;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * pct;
+  const color = net > goal ? 'var(--red)' : 'var(--green)';
+  return `
+    <div class="ring-wrap" style="width:160px;height:160px">
+      <svg width="160" height="160" style="transform:rotate(-90deg)">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--s4)" stroke-width="12"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="12"
+          stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+      </svg>
+      <div class="ring-center">
+        <span class="ring-kcal" style="color:${color};font-size:36px;line-height:1">${Math.round(net)}</span>
+        <span class="ring-label" style="font-size:11px;margin-top:2px">NET kcal</span>
+      </div>
+    </div>`;
+}
+
+// ─── CALCULATIONS ─────────────────────────────────────────────────────────────
+
+function totals() {
+  const d = state.dayData;
+  const consumed    = d.meals.reduce((s, m) => s + (m.calories || 0), 0);
+  const exBurned    = d.exercises.reduce((s, e) => s + (e.burned || 0), 0);
+  // Include training tab workout calories in burned total
+  const workout     = loadWorkout(state.date);
+  const workoutBurned = workout.reduce((s, e) => s + (e.calories || 0), 0);
+  const burned      = exBurned + workoutBurned;
+  const protein     = d.meals.reduce((s, m) => s + (m.protein || 0), 0);
+  const carbs       = d.meals.reduce((s, m) => s + (m.carbs || 0), 0);
+  const fat         = d.meals.reduce((s, m) => s + (m.fat || 0), 0);
+  const sugar       = d.meals.reduce((s, m) => s + (m.sugar || 0), 0);
+  return { consumed, burned, protein, carbs, fat, sugar, net: consumed - burned };
+}
+
+function macroBar(label, value, min, max, color, unit) {
+  unit = unit || 'g';
+  const pct = Math.min(100, (value / max) * 100);
+  const overMax = value > max;
+  const underMin = min > 0 && value < min;
+  const statusColor = overMax ? 'var(--red)' : underMin ? 'var(--orange)' : color;
+  const statusIcon = overMax ? '↑' : underMin ? '!' : '✓';
+  const overageText = overMax
+    ? `<span style="font-size:11px;color:var(--red);font-weight:700;margin-left:4px">+${Math.round(value - max)}${unit}</span>`
+    : '';
+  return `
+    <div class="macro-row">
+      <div class="macro-top">
+        <span style="color:${color};font-weight:600">${label}</span>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="display:inline-block;width:12px;text-align:center;font-size:11px;color:${statusColor};font-weight:700">${statusIcon}</span>
+          <span style="color:${statusColor};font-weight:700;min-width:36px;text-align:right">${Math.round(value)}${unit}</span>
+          <span style="color:var(--s8);font-size:11px">/ ${max}${unit}</span>
+          ${overageText}
+        </div>
+      </div>
+      <div class="macro-track">
+        <div class="macro-fill" style="width:${pct}%;background:${statusColor}"></div>
+      </div>
+    </div>`;
+}
+
+// ─── WEEK DATA & STREAK ───────────────────────────────────────────────────────
+
+// Returns current week Mon–Sun (future days shown as empty)
+function getWeekData() {
+  const result = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Always start from Monday of current week
+  const dow = today.getDay(); // 0=Sun, 1=Mon...
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset);
+  monday.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const dateStr = d.toISOString().slice(0, 10);
+    if (d > today) {
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: true });
+      continue;
+    }
+    const raw = localStorage.getItem('fitlog_day_' + dateStr);
+    if (raw) {
+      const day = safeParseLS('fitlog_day_' + dateStr);
+      if (!day) { result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: false }); continue; }
+      const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
+      const exBurned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
+      const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+      const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
+      const burned = exBurned + workoutBurned;
+      result.push({ date: dateStr, consumed, burned, net: consumed - burned, hasData: consumed > 0, future: false });
+    } else {
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: false });
+    }
+  }
+  return result;
+}
+
+function calcStreak() {
+  let streak = 0;
+
+  // Helper: get net calories for a date including workout
+  function getDayNet(dateStr) {
+    const day = safeParseLS('fitlog_day_' + dateStr);
+    if (!day) return null;
+    const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
+    if (consumed === 0) return null;
+    const exBurned = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
+    const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+    const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
+    return consumed - exBurned - workoutBurned;
+  }
+
+  // Check if today counts
+  const todayNet = getDayNet(todayStr());
+  const todayInDeficit = todayNet !== null && todayNet < state.calorieGoal;
+
+  for (let i = todayInDeficit ? 0 : 1; i < 365; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const net = getDayNet(dateStr);
+    if (net === null) break;
+    if (net < state.calorieGoal) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function weekChartHTML(weekData) {
+  const goal = state.calorieGoal;
+  const maxNet = Math.max(goal * 1.3, ...weekData.map(d => d.net));
+  const days = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su']; // Sun=0 index kept for getDay()
+  const todayDate = todayStr();
+
+  const bars = weekData.map(d => {
+    const date = new Date(d.date + 'T12:00:00');
+    const dayLabel = days[date.getDay()];
+    const isToday = d.date === todayDate;
+    const heightPct = d.hasData ? Math.max(4, (d.net / maxNet) * 100) : 4;
+    const color = d.future ? 'var(--s2)' : !d.hasData ? 'var(--s4)' : d.net < goal ? 'var(--green)' : 'var(--red)';
+    const kcalLabel = d.hasData ? (d.net >= 1000 ? Math.round(d.net/100)/10 + 'k' : Math.round(d.net)) : '';
+    return `
+      <div class="chart-col">
+        <div class="chart-kcal">${kcalLabel}</div>
+        <div class="chart-bar" style="height:${heightPct}%;background:${color};opacity:${isToday ? 1 : 0.7}"></div>
+        <div class="chart-day ${isToday ? 'today' : ''}">${dayLabel}</div>
+      </div>`;
+  }).join('');
+
+  // Goal line position
+  const goalPct = Math.min(95, (goal / maxNet) * 100);
+
+  // Weekly averages (only days with data)
+  const daysWithData = weekData.filter(d => d.hasData && !d.future);
+  const avgNet = daysWithData.length ? Math.round(daysWithData.reduce((s, d) => s + d.net, 0) / daysWithData.length) : 0;
+  const deficitDays = daysWithData.filter(d => d.net < goal).length;
+  const avgColor = avgNet < goal ? 'var(--green)' : 'var(--red)';
+
+  return `
+    <div class="week-chart">
+      <div style="position:relative">
+        <div style="position:absolute;bottom:${goalPct}%;left:0;right:0;height:1px;background:var(--s8);z-index:1;display:flex;align-items:center;justify-content:flex-end">
+          <span style="background:var(--s4);padding:1px 5px;font-size:9px;color:var(--s10);font-family:var(--mono);border:1px solid var(--s6);border-radius:3px;line-height:1.4;margin-right:2px">cilj ${goal}</span>
+        </div>
+        <div class="chart-bars">${bars}</div>
+      </div>
+      <div class="week-avg">
+        <div class="week-avg-item">
+          <div class="week-avg-val" style="color:${avgColor}">${avgNet > 0 ? avgNet : '-'}</div>
+          <div class="week-avg-label">prosek kcal</div>
+        </div>
+        <div class="week-avg-item">
+          <div class="week-avg-val" style="color:var(--green)">${deficitDays}/${daysWithData.length}</div>
+          <div class="week-avg-label">dana u deficitu</div>
+        </div>
+        <div class="week-avg-item">
+          <div class="week-avg-val" style="color:${avgNet < goal ? 'var(--green)' : 'var(--red)'}">
+            ${avgNet > 0 ? (avgNet < goal ? '✓ deficit' : '✗ višak') : '-'}
+          </div>
+          <div class="week-avg-label">nedeljni status</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function bmiCategory(bmi) {
+  if (bmi < 18.5) return { label: 'Pothranjenost', color: 'var(--blue)' };
+  if (bmi < 25)   return { label: 'Normalna težina', color: 'var(--green)' };
+  if (bmi < 30)   return { label: 'Prekomerna težina', color: 'var(--orange)' };
+  if (bmi < 35)   return { label: 'Gojaznost I', color: 'var(--red)' };
+  if (bmi < 40)   return { label: 'Gojaznost II', color: 'var(--red)' };
+  return { label: 'Gojaznost III', color: 'var(--red)' };
+}
+
+
+
+function getHistoryData(maxDays = 90) {
+  const entries = [];
+  for (let i = 0; i < maxDays; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const day = safeParseLS('fitlog_day_' + dateStr);
+    if (day) {
+      const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
+      const exBurned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
+      const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+      const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
+      const burned = exBurned + workoutBurned;
+      const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
+      if (consumed > 0 || burned > 0) {
+        entries.push({ date: dateStr, consumed, burned, net: consumed - burned, protein });
+      }
+    }
+  }
+  return entries;
+}
+
+function historyDayDetailHTML(date) {
+  const day = loadDay(date);
+  const workout = loadWorkout(date);
+  const goal = state.calorieGoal;
+  const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
+  const workoutBurned = workout.reduce((s, e) => s + (e.calories || 0), 0);
+  const exBurned = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
+  const totalBurned = workoutBurned + exBurned;
+  const net = consumed - totalBurned;
+  const inDeficit = net < goal;
+  const deficit = goal - net;
+  const pct = Math.min(100, (net / goal) * 100);
+  const barColor = inDeficit ? 'var(--green)' : 'var(--red)';
+
+  const dayNames = ['Nedelja', 'Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota'];
+  const srMonths = ['', 'jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'avg', 'sep', 'okt', 'nov', 'dec'];
+  const dObj = new Date(date + 'T12:00:00');
+  const dateLabel = `${dayNames[dObj.getDay()]}, ${dObj.getDate()}. ${srMonths[dObj.getMonth()+1]} ${dObj.getFullYear()}`;
+
+  // Meals list
+  const mealsHTML = day.meals?.length ? day.meals.map(m => `
+    <div class="hist-meal-entry">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="hist-meal-time">🍽 ${m.time}</div>
+          ${m.items?.map(it => `<div class="hist-meal-name">${it.amount} ${it.name}</div>`).join('') || `<div class="hist-meal-name">${m.desc || 'Obrok'}</div>`}
+        </div>
+        <div style="text-align:right;flex-shrink:0;padding-left:10px">
+          <div class="hist-meal-kcal" style="color:var(--green)">${Math.round(m.calories)}</div>
+          <div style="font-size:10px;color:var(--s9)">kcal</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+        <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein||0)}g</span>
+        <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
+        <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
+        ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+      </div>
+    </div>`).join('') : `<div style="color:var(--s7);font-size:13px;padding:8px 0">Nema unetih obroka</div>`;
+
+  // Exercises (AI unos)
+  const exHTML = day.exercises?.length ? `
+    <div class="hist-section-label">💪 Aktivnosti</div>
+    ${day.exercises.map(e => `
+      <div class="hist-workout-entry">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
+          ${e.items?.map(it => `<div style="color:var(--tc)">${it.name} · ${it.detail}</div>`).join('') || ''}
+        </div>
+        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${Math.round(e.burned)} kcal</div>
+      </div>`).join('')}` : '';
+
+  // Workout (trening tab)
+  const workoutHTML = workout.length ? `
+    <div class="hist-section-label">🏋️ Trening</div>
+    ${workout.map(e => `
+      <div class="hist-workout-entry">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
+          <div style="color:var(--tc)">${e.name} · ${e.sets}×${e.reps || e.secs+'s'}</div>
+        </div>
+        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${e.calories} kcal</div>
+      </div>`).join('')}` : '';
+
+  return `<div class="card">
+    <div class="hist-detail-header">
+      <button class="hist-back-btn" onclick="closeHistoryDetail()">← Nazad</button>
+      <span class="hist-detail-date">${dateLabel}</span>
+    </div>
+
+    <!-- PROGRESS BAR -->
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <span style="font-size:26px;font-weight:800;font-family:var(--mono);color:${barColor}">${Math.round(net)}</span>
+      <span style="font-size:12px;color:var(--muted)">od ${goal} kcal</span>
+    </div>
+    <div class="hist-progress-track">
+      <div class="hist-progress-fill" style="width:${pct}%;background:${barColor}"></div>
+    </div>
+    <div class="hist-progress-labels">
+      <span>Uneseno: <strong style="color:var(--text)">${Math.round(consumed)}</strong></span>
+      <span>Sagoreno: <strong style="color:var(--blue)">${Math.round(totalBurned)}</strong></span>
+      <span style="color:${inDeficit?'var(--green)':'var(--red)'}">
+        ${inDeficit ? '↓ deficit ' + Math.abs(Math.round(deficit)) : '↑ višak ' + Math.abs(Math.round(deficit))} kcal
+      </span>
+    </div>
+
+    <!-- OBROCI -->
+    <div class="hist-section-label" style="margin-top:16px">🍽 Obroci</div>
+    ${mealsHTML}
+    ${exHTML}
+    ${workoutHTML}
+    ${(() => {
+      const score = loadNutritionScore(date);
+      if (!score) return '';
+      const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      const isExpanded = state.expandedScoreDate === date;
+      return `
+    <div class="hist-section-label" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleHistoryScore('${date}')">
+      <span>🤖 Analiza ishrane</span>
+      <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
+    </div>
+    ${isExpanded ? `
+    <div class="score-card" style="margin-top:6px">
+      <div class="score-row"><span>${score.calories}</span></div>
+      <div class="score-row"><span>${score.protein}</span></div>
+      <div class="score-row"><span>${score.fat}</span></div>
+      <div class="score-row"><span>${score.sugar}</span></div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">${score.tip}</div>
+    </div>` : ''}`;
+    })()}
+  </div>`;
+}
+
+function historyTabHTML() {
+  // Show detail view if a date is selected
+  if (state.selectedHistoryDate) {
+    return historyDayDetailHTML(state.selectedHistoryDate);
+  }
+
+  const entries = getHistoryData();
+  if (entries.length === 0) {
+    return `<div class="card"><div class="hist-empty">📭 Još nema istorije.<br>Počni da unosiš obroke u Dnevniku!</div></div>`;
+  }
+
+  const goal = state.calorieGoal;
+  const maxConsumed = Math.max(...entries.map(e => e.consumed), goal);
+  const todayDate = todayStr();
+
+  const byMonth = {};
+  entries.forEach(e => {
+    const month = e.date.slice(0, 7);
+    if (!byMonth[month]) byMonth[month] = [];
+    byMonth[month].push(e);
+  });
+
+  const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
+  const dayNames = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su'];
+
+  let html = '';
+  Object.keys(byMonth).sort().reverse().forEach(month => {
+    const [yr, mo] = month.split('-');
+    const monthLabel = `${srMonths[parseInt(mo)]} ${yr}`;
+    const monthEntries = byMonth[month];
+    const monthAvg = Math.round(monthEntries.reduce((s, e) => s + e.net, 0) / monthEntries.length);
+    const monthDeficit = monthEntries.filter(e => e.net < goal).length;
+    const avgColor = monthAvg < goal ? 'var(--green)' : 'var(--red)';
+
+    const rows = monthEntries.map(e => {
+      const isToday = e.date === todayDate;
+      const inDeficit = e.net < goal;
+      const dotColor = inDeficit ? 'var(--green)' : 'var(--red)';
+      const netColor = inDeficit ? 'var(--green)' : 'var(--red)';
+      const consumedPct = Math.min(100, (e.consumed / maxConsumed) * 100);
+      const burnedPct = Math.min(100, (e.burned / maxConsumed) * 100);
+      const dayObj = new Date(e.date + 'T12:00:00');
+      const dayShort = ['Ne','Po','Ut','Sr','Če','Pe','Su'][dayObj.getDay()];
+      const dayNum = e.date.slice(8).replace(/^0/, '');
+      const dayLabel = isToday ? 'danas' : `${dayShort} ${dayNum}.${e.date.slice(5,7)}.`;
+      const score = loadNutritionScore(e.date);
+
+      return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
+        <div class="hist-dot" style="background:${dotColor}"></div>
+        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:68px;font-size:13px">${dayLabel}</div>
+        <div class="hist-bars" style="flex:1">
+          <div class="hist-bar-row">
+            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${consumedPct}%;height:4px;background:var(--green)88"></div></div>
+            <div class="hist-bar-label" style="color:var(--s11);font-size:11px">${Math.round(e.consumed)}</div>
+          </div>
+          ${e.burned > 0 ? `<div class="hist-bar-row">
+            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${burnedPct}%;height:4px;background:var(--blue)88"></div></div>
+            <div class="hist-bar-label" style="color:var(--blue);font-size:11px">-${Math.round(e.burned)}</div>
+          </div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
+          <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
+          <span style="font-size:10px;color:var(--muted)">▶</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    html += `<div class="card">
+      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${monthLabel}</span>
+        <span style="color:${avgColor};font-size:10px">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
+      </div>
+      ${rows}
+    </div>`;
+  });
+
+  return html;
+}
+
+function trainingTabHTML() {
+  const workout = loadWorkout(state.date);
+  const totalKcal = workout.reduce((s, e) => s + (e.calories || 0), 0);
+
+  // Group done entries by exercise id
+  const doneByEx = {};
+  workout.forEach(e => {
+    if (!doneByEx[e.exId]) doneByEx[e.exId] = [];
+    doneByEx[e.exId].push(e);
+  });
+
+  // Predefined exercise cards
+  const exCards = EXERCISES.map(ex => {
+    const inp = state.trainingInputs[ex.id];
+    const done = doneByEx[ex.id] || [];
+    const preview = ex.type === 'reps'
+      ? calcExerciseKcal(ex, inp.sets, inp.reps, 0)
+      : calcExerciseKcal(ex, inp.sets, 0, inp.secs);
+
+    const doneHTML = done.length ? `
+      <div class="ex-done-list">
+        ${done.map(e => `
+          <div class="ex-done-item">
+            <span>${e.sets}×${e.reps || e.secs + 's'}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="ex-done-kcal">-${e.calories} kcal</span>
+              <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const inputsHTML = ex.type === 'reps' ? `
+      <div class="ex-input-group">
+        <div class="ex-input-label">Serije</div>
+        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
+          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
+      </div>
+      <div class="ex-sep">×</div>
+      <div class="ex-input-group">
+        <div class="ex-input-label">Ponavljanja</div>
+        <input class="ex-input" type="number" min="1" max="200" value="${inp.reps}"
+          oninput="updateTrainingInput('${ex.id}','reps',this.value)" />
+      </div>` : `
+      <div class="ex-input-group">
+        <div class="ex-input-label">Serije</div>
+        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
+          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
+      </div>
+      <div class="ex-sep">×</div>
+      <div class="ex-input-group">
+        <div class="ex-input-label">Sekunde</div>
+        <input class="ex-input" type="number" min="5" max="600" value="${inp.secs}"
+          oninput="updateTrainingInput('${ex.id}','secs',this.value)" />
+      </div>`;
+
+    return `<div class="ex-card">
+      <div class="ex-header">
+        <span class="ex-icon">${ex.icon}</span>
+        <span class="ex-name">${ex.name}</span>
+      </div>
+      <div class="ex-inputs">
+        ${inputsHTML}
+        <button class="ex-add-btn" onclick="addWorkoutEntry('${ex.id}')">
+          +${preview} kcal
+        </button>
+      </div>
+      ${doneHTML}
+    </div>`;
+  }).join('');
+
+  // Custom exercise
+  const ci = state.trainingInputs.custom;
+  const customCard = `
+    <div class="custom-ex-card">
+      <div class="ex-header">
+        <span class="ex-icon">✏️</span>
+        <span class="ex-name" style="color:var(--muted)">Custom vežba</span>
+      </div>
+      <input id="customNameInput" style="width:100%;background:var(--s4);border:1px solid var(--s6);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;font-family:var(--sans);outline:none;margin-bottom:10px"
+        type="text" placeholder="Naziv vežbe..." value="${ci.name}" />
+      <div class="ex-inputs">
+        <div class="ex-input-group">
+          <div class="ex-input-label">Serije</div>
+          <input class="ex-input" type="number" min="1" max="20" value="${ci.sets}"
+            oninput="updateTrainingInput('custom','sets',this.value)" />
+        </div>
+        <div class="ex-sep">×</div>
+        <div class="ex-input-group">
+          <div class="ex-input-label">Ponavljanja</div>
+          <input class="ex-input" type="number" min="1" max="200" value="${ci.reps}"
+            oninput="updateTrainingInput('custom','reps',this.value)" />
+        </div>
+        <button class="ex-add-btn" style="background:var(--blue)" onclick="addCustomWorkoutEntry()">Dodaj</button>
+      </div>
+      ${(doneByEx['custom'] || []).length ? `
+        <div class="ex-done-list">
+          ${(doneByEx['custom'] || []).map(e => `
+            <div class="ex-done-item">
+              <span>${e.name} · ${e.sets}×${e.reps}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="ex-done-kcal" style="color:var(--blue)">~${e.calories} kcal</span>
+                <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+
+  const totalHTML = totalKcal > 0 ? `
+    <div class="card">
+      <div class="workout-total">
+        <span class="workout-total-label">Ukupno sagoreno</span>
+        <span class="workout-total-val">-${totalKcal} kcal</span>
+      </div>
+    </div>` : '';
+
+  return `
+    ${totalHTML}
+    <div class="card">
+      <div class="card-label">Trening — ${state.date === todayStr() ? 'danas' : state.date}</div>
+      ${exCards}
+      ${customCard}
+    </div>`;
+}
+
+function weeklyReportHTML(weekData) {
+  // weekData passed from render to avoid double compute
+  weekData = weekData || getWeekData();
+  const goal = state.calorieGoal;
+  const daysWithData = weekData.filter(d => d.hasData && !d.future);
+
+  if (daysWithData.length === 0) {
+    return `<div class="card"><div class="hist-empty">📭 Nema podataka za ovu nedelju.<br>Počni da unosiš obroke!</div></div>`;
+  }
+
+  const totalConsumed = daysWithData.reduce((s, d) => s + d.consumed, 0);
+  const totalBurned   = daysWithData.reduce((s, d) => s + d.burned, 0);
+  const totalNet      = daysWithData.reduce((s, d) => s + d.net, 0);
+  const avgNet        = Math.round(totalNet / daysWithData.length);
+  const deficitDays   = daysWithData.filter(d => d.net < goal).length;
+  const avgDeficit    = Math.round(goal - avgNet);
+  const projectedLoss = ((avgDeficit * 7) / 7700).toFixed(2); // ~7700 kcal per kg fat
+
+  // Grade
+  const deficitRatio = deficitDays / daysWithData.length;
+  const grade = deficitRatio >= 0.86 ? { emoji: '🏆', label: 'Odlično!', color: 'var(--green)' }
+              : deficitRatio >= 0.57 ? { emoji: '💪', label: 'Dobro', color: 'var(--green)' }
+              : deficitRatio >= 0.29 ? { emoji: '😐', label: 'Može bolje', color: 'var(--orange)' }
+              : { emoji: '😔', label: 'Treba raditi', color: 'var(--red)' };
+
+  const dayNames = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su'];
+  const maxNet = Math.max(...weekData.map(d => d.net), goal);
+
+  const dayRows = weekData.map(d => {
+    const dayObj = new Date(d.date + 'T12:00:00');
+    const name = dayNames[dayObj.getDay()];
+    if (d.future) return `<div class="report-day-row">
+      <span class="report-day-name">${name}</span>
+      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:0%;background:var(--s4)"></div></div>
+      <span class="report-day-val" style="color:var(--s6)">—</span>
+    </div>`;
+    if (!d.hasData) return `<div class="report-day-row">
+      <span class="report-day-name">${name}</span>
+      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:2%;background:var(--s4)"></div></div>
+      <span class="report-day-val" style="color:var(--s6)">0</span>
+    </div>`;
+    const pct = Math.min(100, (d.net / maxNet) * 100);
+    const color = d.net < goal ? 'var(--green)' : 'var(--red)';
+    return `<div class="report-day-row" onclick="setTab('history');state.selectedHistoryDate='${d.date}';render()" style="cursor:pointer">
+      <span class="report-day-name" style="color:${d.net < goal ? 'var(--green)' : 'var(--muted)'}">${name}</span>
+      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:${pct}%;background:${color}55"></div></div>
+      <span class="report-day-val" style="color:${color}">${Math.round(d.net)}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-label">Nedeljni izveštaj</div>
+      <div class="report-grade">${grade.emoji}</div>
+      <div class="report-grade-label" style="color:${grade.color}">${grade.label}</div>
+      <div class="report-grade-sub">${deficitDays} od ${daysWithData.length} dana ispod cilja</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Statistike nedelje</div>
+      <div class="report-stat">
+        <span class="report-stat-label">Prosečan dnevni unos</span>
+        <span class="report-stat-val" style="color:var(--text)">${Math.round(totalConsumed / daysWithData.length)} kcal</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Prosečno sagoreno</span>
+        <span class="report-stat-val" style="color:var(--blue)">${Math.round(totalBurned / daysWithData.length)} kcal</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Prosečan neto</span>
+        <span class="report-stat-val" style="color:${avgNet < goal ? 'var(--green)' : 'var(--red)'}">${avgNet} kcal</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Prosečan deficit</span>
+        <span class="report-stat-val" style="color:${avgDeficit > 0 ? 'var(--green)' : 'var(--red)'}">${avgDeficit > 0 ? '-' : '+'}${Math.abs(avgDeficit)} kcal</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Ukupno uneseno</span>
+        <span class="report-stat-val" style="color:var(--muted)">${Math.round(totalConsumed)} kcal</span>
+      </div>
+      <div class="report-stat">
+        <span class="report-stat-label">Procenjen gubitak masti</span>
+        <span class="report-stat-val" style="color:${avgDeficit > 0 ? 'var(--green)' : 'var(--red)'}">
+          ${avgDeficit > 0 ? '~' + projectedLoss + ' kg' : 'Nema deficita'}
+        </span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Dani — neto kalorije</div>
+      ${dayRows}
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span>
+      </div>
+    </div>`;
+}
+
+function deleteWeightEntry(date) {
+  const log = loadWeightLog().filter(e => e.date !== date);
+  localStorage.setItem('fitlog_weightlog', JSON.stringify(log));
+  // Update current weight to latest entry
+  if (log.length > 0) {
+    state.weight = log[0].weight;
+    localStorage.setItem('fitlog_weight', log[0].weight);
+  } else {
+    state.weight = null;
+    localStorage.removeItem('fitlog_weight');
+  }
+  render();
+}
+
+function weightChartHTML(log) {
+  if (log.length < 2) return `<div style="color:var(--s7);font-size:12px;padding:8px 0">Potrebno najmanje 2 merenja za grafikon.</div>`;
+  const entries = [...log].reverse();
+  const weights = entries.map(e => e.weight);
+  const minW = Math.min(...weights) - 1;
+  const maxW = Math.max(...weights) + 1;
+  const W = 300, H = 80;
+  const xStep = entries.length > 1 ? W / (entries.length - 1) : W;
+  const points = entries.map((e, i) => {
+    const x = i * xStep;
+    const y = H - ((e.weight - minW) / (maxW - minW)) * H;
+    return `${x},${y}`;
+  }).join(' ');
+  const dots = entries.map((e, i) => {
+    const x = i * xStep;
+    const y = H - ((e.weight - minW) / (maxW - minW)) * H;
+    return `<circle cx="${x}" cy="${y}" r="3" fill="var(--green)"/>`;
+  }).join('');
+
+  // Linear regression trend line
+  const n = entries.length;
+  const sumX = entries.reduce((s, _, i) => s + i, 0);
+  const sumY = entries.reduce((s, e) => s + e.weight, 0);
+  const sumXY = entries.reduce((s, e, i) => s + i * e.weight, 0);
+  const sumX2 = entries.reduce((s, _, i) => s + i * i, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const trendY0 = H - ((intercept - minW) / (maxW - minW)) * H;
+  const trendY1 = H - ((intercept + slope * (n - 1) - minW) / (maxW - minW)) * H;
+  const trendColor = slope < -0.01 ? 'var(--green)' : slope > 0.01 ? 'var(--red)' : 'var(--muted)';
+  const trendLabel = slope < -0.01 ? '↘ trend pada' : slope > 0.01 ? '↗ trend raste' : '→ stabilan';
+
+  const diff = entries[entries.length-1].weight - entries[0].weight;
+  const diffColor = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
+  return `
+    <div class="weight-chart-wrap">
+      <svg class="weight-chart-svg" viewBox="-10 -10 ${W+20} ${H+20}" height="90">
+        <line x1="0" y1="${trendY0}" x2="${W}" y2="${trendY1}" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+        <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+        ${dots}
+      </svg>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s9);margin-top:2px">
+        <span>${entries[0].date.slice(5)}</span>
+        <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
+        <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
+      </div>
+    </div>`;
+}
+
+function zdravljeTabHTML() {
+  const log = loadWeightLog();
+  const h = state.height;
+  const current = log[0] || null;
+  const w = current ? current.weight : state.weight;
+  const goal = state.calorieGoal;
+
+  const activityMultipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+  const actMult = activityMultipliers[state.activity] || 1.2;
+
+  // Water
+  const waterToday = loadWater(state.date);
+  const waterGoal = state.waterGoal;
+  const waterPct = Math.min(100, (waterToday / waterGoal) * 100);
+  const drops = 8;
+  const mlPerDrop = waterGoal / drops;
+  const filledDrops = Math.min(drops, Math.floor(waterToday / mlPerDrop));
+  const dayNames = ['Ne','Po','Ut','Sr','Ce','Pe','Su'];
+  const waterHistory = loadWaterHistory(7);
+  let waterStreak = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const ml = parseInt(localStorage.getItem('fitlog_water_' + ds) || 0);
+    if (ml >= waterGoal) waterStreak++;
+    else if (i > 0) break;
+  }
+
+  const waterSection = `
+    <div class="card">
+      <div class="card-label" style="display:flex;justify-content:space-between">
+        <span>💧 Voda danas</span>
+        <span style="font-family:var(--mono);color:var(--blue);font-size:12px">${waterToday} / ${waterGoal} ml</span>
+      </div>
+      <div class="water-drops">
+        ${Array.from({length: drops}, (_, i) =>
+          `<div class="water-drop ${i < filledDrops ? 'filled' : 'empty'}">${i < filledDrops ? '💧' : '○'}</div>`
+        ).join('')}
+      </div>
+      <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden;margin-bottom:12px">
+        <div style="height:100%;width:${waterPct}%;background:var(--blue);border-radius:3px;transition:width 0.4s"></div>
+      </div>
+      <div class="water-btns">
+        <button class="water-btn" onclick="addWater(250)">+250 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">čaša</span></button>
+        <button class="water-btn" onclick="addWater(330)">+330 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">limenka</span></button>
+        <button class="water-btn" onclick="addWater(500)">+500 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">flaša</span></button>
+        <button class="water-btn" style="color:var(--red)" onclick="addWater(-250)">-250 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">ispravka</span></button>
+      </div>
+      <div class="water-custom-row">
+        <input class="water-custom-input" id="waterInput" type="number" placeholder="ml..." min="1" max="2000"/>
+        <button class="water-add-btn" onclick="addWaterCustom()">Dodaj</button>
+      </div>
+      ${waterStreak > 0 ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">💧 Streak: <strong style="color:var(--blue)">${waterStreak} dan${waterStreak > 1 ? 'a' : ''}</strong> zaredom</div>` : ''}
+      <div style="margin-top:12px">
+        <div class="card-label" style="margin-bottom:6px">Poslednjih 7 dana</div>
+        ${waterHistory.map(e => {
+          const pct = Math.min(100, (e.ml / waterGoal) * 100);
+          const dayObj = new Date(e.date + 'T12:00:00');
+          const col = e.ml >= waterGoal ? 'var(--blue)' : e.ml > 0 ? 'var(--blue)66' : 'var(--s4)';
+          const isToday = e.date === todayStr();
+          return `<div class="water-hist-row">
+            <span class="water-hist-date" style="${isToday ? 'color:var(--blue)' : ''}">${dayNames[dayObj.getDay()]}</span>
+            <div class="water-hist-bar-wrap"><div class="water-hist-bar" style="width:${pct}%;background:${col}"></div></div>
+            <span class="water-hist-val" style="color:${e.ml >= waterGoal ? 'var(--blue)' : 'var(--s9)'}">${e.ml > 0 ? e.ml + 'ml' : '—'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
+        Dnevni cilj:
+        <input class="goal-input" type="number" value="${waterGoal}" onchange="updateWaterGoal(this.value)" style="width:75px"/>
+        <span style="color:var(--s9)">ml</span>
+      </div>
+    </div>`;
+
+  if (!w || !h) {
+    return `<div class="card" style="text-align:center;padding:32px 20px">
+      <div style="font-size:36px;margin-bottom:12px">⚖️</div>
+      <div style="color:var(--muted);font-size:13px">Unesi težinu i visinu u Pregled tabu da vidiš zdravstvene podatke.</div>
+    </div>${waterSection}`;
+  }
+
+  const bmi = w / ((h / 100) ** 2);
+  const cat = bmiCategory(bmi);
+  const idealMin = Math.round(18.5 * (h / 100) ** 2);
+  const idealMax = Math.round(24.9 * (h / 100) ** 2);
+  const toIdeal = Math.max(0, Math.round(w - idealMax));
+  const genderOffset = state.gender === 'male' ? 5 : -161;
+  const bmr = Math.round(10 * w + 6.25 * h - 5 * state.age + genderOffset);
+  const tdee = Math.round(bmr * actMult);
+  const suggestedGoal = Math.round(tdee - 500);
+  const bmiMin = 15, bmiMax = 45;
+  const bmiPct = Math.min(98, Math.max(2, ((bmi - bmiMin) / (bmiMax - bmiMin)) * 100));
+
+  const tw = state.targetWeight;
+  let progHTML = '';
+  if (tw && tw < w) {
+    const toTarget = w - tw;
+    const weeklyDeficit = goal < tdee ? (tdee - goal) * 7 / 7700 : 0;
+    const weeksNeeded = weeklyDeficit > 0 ? Math.ceil(toTarget / weeklyDeficit) : null;
+    const startWeight = log.length > 1 ? log[log.length-1].weight : w;
+    const progressPct = startWeight > tw ? Math.min(100, Math.max(0, ((startWeight - w) / (startWeight - tw)) * 100)) : 0;
+    progHTML = `
+      <div class="prognoza-bar"><div class="prognoza-fill" style="width:${progressPct}%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px">
+        <span>Start: ${startWeight} kg</span>
+        <span style="color:var(--green);font-weight:700">Cilj: ${tw} kg (još -${Math.round(w - tw)} kg)</span>
+      </div>
+      ${weeksNeeded ? `<div style="margin-top:8px;font-size:12px;color:var(--muted)">
+        Procena: <strong style="color:var(--text)">~${weeksNeeded} nedelja</strong>
+        (~${weeklyDeficit.toFixed(1)} kg/ned)</div>` :
+        `<div style="margin-top:6px;font-size:12px;color:var(--orange)">Postavi kalorijski deficit za prognozu.</div>`}`;
+  }
+
+  const prev = log[1] || null;
+  let diffHTML = '';
+  if (current && prev) {
+    const diff = current.weight - prev.weight;
+    const col = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
+    diffHTML = `<span class="weight-log-diff" style="background:${col}22;color:${col}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>`;
+  }
+
+  const logHTML = log.slice(0, 8).map((e, i) => {
+    let entryDiff = '';
+    if (i < log.length - 1) {
+      const d = e.weight - log[i+1].weight;
+      const c = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
+      entryDiff = `<span class="weight-log-diff" style="background:${c}22;color:${c}">${d>0?'+':''}${d.toFixed(1)}</span>`;
+    }
+    return `<div class="weight-log-item">
+      <span class="weight-log-date">${e.date}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${entryDiff}
+        <span class="weight-log-val">${e.weight} kg</span>
+        <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const sub = state.zdravljeSubTab || 'tezina';
+  const subNav = `
+    <div class="sub-tabs">
+      <button class="sub-tab ${sub==='tezina'?'active':'inactive'}" onclick="setZdravljeTab('tezina')">⚖️ Težina</button>
+      <button class="sub-tab ${sub==='kalorije'?'active':'inactive'}" onclick="setZdravljeTab('kalorije')">🔥 Kalorije</button>
+      <button class="sub-tab ${sub==='voda'?'active':'inactive'}" onclick="setZdravljeTab('voda')">💧 Voda</button>
+    </div>`;
+
+  if (sub === 'voda') return subNav + waterSection;
+
+  if (sub === 'kalorije') return subNav + `
+    <div class="card">
+      <div class="card-label">🔥 Kalorije — preporuka</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:1;min-width:70px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Godine</div>
+          <input class="goal-input" type="number" value="${state.age}" onchange="updateProfile('age',this.value)" style="width:100%"/>
+        </div>
+        <div style="flex:1;min-width:80px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Pol</div>
+          <select onchange="updateProfile('gender',this.value)" style="width:100%;background:var(--s1);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 6px;font-size:12px;outline:none">
+            <option value="male" ${state.gender==='male'?'selected':''}>Muško</option>
+            <option value="female" ${state.gender==='female'?'selected':''}>Žensko</option>
+          </select>
+        </div>
+        <div style="flex:2;min-width:140px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Aktivnost</div>
+          <select onchange="updateProfile('activity',this.value)" style="width:100%;background:var(--s1);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 6px;font-size:12px;outline:none">
+            <option value="sedentary" ${state.activity==='sedentary'?'selected':''}>Sedentarni</option>
+            <option value="light" ${state.activity==='light'?'selected':''}>Lako aktivan (1-3x/ned)</option>
+            <option value="moderate" ${state.activity==='moderate'?'selected':''}>Umeren (3-5x/ned)</option>
+            <option value="active" ${state.activity==='active'?'selected':''}>Aktivan (6-7x/ned)</option>
+          </select>
+        </div>
+      </div>
+      <div class="zdravlje-stat">
+        <span class="zdravlje-stat-label">Bazalni metabolizam (BMR)</span>
+        <span class="zdravlje-stat-val">${bmr} kcal</span>
+      </div>
+      <div class="zdravlje-stat">
+        <span class="zdravlje-stat-label">Dnevna potrošnja (TDEE)</span>
+        <span class="zdravlje-stat-val" style="color:var(--blue)">${tdee} kcal</span>
+      </div>
+      <div class="zdravlje-stat">
+        <span class="zdravlje-stat-label">Preporučeni cilj (-500 kcal)</span>
+        <span class="zdravlje-stat-val" style="color:var(--green)">${suggestedGoal} kcal</span>
+      </div>
+      <div class="zdravlje-stat">
+        <span class="zdravlje-stat-label">Tvoj trenutni cilj</span>
+        <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}</span>
+      </div>
+    </div>`;
+
+  // Default: Težina subtab
+  return subNav + `
+    <div class="card">
+      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>⚖️ Težina</span>
+        ${h ? `<span style="font-size:11px;color:var(--s9)">${h} cm <span onclick="startEditHeight()" style="color:var(--s10);cursor:pointer;text-decoration:underline">izmeni</span></span>` :
+          `<button class="weight-btn" onclick="startEditHeight()" style="font-size:11px">+ Visina</button>`}
+      </div>
+      ${state.editHeight ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <span style="font-size:12px;color:var(--muted)">Visina:</span>
+        <input class="weight-input" id="hInput" type="number" value="${state.heightInput}" placeholder="cm" style="width:70px"/>
+        <button class="save-btn" onclick="saveHeight()">Sačuvaj</button>
+      </div>` : ''}
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+        <div style="font-size:48px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1">${current ? current.weight : '—'}</div>
+        <div style="font-size:14px;color:var(--muted)">kg ${diffHTML}</div>
+        <button class="weight-btn" onclick="startEditWeight()" style="margin-left:auto;font-size:11px">${current ? '✏ Izmeri' : '+ Unesi težinu'}</button>
+      </div>
+      ${state.editWeight ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <span style="font-size:12px;color:var(--muted)">Nova težina:</span>
+        <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
+        <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
+      </div>` : ''}
+      <div style="background:var(--s1);border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="font-size:36px;font-weight:800;font-family:var(--mono);color:${cat.color}">${bmi.toFixed(1)}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:${cat.color}">${cat.label}</div>
+            <div style="font-size:11px;color:var(--muted)">Idealna: ${idealMin}–${idealMax} kg</div>
+            ${toIdeal > 0 ? `<div style="font-size:11px;color:var(--orange)">Do idealne: -${toIdeal} kg</div>` : ''}
+          </div>
+          ${(() => {
+            const bf = estimateBodyFat(bmi, state.age, state.gender);
+            const bfColor = state.gender === 'male'
+              ? (bf < 6 ? 'var(--blue)' : bf < 14 ? 'var(--green)' : bf < 25 ? 'var(--orange)' : 'var(--red)')
+              : (bf < 14 ? 'var(--blue)' : bf < 21 ? 'var(--green)' : bf < 32 ? 'var(--orange)' : 'var(--red)');
+            return `<div style="margin-left:auto;text-align:center">
+              <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${bfColor}">${bf}%</div>
+              <div style="font-size:11px;color:var(--muted)">tel. mast</div>
+            </div>`;
+          })()}
+        </div>
+        <div class="bmi-scale-wrap" style="margin-top:10px">
+          <div class="bmi-scale-track"><div class="bmi-scale-marker" style="left:${bmiPct}%"></div></div>
+          <div class="bmi-scale-labels"><span>Pothr.</span><span>Normalno</span><span>Prekomerno</span><span>Gojaznost</span></div>
+        </div>
+      </div>
+      ${log.length >= 2 ? `<div style="margin-bottom:10px">${weightChartHTML(log)}</div>` : ''}
+      <div><div class="card-label">Istorija</div>${logHTML}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">🎯 Ciljna težina</div>
+      ${state.targetWeight ? `
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+          <span style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--green)">${state.targetWeight}</span>
+          <span style="color:var(--muted)">kg</span>
+          <button onclick="clearTargetWeight()" style="margin-left:auto;background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s10);padding:4px 10px;font-size:11px;cursor:pointer">izmeni</button>
+        </div>${progHTML}` :
+        `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">Postavi ciljnu težinu da vidiš prognozu mršavljenja.</div>`}
+      ${state.editTargetWeight ? `
+        <div class="target-input-row">
+          <span style="font-size:12px;color:var(--muted)">Cilj:</span>
+          <input class="target-input" id="twInput" type="number" placeholder="kg" value="${state.targetWeightInput}"/>
+          <button class="save-btn" onclick="saveTargetWeight()">Sačuvaj</button>
+          <button onclick="state.editTargetWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button>
+        </div>` : `
+        <button class="weight-btn" onclick="startEditTargetWeight()" style="font-size:12px;margin-top:4px">
+          ${state.targetWeight ? '' : '+ '}Postavi ciljnu težinu
+        </button>`}
+    </div>`;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+
+function render() {
+  const app = document.getElementById('app');
+
+  // API key screen
+  if (!state.apiKey) {
+    app.innerHTML = `
+      <div class="header"><div class="header-top"><span class="logo">FITLOG</span></div></div>
+      <div class="api-screen">
+        <h2>Gemini API ključ</h2>
+        <p>Da bi app radio, potreban ti je besplatan Gemini API ključ.<br>
+        Nabavi ga na <strong>aistudio.google.com</strong> → Get API Key → Create API key.</p>
+        <input class="api-input" id="apiInput" type="password" placeholder="AIzaSy..." autocomplete="off"/>
+        <button class="api-save-btn" onclick="saveApiKey()">SAČUVAJ I NASTAVI</button>
+        <p class="api-hint">Ključ se čuva samo lokalno na tvom uređaju. <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></p>
+      </div>`;
+    return;
+  }
+
+  // Onboarding screen — shown if profile not complete
+  const profileComplete = !!(state.height && localStorage.getItem('fitlog_onboarding_done'));
+  if (!profileComplete) {
+    app.innerHTML = `
+      <div class="header"><div class="header-top"><span class="logo">FITLOG</span></div></div>
+      <div class="onboard-screen">
+        <div class="onboard-title">Podesi profil</div>
+        <div class="onboard-sub">Ovi podaci se koriste za tačan izračun kalorija i makroa. Sve možeš da promeniš kasnije.</div>
+        <div class="onboard-field">
+          <div class="onboard-label">Telesna masa (kg)</div>
+          <input class="onboard-input" id="ob_weight" type="number" placeholder="npr. 85" value="${state.weight || ''}"/>
+        </div>
+        <div class="onboard-field">
+          <div class="onboard-label">Visina (cm)</div>
+          <input class="onboard-input" id="ob_height" type="number" placeholder="npr. 182" value="${state.height || ''}"/>
+        </div>
+        <div class="onboard-field">
+          <div class="onboard-label">Godine</div>
+          <input class="onboard-input" id="ob_age" type="number" placeholder="npr. 30" value="${state.age !== 30 ? state.age : ''}"/>
+        </div>
+        <div class="onboard-field">
+          <div class="onboard-label">Pol</div>
+          <select class="onboard-select" id="ob_gender">
+            <option value="male" ${state.gender==='male'?'selected':''}>Muško</option>
+            <option value="female" ${state.gender==='female'?'selected':''}>Žensko</option>
+          </select>
+        </div>
+        <div class="onboard-field">
+          <div class="onboard-label">Nivo aktivnosti</div>
+          <select class="onboard-select" id="ob_activity">
+            <option value="sedentary" ${state.activity==='sedentary'?'selected':''}>Sedentarni (desk job, bez vežbanja)</option>
+            <option value="light" ${state.activity==='light'?'selected':''}>Lako aktivan (1-3x nedeljno)</option>
+            <option value="moderate" ${state.activity==='moderate'?'selected':''}>Umeren (3-5x nedeljno)</option>
+            <option value="active" ${state.activity==='active'?'selected':''}>Aktivan (6-7x nedeljno)</option>
+          </select>
+        </div>
+        <button class="onboard-btn" onclick="saveOnboarding()">POČNI →</button>
+      </div>`;
+    return;
+  }
+
+  const t = totals();
+  const d = state.dayData;
+  const w = state.weight;
+
+  // Streak & week data — only computed for stats tab
+  let statsContent = '';
+  if (state.activeTab === 'stats') {
+    const streak = calcStreak();
+    const weekData = getWeekData();
+    const streakEmoji = streak >= 14 ? '🔥' : streak >= 7 ? '⚡' : streak >= 3 ? '💪' : streak >= 1 ? '✅' : '😴';
+    const streakMsg = streak === 0
+      ? 'Još nema niza. Počni danas!'
+      : streak === 1 ? 'Odličan početak! Nastavi sutra.'
+      : `${streak} dana zaredom ispod cilja!`;
+
+    statsContent = `
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+      ${ringHTML(t.consumed, t.burned, state.calorieGoal)}
+      <div style="width:100%">
+        <div class="goal-row" style="justify-content:center;margin-bottom:12px">Cilj:
+          <input class="goal-input" type="number" value="${state.calorieGoal}" onchange="updateGoal(this.value)"/>
+          <span style="color:var(--s9)">kcal</span>
+          ${state.calorieGoalManual ? `<span onclick="resetGoalToAuto()" style="font-size:10px;color:var(--s9);cursor:pointer;text-decoration:underline;margin-left:4px">auto</span>` : `<span style="font-size:10px;color:var(--s8);margin-left:4px">TDEE-500</span>`}
+        </div>
+        <div class="stats-grid">
+          <div><div class="stat-label">Uneseno</div><div class="stat-val" style="color:var(--green)">${Math.round(t.consumed)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
+          <div><div class="stat-label">Sagoreno</div><div class="stat-val" style="color:var(--blue)">${Math.round(t.burned)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
+          <div><div class="stat-label">Neto</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'}">${Math.round(t.net)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
+          <div><div class="stat-label">Preostalo</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--tc)'}">
+            ${t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net)}
+            <span style="color:var(--s9);font-size:10px">kcal</span>
+          </div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Makronutrijenti</div>
+      ${(() => { const ml = macroLimits(); return `
+      ${macroBar('Proteini', t.protein, ml.protMin, ml.protMax, 'var(--green)')}
+      ${macroBar('Ugljeni hidrati', t.carbs, ml.carbMin, ml.carbMax, 'var(--blue)')}
+      ${macroBar('Masti', t.fat, ml.fatMin, ml.fatMax, 'var(--orange)')}
+      ${macroBar('Šećer', t.sugar, 0, ml.sugarMax, 'var(--pink)')}`; })()}
+    </div>
+    <div class="card">
+      <div class="card-label">Nedeljni bilans</div>
+      ${weekChartHTML(weekData)}
+    </div>
+    <div class="card">
+      <div class="card-label">Streak — dani ispod cilja</div>
+      <div class="streak-wrap">
+        <div class="streak-num ${streak === 0 ? 'zero' : ''}">${streak}</div>
+        <div class="streak-info">
+          <div class="streak-title">${streakEmoji} ${streak === 0 ? 'Nema niza' : streak === 1 ? '1 dan' : streak + ' dana'}</div>
+          <div class="streak-sub">${streakMsg}</div>
+        </div>
+      </div>
+    </div>
+    ${weeklyReportHTML(weekData)}`;
+  }
+
+  // Meals
+  const mealsHTML = d.meals.length ? `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
+        <div class="card-label" style="margin:0">Obroci · ${Math.round(t.consumed)} kcal</div>
+      </div>
+      ${d.meals.map(m => {
+        const isOpen = state.expandedMealIds.has(m.id);
+        const mainName = m.items[0]?.name || 'Obrok';
+        const extraCount = m.items.length > 1 ? ` +${m.items.length - 1}` : '';
+        const score = loadNutritionScore(state.date);
+        return `
+          <div class="log-item" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
+            <div class="swipe-delete-bg">🗑</div>
+            <div class="log-item-inner" id="swipe-meal-${m.id}" style="background:var(--card)">
+              <div class="meal-header" onclick="toggleMeal(${m.id})">
+                <span class="meal-time-badge">${m.time}</span>
+                <span class="meal-summary">${mainName}${extraCount}</span>
+                <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
+                <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
+              </div>
+              ${isOpen ? `
+              <div class="meal-details">
+                ${m.items.map(it => `
+                  <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.amount} · ${it.calories} kcal</div>`).join('')}
+                <div class="pills" style="margin-top:8px">
+                  <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein)}g</span>
+                  <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
+                  <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat)}g</span>
+                  ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+                </div>
+                ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
+                ${(() => {
+                  const ms = state.mealScores[m.id];
+                  if (state.mealScoreLoading === m.id) return `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`;
+                  if (ms) {
+                    const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
+                    return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore(${m.id})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`;
+                  }
+                  return `<button class="meal-score-btn" onclick="scoreMeal(${m.id})">🤖 Oceni obrok</button>`;
+                })()}
+                <button onclick="deleteMeal(${m.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
+              </div>` : ''}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>` : '';
+
+  // Exercises
+  const exHTML = d.exercises.length ? `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
+        <div class="card-label" style="margin:0">Aktivnosti · -${Math.round(t.burned)} kcal</div>
+      </div>
+      ${d.exercises.map(e => {
+        const isOpen = state.expandedExIds.has(e.id);
+        const mainName = e.items[0]?.name || 'Aktivnost';
+        return `
+          <div class="log-item">
+            <div class="log-item-inner" style="background:var(--card)">
+              <div class="meal-header" onclick="toggleEx(${e.id})">
+                <span class="meal-time-badge" style="color:var(--blue)">${e.time}</span>
+                <span class="meal-summary">${mainName}</span>
+                <span class="meal-kcal-badge" style="color:var(--blue)">-${Math.round(e.burned)} kcal</span>
+                <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
+              </div>
+              ${isOpen ? `
+              <div class="meal-details">
+                ${e.items.map(it => `
+                  <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.detail}</div>`).join('')}
+                ${e.note ? `<div class="log-note" style="margin-top:6px">${e.note}</div>` : ''}
+                <button onclick="deleteEx(${e.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši aktivnost</button>
+              </div>` : ''}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>` : '';
+
+  const hour = new Date().getHours();
+  const emptyMsg = hour < 11 ? '🌅 Dobro jutro! Šta si pojeo za doručak?' :
+                   hour < 15 ? '☀️ Vreme je za ručak! Unesi šta si jeo.' :
+                   hour < 19 ? '🌤 Kako ide popodne? Dodaj obrok ili vežbu.' :
+                                '🌙 Dobar večernji unos zatvara dan lepo.';
+
+  const emptyHTML = (!d.meals.length && !d.exercises.length) ? `
+    <div class="empty">
+      <div class="empty-icon">🥗</div>
+      ${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}
+    </div>` : '';
+
+  const placeholder = state.mode === 'food'
+    ? 'npr. jeo sam 200g pilećih prsa sa 100g pirinča...'
+    : 'npr. uradio sam 50 čučnjeva i prošetao 4000 koraka...';
+
+  const btnText = state.loading ? 'Analiziram...' : state.mode === 'food' ? 'Dodaj obrok' : 'Dodaj vežbu';
+
+  const progressPct = state.calorieGoal > 0 ? Math.min(100, (t.net / state.calorieGoal) * 100) : 0;
+  const progressColor = progressPct >= 100 ? 'var(--red)' : 'var(--green)';
+  const progressLabel = progressPct >= 100
+    ? `${Math.round(t.net)} kcal — cilj premaše`
+    : `${Math.round(t.net)} / ${state.calorieGoal} kcal`;
+
+  // Smart date label
+  const today = todayStr();
+
+  app.innerHTML = `
+    <div class="header">
+      <span class="logo">FITLOG</span>
+    </div>
+    <div class="header-progress-wrap">
+      <div class="header-progress-track">
+        <div class="header-progress-fill" style="width:${progressPct}%;background:${progressColor}"></div>
+      </div>
+      <div class="header-progress-labels">
+        <span>${progressLabel}</span>
+        <span style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--s6)'}">-${Math.round(t.burned)} kcal sagoreno</span>
+      </div>
+    </div>
+
+    ${state.activeTab === 'stats' ? statsContent : ''}
+    ${state.activeTab === 'history' ? historyTabHTML() : ''}
+    ${state.activeTab === 'training' ? trainingTabHTML() : ''}
+    ${state.activeTab === 'zdravlje' ? zdravljeTabHTML() : ''}
+
+    ${state.activeTab === 'log' ? `
+      <div class="card">
+        <div class="mode-toggle">
+          <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
+          <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
+        </div>
+        ${state.mode === 'food' && state.imageBase64 ? `
+          <img class="img-preview show" src="data:${state.imageMime || 'image/jpeg'};base64,${state.imageBase64}" />
+          <button class="img-analyze-btn" onclick="handleImageSubmit()" ${state.loading ? 'disabled' : ''}>
+            ${state.loading ? '⏳ Analiziram...' : '📷 Analiziraj sliku'}
+          </button>` : ''}
+        <textarea class="msg-input" id="msgInput" rows="3" placeholder="${placeholder}">${''}</textarea>
+        <div class="hint">Enter za novi red</div>
+        <div class="send-row">
+          ${state.mode === 'food' ? `
+            <label class="img-btn ${state.imageBase64 ? 'has-image' : ''}" title="Dodaj sliku obroka">
+              📎
+              <input type="file" accept="image/*" onchange="handleImageSelect(this)" />
+            </label>` : ''}
+          <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
+        </div>
+        <div class="settings-link" onclick="clearApiKey()">⚙ Promeni API ključ</div>
+      </div>
+      ${state.loading ? `
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-time"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
+            <div style="flex:1">
+              <div class="skeleton skeleton-line" style="width:80%"></div>
+              <div class="skeleton skeleton-line" style="width:60%"></div>
+            </div>
+            <div class="skeleton skeleton-kcal"></div>
+          </div>
+          <div class="skeleton-pills">
+            <div class="skeleton skeleton-pill"></div>
+            <div class="skeleton skeleton-pill"></div>
+            <div class="skeleton skeleton-pill"></div>
+          </div>
+        </div>` : ''}
+      ${mealsHTML}
+      ${exHTML}
+      ${emptyHTML}
+      ${d.meals.length ? `
+        <div class="card" style="padding:0;overflow:hidden">
+          ${state.nutritionScoreLoading ? `
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
+              🤖 AI analizira tvoj unos...
+            </div>` :
+          state.nutritionScore ? `
+            <div style="padding:16px">
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+                <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
+                <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
+                <button onclick="state.nutritionScore=null;localStorage.removeItem(SCORE_KEY + state.date);render()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:18px">×</button>
+              </div>
+              <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
+              <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)">${state.nutritionScore.tip}</div>
+            </div>` : `
+            <button class="score-btn" style="margin:0;border-radius:0;border:none;border-top:1px solid var(--s6)" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
+        </div>` : ''}
+    ` : ''}
+    <div class="spacer"></div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bottom-nav">
+      <button class="nav-btn ${state.activeTab === 'log' ? 'active' : 'inactive'}" onclick="setTab('log')">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Dnevnik</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'training' ? 'active' : 'inactive'}" onclick="setTab('training')">
+        <span class="nav-icon">🏋️</span>
+        <span class="nav-label">Trening</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'stats' ? 'active' : 'inactive'}" onclick="setTab('stats')">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Pregled</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'zdravlje' ? 'active' : 'inactive'}" onclick="setTab('zdravlje')">
+        <span class="nav-icon">❤️</span>
+        <span class="nav-label">Zdravlje</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'history' ? 'active' : 'inactive'}" onclick="setTab('history')">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Istorija</span>
+      </button>
+    </div>`;
+}
+
+function addWater(ml) {
+  const current = loadWater(state.date);
+  const updated = Math.max(0, current + ml);
+  saveWater(state.date, updated);
+  if (ml > 0) showToast(`+${ml}ml dodato 💧`);
+  render();
+}
+
+function addWaterCustom() {
+  const input = document.getElementById('waterInput');
+  const ml = parseInt(input?.value);
+  if (!ml || ml <= 0) { showToast('Unesi količinu u ml', 'err'); return; }
+  const current = loadWater(state.date);
+  saveWater(state.date, current + ml);
+  showToast(`+${ml}ml dodato 💧`);
+  render();
+}
+
+function updateWaterGoal(val) {
+  const v = parseInt(val);
+  if (!isNaN(v) && v > 0) {
+    state.waterGoal = v;
+    localStorage.setItem('fitlog_water_goal', v);
+    localStorage.setItem('fitlog_water_goal_manual', '1');
+  }
+}
+
+function updateProfile(field, value) {
+  if (field === 'age') {
+    const v = parseInt(value);
+    if (!isNaN(v) && v > 0) { state.age = v; localStorage.setItem('fitlog_age', v); }
+  } else if (field === 'gender') {
+    state.gender = value;
+    localStorage.setItem('fitlog_gender', value);
+  } else if (field === 'activity') {
+    state.activity = value;
+    localStorage.setItem('fitlog_activity', value);
+  }
+  // Recalculate calorie goal if not manually set
+  autoCalorieGoal();
+  render();
+}
+
+function startEditTargetWeight() {
+  state.editTargetWeight = true;
+  state.targetWeightInput = state.targetWeight || '';
+  render();
+  document.getElementById('twInput')?.focus();
+}
+
+function saveTargetWeight() {
+  const v = parseFloat(document.getElementById('twInput')?.value);
+  if (!isNaN(v) && v > 0) {
+    state.targetWeight = v;
+    localStorage.setItem('fitlog_target_weight', v);
+  }
+  state.editTargetWeight = false;
+  render();
+}
+
+function clearTargetWeight() {
+  state.editTargetWeight = true;
+  state.targetWeightInput = state.targetWeight || '';
+  render();
+  document.getElementById('twInput')?.focus();
+}
+
+// ─── SWIPE TO DELETE ──────────────────────────────────────────────────────────
+const _swipe = {};
+function swipeCancel(id) {
+  if (!_swipe[id]) return;
+  const el = document.getElementById('swipe-meal-' + id);
+  const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
+  if (el) el.style.transform = 'translateX(0)';
+  if (bg) bg.style.opacity = '0';
+  delete _swipe[id];
+}
+function swipeStart(e, id, type) {
+  _swipe[id] = { startX: e.touches[0].clientX, type };
+}
+function swipeMove(e, id) {
+  if (!_swipe[id]) return;
+  const dx = e.touches[0].clientX - _swipe[id].startX;
+  if (dx >= 0) return;
+  const el = document.getElementById('swipe-meal-' + id);
+  const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
+  if (el) el.style.transform = `translateX(${Math.max(-80, dx)}px)`;
+  if (bg) bg.style.opacity = String(Math.min(1, Math.abs(dx) / 60));
+}
+function swipeEnd(e, id, type) {
+  if (!_swipe[id]) return;
+  const dx = e.changedTouches[0].clientX - _swipe[id].startX;
+  const el = document.getElementById('swipe-meal-' + id);
+  const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
+  if (dx < -60) {
+    if (el) el.style.transform = 'translateX(-100%)';
+    if (bg) bg.style.opacity = '0';
+    setTimeout(() => { if (type === 'meal') deleteMeal(id); }, 200);
+  } else {
+    if (el) el.style.transform = 'translateX(0)';
+    if (bg) bg.style.opacity = '0';
+  }
+  delete _swipe[id];
+}
+
+// ─── BODY FAT ESTIMATE ────────────────────────────────────────────────────────
+function estimateBodyFat(bmi, age, gender) {
+  // Deurenberg formula
+  const factor = gender === 'male' ? 1 : 0;
+  return Math.round((1.20 * bmi) + (0.23 * age) - (10.8 * factor) - 5.4);
+}
+
+function openHistoryDetail(date) {
+  state.selectedHistoryDate = date;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function closeHistoryDetail() {
+  state.selectedHistoryDate = null;
+  render();
+}
+
+function handleImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  // Reject files over 8MB — Gemini API limit
+  if (file.size > 8 * 1024 * 1024) {
+    showToast('Slika je prevelika (max 8MB). Smanji rezoluciju.', 'err');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const b64 = e.target.result.split(',')[1];
+    state.imageBase64 = b64;
+    state.imageMime = file.type || 'image/jpeg';
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleImageSubmit() {
+  if (!state.imageBase64) return;
+  state.loading = true;
+  render();
+  try {
+    const result = await parseFoodFromImage(state.imageBase64, state.imageMime || 'image/jpeg');
+    if (!result?.items?.length) throw new Error('Nije parsovano');
+    const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+    const meal = {
+      id: Date.now(),
+      time: now,
+      items: result.items,
+      calories: result.total_calories,
+      protein: result.total_protein,
+      carbs: result.total_carbs,
+      fat: result.total_fat,
+      sugar: result.total_sugar || 0,
+      note: result.note || '',
+    };
+    state.dayData.meals.push(meal);
+    saveDay(state.date, state.dayData);
+    state.imageBase64 = null;
+    state.imageMime = null;
+    showToast(`+${Math.round(meal.calories)} kcal dodato ✓`);
+  } catch (e) {
+    showToast('Greška pri analizi slike. Pokušaj ponovo.', 'err');
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+// ── existing actions below ──
+
+function saveApiKey() {
+  const val = document.getElementById('apiInput').value.trim();
+  if (!val) { showToast('Unesi API ključ', 'err'); return; }
+  state.apiKey = val;
+  localStorage.setItem('fitlog_apikey', val);
+  state.dayData = loadDay(state.date);
+  render();
+}
+
+function clearApiKey() {
+  if (confirm('Obriši API ključ?')) {
+    state.apiKey = '';
+    localStorage.removeItem('fitlog_apikey');
+    render();
+  }
+}
+
+function startEditWeight() {
+  state.editWeight = true;
+  state.weightInput = state.weight || '';
+  render();
+  document.getElementById('wInput')?.focus();
+}
+
+function saveWeight() {
+  const v = parseFloat(document.getElementById('wInput').value);
+  if (!isNaN(v) && v > 0) {
+    state.weight = v;
+    localStorage.setItem('fitlog_weight', v);
+    saveWeightEntry(todayStr(), v);
+    // Auto-update water goal only if user hasn't manually set it
+    const manualGoal = localStorage.getItem('fitlog_water_goal_manual');
+    if (!manualGoal) {
+      state.waterGoal = Math.round(v * 30);
+    }
+    // Recalculate calorie goal if not manually set
+    autoCalorieGoal();
+  }
+  state.editWeight = false;
+  render();
+}
+
+function startEditHeight() {
+  state.editHeight = true;
+  state.heightInput = state.height || '';
+  render();
+  document.getElementById('hInput')?.focus();
+}
+
+function saveHeight() {
+  const v = parseFloat(document.getElementById('hInput').value);
+  if (!isNaN(v) && v > 0) {
+    state.height = v;
+    localStorage.setItem('fitlog_height', v);
+  }
+  state.editHeight = false;
+  render();
+}
+
+function changeDate(val) {
+  state.date = val;
+  state.dayData = loadDay(val);
+  state.imageBase64 = null;
+  state.imageMime = null;
+  state.nutritionScore = loadNutritionScore(val);
+  state.expandedMealIds = new Set();
+  state.expandedExIds = new Set();
+  state.mealScores = {};
+  state.mealScoreLoading = null;
+  render();
+}
+
+async function scoreNutrition() {
+  const d = state.dayData;
+  if (!d.meals.length) { showToast('Nema unesenih obroka za danas', 'err'); return; }
+  state.nutritionScoreLoading = true;
+  state.nutritionScore = null;
+  render();
+  try {
+    const t = totals();
+    const ml = macroLimits();
+    const mealsSummary = d.meals.map(m =>
+      m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
+    ).join(' | ');
+    const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
+Obroci: ${mealsSummary}
+Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
+Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: ${ml.protMin}g.
+
+Vrati SAMO validan JSON bez markdown oznaka:
+{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
+    });
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const score = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    state.nutritionScore = score;
+    // Persist score so it survives tab switches
+    saveNutritionScore(state.date, score);
+  } catch(e) {
+    showToast('Greška pri oceni ishrane', 'err');
+  } finally {
+    state.nutritionScoreLoading = false;
+    render();
+  }
+}
+
+function saveOnboarding() {
+  const w = parseFloat(document.getElementById('ob_weight')?.value);
+  const h = parseFloat(document.getElementById('ob_height')?.value);
+  const age = parseInt(document.getElementById('ob_age')?.value);
+  const gender = document.getElementById('ob_gender')?.value;
+  const activity = document.getElementById('ob_activity')?.value;
+
+  if (!w || !h || !age) { showToast('Unesi sve podatke', 'err'); return; }
+
+  state.weight = w; localStorage.setItem('fitlog_weight', w);
+  state.height = h; localStorage.setItem('fitlog_height', h);
+  state.age = age; localStorage.setItem('fitlog_age', age);
+  state.gender = gender; localStorage.setItem('fitlog_gender', gender);
+  state.activity = activity; localStorage.setItem('fitlog_activity', activity);
+  localStorage.setItem('fitlog_onboarding_done', '1');
+
+  // Save weight to log
+  saveWeightEntry(todayStr(), w);
+
+  // Auto water goal
+  state.waterGoal = Math.round(w * 30);
+
+  // Auto calorie goal
+  state.calorieGoalManual = false;
+  localStorage.removeItem('fitlog_goal_manual');
+  autoCalorieGoal();
+
+  showToast('Profil sačuvan! 🎉');
+  render();
+}
+
+function toggleMeal(id) {
+  if (state.expandedMealIds.has(id)) state.expandedMealIds.delete(id);
+  else state.expandedMealIds.add(id);
+  render();
+}
+
+function toggleEx(id) {
+  if (state.expandedExIds.has(id)) state.expandedExIds.delete(id);
+  else state.expandedExIds.add(id);
+  render();
+}
+
+async function scoreMeal(mealId) {
+  const meal = state.dayData.meals.find(m => m.id === mealId);
+  if (!meal) return;
+  state.mealScoreLoading = mealId;
+  render();
+  try {
+    const items = meal.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ');
+    const prompt = `Oceni ovaj obrok u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
+Obrok: ${items}
+Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
+Korisnik: ${state.weight}kg, cilj mršavljenje.
+Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpskom"}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2 } })
+    });
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    state.mealScores[mealId] = JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch(e) {
+    state.mealScores[mealId] = { score: null, comment: 'Greška pri analizi.' };
+  } finally {
+    state.mealScoreLoading = null;
+    render();
+  }
+}
+
+function clearMealScore(mealId) {
+  delete state.mealScores[mealId];
+  render();
+}
+
+function toggleHistoryScore(date) {
+  state.expandedScoreDate = state.expandedScoreDate === date ? null : date;
+  render();
+}
+
+function setZdravljeTab(sub) {
+  state.zdravljeSubTab = sub;
+  render();
+}
+
+function setTab(tab) {
+  state.activeTab = tab;
+  state.selectedHistoryDate = null;
+  state.imageBase64 = null;
+  state.imageMime = null;
+  state.expandedMealIds = new Set();
+  state.expandedExIds = new Set();
+  if (tab === 'log') state.nutritionScore = loadNutritionScore(state.date);
+  render();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  state.imageBase64 = null;
+  state.imageMime = null;
+  render();
+  document.getElementById('msgInput')?.focus();
+}
+
+function updateTrainingInput(exId, field, value) {
+  if (field === 'name') state.trainingInputs[exId][field] = value;
+  else state.trainingInputs[exId][field] = parseInt(value) || 0;
+  debounceRender(); // debounced to avoid lag on fast typing
+}
+
+function addWorkoutEntry(exId) {
+  const ex = EXERCISES.find(e => e.id === exId);
+  if (!ex) return;
+  const inp = state.trainingInputs[exId];
+  // Guard against zero values
+  if (ex.type === 'reps' && (!inp.sets || !inp.reps)) {
+    showToast('Unesi serije i ponavljanja', 'err'); return;
+  }
+  if (ex.type === 'secs' && (!inp.sets || !inp.secs)) {
+    showToast('Unesi serije i sekunde', 'err'); return;
+  }
+  const calories = calcExerciseKcal(ex, inp.sets, inp.reps || 0, inp.secs || 0);
+  const entry = {
+    uid: Date.now() + '_' + exId,
+    exId,
+    name: ex.name,
+    sets: inp.sets,
+    reps: ex.type === 'reps' ? inp.reps : null,
+    secs: ex.type === 'secs' ? inp.secs : null,
+    calories,
+    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+  };
+  const workout = loadWorkout(state.date);
+  workout.push(entry);
+  saveWorkout(state.date, workout);
+  showToast(`${ex.name} dodato · -${calories} kcal`);
+  render();
+}
+
+function addCustomWorkoutEntry() {
+  // Read name directly from DOM to avoid re-render on every keystroke
+  const nameEl = document.getElementById('customNameInput');
+  const name = nameEl ? nameEl.value.trim() : state.trainingInputs.custom.name.trim();
+  if (!name) { showToast('Unesi naziv vežbe', 'err'); return; }
+  // Sync name to state for persistence
+  state.trainingInputs.custom.name = name;
+  const ci = state.trainingInputs.custom;
+  const w = state.weight || 80;
+  const calories = Math.round(ci.sets * ci.reps * 0.002 * w);
+  const entry = {
+    uid: Date.now() + '_custom',
+    exId: 'custom',
+    name,
+    sets: ci.sets,
+    reps: ci.reps,
+    secs: null,
+    calories,
+    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+  };
+  const workout = loadWorkout(state.date);
+  workout.push(entry);
+  saveWorkout(state.date, workout);
+  state.trainingInputs.custom.name = ''; // reset after adding
+  showToast(`${entry.name} dodato · ~-${calories} kcal`);
+  render();
+}
+
+function deleteWorkoutEntry(uid) {
+  const workout = loadWorkout(state.date).filter(e => e.uid !== uid);
+  saveWorkout(state.date, workout);
+  render();
+}
+
+function updateGoal(val) {
+  const v = parseInt(val);
+  if (!isNaN(v) && v > 0) {
+    state.calorieGoal = v;
+    state.calorieGoalManual = true;
+    localStorage.setItem('fitlog_goal', v);
+    localStorage.setItem('fitlog_goal_manual', '1');
+  }
+}
+
+function resetGoalToAuto() {
+  state.calorieGoalManual = false;
+  localStorage.removeItem('fitlog_goal_manual');
+  autoCalorieGoal();
+  render();
+}
+
+function deleteMeal(id) {
+  state.dayData.meals = state.dayData.meals.filter(m => m.id !== id);
+  saveDay(state.date, state.dayData);
+  render();
+}
+
+function deleteEx(id) {
+  state.dayData.exercises = state.dayData.exercises.filter(e => e.id !== id);
+  saveDay(state.date, state.dayData);
+  render();
+}
+
+async function handleSubmit() {
+  const input = document.getElementById('msgInput')?.value.trim();
+  if (!input) return;
+  state.loading = true;
+  render();
+
+  try {
+    const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+
+    if (state.mode === 'food') {
+      const result = await parseFood(input);
+      if (!result?.items?.length) throw new Error('Nije parsovano');
+      const meal = {
+        id: Date.now(),
+        time: now,
+        items: result.items,
+        calories: result.total_calories,
+        protein: result.total_protein,
+        carbs: result.total_carbs,
+        fat: result.total_fat,
+        sugar: result.total_sugar || 0,
+        note: result.note || '',
+      };
+      state.dayData.meals.push(meal);
+      saveDay(state.date, state.dayData);
+      showToast(`+${Math.round(meal.calories)} kcal dodato ✓`);
+    } else {
+      const result = await parseExercise(input);
+      if (!result?.items?.length) throw new Error('Nije parsovano');
+      const ex = {
+        id: Date.now(),
+        time: now,
+        items: result.items,
+        burned: result.total_burned,
+        note: result.note || '',
+      };
+      state.dayData.exercises.push(ex);
+      saveDay(state.date, state.dayData);
+      showToast(`-${Math.round(ex.burned)} kcal sagoreno ✓`);
+    }
+  } catch (e) {
+    const msg = e.message?.includes('API_KEY_INVALID') || e.message?.includes('API_KEY') ? '❌ Neispravan API ključ — proveri u Promeni API ključ' :
+                e.message?.includes('RESOURCE_EXHAUSTED') ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.message?.includes('quota') ? '⏳ Dnevni limit dostignut' :
+                e.message?.includes('Failed to fetch') || e.message?.includes('fetch') ? '📡 Proveri internet konekciju' :
+                `Greška: ${e.message?.slice(0, 55) || 'Pokušaj ponovo'}`;
+    showToast(msg, 'err');
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+state.dayData = loadDay(state.date);
+state.weightInput = state.weight || '';
+state.heightInput = state.height || '';
+state.nutritionScore = loadNutritionScore(state.date);
+
+// Migrate: if weight exists but log is empty, add it as today's entry
+if (state.weight && loadWeightLog().length === 0) {
+  saveWeightEntry(todayStr(), state.weight);
+}
+
+render();
+
+// Toast element (persistent)
+const toastEl = document.createElement('div');
+toastEl.id = 'toast';
+toastEl.style.display = 'none';
+document.body.appendChild(toastEl);
+</script>
+</body>
+</html>
