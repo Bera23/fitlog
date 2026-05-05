@@ -1023,63 +1023,6 @@ function historyDayDetailHTML(date) {
   </div>`;
 }
 
-  // Meals list
-  const histMealScores = loadMealScores(date);
-
-  const mealsHTML = day.meals?.length ? day.meals.map(m => {
-    const ms = histMealScores[m.id];
-    const msHTML = ms
-      ? (() => {
-          const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-          return `<div class="meal-score-inline" style="margin-top:8px"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span></div>`;
-        })()
-      : '';
-    return `
-    <div class="hist-meal-entry">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div class="hist-meal-time">🍽 ${m.time}</div>
-          ${m.items?.map(it => `<div class="hist-meal-name">${it.amount} ${it.name}</div>`).join('') || `<div class="hist-meal-name">${m.desc || 'Obrok'}</div>`}
-        </div>
-        <div style="text-align:right;flex-shrink:0;padding-left:10px">
-          <div class="hist-meal-kcal" style="color:var(--green)">${Math.round(m.calories)}</div>
-          <div style="font-size:10px;color:var(--s9)">kcal</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
-        <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein||0)}g</span>
-        <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
-        <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
-        ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
-      </div>
-      ${msHTML}
-    </div>`;
-  }).join('') : `<div style="color:var(--s7);font-size:13px;padding:8px 0">Nema unetih obroka</div>`;
-
-  // Exercises (AI unos)
-  const exHTML = day.exercises?.length ? `
-    <div class="hist-section-label">💪 Aktivnosti</div>
-    ${day.exercises.map(e => `
-      <div class="hist-workout-entry">
-        <div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
-          ${e.items?.map(it => `<div style="color:var(--tc)">${it.name} · ${it.detail}</div>`).join('') || ''}
-        </div>
-        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${Math.round(e.burned)} kcal</div>
-      </div>`).join('')}` : '';
-
-  // Workout (trening tab)
-  const workoutHTML = workout.length ? `
-    <div class="hist-section-label">🏋️ Trening</div>
-    ${workout.map(e => `
-      <div class="hist-workout-entry">
-        <div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
-          <div style="color:var(--tc)">${e.name} · ${e.sets}×${e.reps || e.secs+'s'}</div>
-        </div>
-        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${e.calories} kcal</div>
-      </div>`).join('')}` : '';
-
 function historyTabHTML() {
   // Show detail view if a date is selected
   if (state.selectedHistoryDate) {
