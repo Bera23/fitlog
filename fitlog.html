@@ -376,6 +376,7 @@ const state = {
   expandedScoreDate: null,
   mealScores: {},
   mealScoreLoading: null,
+  expandedHistoryMealIds: new Set(),
   expandedMealIds: new Set(),
   expandedExIds: new Set(),
   loading: false,
@@ -881,10 +882,146 @@ function historyDayDetailHTML(date) {
   const pct = Math.min(100, (net / goal) * 100);
   const barColor = inDeficit ? 'var(--green)' : 'var(--red)';
 
-  const dayNames = ['Nedelja', 'Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota'];
-  const srMonths = ['', 'jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'avg', 'sep', 'okt', 'nov', 'dec'];
   const dObj = new Date(date + 'T12:00:00');
-  const dateLabel = `${dayNames[dObj.getDay()]}, ${dObj.getDate()}. ${srMonths[dObj.getMonth()+1]} ${dObj.getFullYear()}`;
+  const dayNum = dObj.getDate();
+  const srMonths = ['','jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
+  const dateLabel = `${dayNum}. ${srMonths[dObj.getMonth()+1]} ${dObj.getFullYear()}.`;
+
+  // Totals for day macros
+  const totP = day.meals?.reduce((s,m) => s+(m.protein||0), 0) || 0;
+  const totC = day.meals?.reduce((s,m) => s+(m.carbs||0), 0) || 0;
+  const totF = day.meals?.reduce((s,m) => s+(m.fat||0), 0) || 0;
+  const totS = day.meals?.reduce((s,m) => s+(m.sugar||0), 0) || 0;
+
+  const histMealScores = loadMealScores(date);
+
+  // Meals — collapsible per meal
+  const mealsHTML = day.meals?.length ? day.meals.map(m => {
+    const ms = histMealScores[m.id];
+    const isExp = state.expandedHistoryMealIds.has(m.id);
+    const msHTML = ms ? (() => {
+      const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:13px;line-height:1.4">${ms.comment}</span></div>`;
+    })() : '';
+
+    return `
+    <div style="border-top:1px solid var(--s3)">
+      <div onclick="toggleHistoryMeal(${m.id})" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
+        <div>
+          <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green)">${m.time}</div>
+          <div style="font-size:13px;color:var(--tc);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${ms ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${ms.score>=7?'var(--green)':ms.score>=5?'var(--orange)':'var(--red)'}">${ms.score}/10</span>` : ''}
+          <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--green)">${Math.round(m.calories)}</span>
+          <span style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      ${isExp ? `
+      <div style="padding-bottom:12px">
+        ${m.items?.map(it => `<div style="font-size:13px;color:var(--tc);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s9)">· ${it.calories} kcal</span></div>`).join('') || ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein||0)}g</span>
+          <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
+          <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
+          ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+        </div>
+        ${msHTML}
+      </div>` : ''}
+    </div>`;
+  }).join('') : `<div style="color:var(--s7);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
+
+  // Exercises (AI unos)
+  const exHTML = day.exercises?.length ? `
+    <div class="hist-section-label" style="margin-top:16px">💪 Aktivnosti</div>
+    ${day.exercises.map(e => `
+      <div class="hist-workout-entry">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
+          ${e.items?.map(it => `<div style="color:var(--tc)">${it.name} · ${it.detail}</div>`).join('') || ''}
+        </div>
+        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${Math.round(e.burned)} kcal</div>
+      </div>`).join('')}` : '';
+
+  const workoutHTML = workout.length ? `
+    <div class="hist-section-label" style="margin-top:16px">🏋️ Trening</div>
+    ${workout.map(e => `
+      <div class="hist-workout-entry">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
+          <div style="color:var(--tc)">${e.name} · ${e.sets}×${e.reps || e.secs+'s'}</div>
+        </div>
+        <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${e.calories} kcal</div>
+      </div>`).join('')}` : '';
+
+  return `<div class="card">
+    <div class="hist-detail-header">
+      <button class="hist-back-btn" onclick="closeHistoryDetail()">← Nazad</button>
+      <span class="hist-detail-date">${dateLabel}</span>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <span style="font-size:32px;font-weight:800;font-family:var(--mono);color:${barColor}">${Math.round(net)}</span>
+      <span style="font-size:13px;color:var(--muted)">od ${goal} kcal</span>
+    </div>
+    <div class="hist-progress-track">
+      <div class="hist-progress-fill" style="width:${pct}%;background:${barColor}"></div>
+    </div>
+    <div class="hist-progress-labels">
+      <span>Uneseno: <strong style="color:var(--text)">${Math.round(consumed)}</strong></span>
+      <span>Sagoreno: <strong style="color:var(--blue)">${Math.round(totalBurned)}</strong></span>
+      <span style="color:${inDeficit?'var(--green)':'var(--red)'}">
+        ${inDeficit ? '↓ ' + Math.abs(Math.round(deficit)) : '↑ +' + Math.abs(Math.round(deficit))} kcal
+      </span>
+    </div>
+
+    ${day.meals?.length ? `
+    <div style="display:flex;gap:8px;margin-top:16px;padding:10px 12px;background:var(--s3);border-radius:8px">
+      <div style="flex:1;text-align:center">
+        <div style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--green)">${Math.round(totP)}g</div>
+        <div style="font-size:11px;color:var(--muted)">proteini</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--blue)">${Math.round(totC)}g</div>
+        <div style="font-size:11px;color:var(--muted)">UH</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--orange)">${Math.round(totF)}g</div>
+        <div style="font-size:11px;color:var(--muted)">masti</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--pink)">${Math.round(totS)}g</div>
+        <div style="font-size:11px;color:var(--muted)">šećer</div>
+      </div>
+    </div>` : ''}
+
+    <div class="hist-section-label" style="margin-top:16px">🍽 Obroci</div>
+    ${mealsHTML}
+    ${exHTML}
+    ${workoutHTML}
+    ${(() => {
+      const score = loadNutritionScore(date);
+      if (!score) return '';
+      const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      const isExpanded = state.expandedScoreDate === date;
+      return `
+    <div style="margin-top:16px;padding:12px;background:var(--s3);border-radius:12px;cursor:pointer" onclick="toggleHistoryScore('${date}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;color:var(--muted)">🤖 Analiza ishrane</span>
+        <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
+      </div>
+      ${isExpanded ? `
+      <div style="margin-top:10px">
+        <div class="score-row"><span>${score.calories}</span></div>
+        <div class="score-row"><span>${score.protein}</span></div>
+        <div class="score-row"><span>${score.fat}</span></div>
+        <div class="score-row"><span>${score.sugar}</span></div>
+        <div style="margin-top:8px;font-size:13px;color:var(--muted)">${score.tip}</div>
+      </div>` : ''}
+    </div>`;
+    })()}
+  </div>`;
+}
 
   // Meals list
   const histMealScores = loadMealScores(date);
@@ -943,55 +1080,6 @@ function historyDayDetailHTML(date) {
         <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${e.calories} kcal</div>
       </div>`).join('')}` : '';
 
-  return `<div class="card">
-    <div class="hist-detail-header">
-      <button class="hist-back-btn" onclick="closeHistoryDetail()">← Nazad</button>
-      <span class="hist-detail-date">${dateLabel}</span>
-    </div>
-
-    <!-- PROGRESS BAR -->
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-      <span style="font-size:26px;font-weight:800;font-family:var(--mono);color:${barColor}">${Math.round(net)}</span>
-      <span style="font-size:12px;color:var(--muted)">od ${goal} kcal</span>
-    </div>
-    <div class="hist-progress-track">
-      <div class="hist-progress-fill" style="width:${pct}%;background:${barColor}"></div>
-    </div>
-    <div class="hist-progress-labels">
-      <span>Uneseno: <strong style="color:var(--text)">${Math.round(consumed)}</strong></span>
-      <span>Sagoreno: <strong style="color:var(--blue)">${Math.round(totalBurned)}</strong></span>
-      <span style="color:${inDeficit?'var(--green)':'var(--red)'}">
-        ${inDeficit ? '↓ deficit ' + Math.abs(Math.round(deficit)) : '↑ višak ' + Math.abs(Math.round(deficit))} kcal
-      </span>
-    </div>
-
-    <!-- OBROCI -->
-    <div class="hist-section-label" style="margin-top:16px">🍽 Obroci</div>
-    ${mealsHTML}
-    ${exHTML}
-    ${workoutHTML}
-    ${(() => {
-      const score = loadNutritionScore(date);
-      if (!score) return '';
-      const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
-      const isExpanded = state.expandedScoreDate === date;
-      return `
-    <div class="hist-section-label" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleHistoryScore('${date}')">
-      <span>🤖 Analiza ishrane</span>
-      <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
-    </div>
-    ${isExpanded ? `
-    <div class="score-card" style="margin-top:6px">
-      <div class="score-row"><span>${score.calories}</span></div>
-      <div class="score-row"><span>${score.protein}</span></div>
-      <div class="score-row"><span>${score.fat}</span></div>
-      <div class="score-row"><span>${score.sugar}</span></div>
-      <div style="margin-top:10px;font-size:12px;color:var(--muted)">${score.tip}</div>
-    </div>` : ''}`;
-    })()}
-  </div>`;
-}
-
 function historyTabHTML() {
   // Show detail view if a date is selected
   if (state.selectedHistoryDate) {
@@ -1033,29 +1121,18 @@ function historyTabHTML() {
       const netColor = inDeficit ? 'var(--green)' : 'var(--red)';
       const consumedPct = Math.min(100, (e.consumed / maxConsumed) * 100);
       const burnedPct = Math.min(100, (e.burned / maxConsumed) * 100);
-      const dayObj = new Date(e.date + 'T12:00:00');
-      const dayShort = ['Ne','Po','Ut','Sr','Če','Pe','Su'][dayObj.getDay()];
       const dayNum = e.date.slice(8).replace(/^0/, '');
-      const dayLabel = isToday ? 'danas' : `${dayShort} ${dayNum}.${e.date.slice(5,7)}.`;
+      const dayLabel = `${dayNum}.${e.date.slice(5,7)}.`;
       const score = loadNutritionScore(e.date);
 
       return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
         <div class="hist-dot" style="background:${dotColor}"></div>
-        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:68px;font-size:13px">${dayLabel}</div>
-        <div class="hist-bars" style="flex:1">
-          <div class="hist-bar-row">
-            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${consumedPct}%;height:4px;background:var(--green)88"></div></div>
-            <div class="hist-bar-label" style="color:var(--s11);font-size:11px">${Math.round(e.consumed)}</div>
-          </div>
-          ${e.burned > 0 ? `<div class="hist-bar-row">
-            <div class="hist-bar-track" style="height:4px"><div class="hist-bar-fill" style="width:${burnedPct}%;height:4px;background:var(--blue)88"></div></div>
-            <div class="hist-bar-label" style="color:var(--blue);font-size:11px">-${Math.round(e.burned)}</div>
-          </div>` : ''}
-        </div>
+        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:44px;font-size:13px;font-family:var(--mono)">${dayLabel}</div>
+        <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:6px">
           ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
           <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
-          <span style="font-size:10px;color:var(--muted)">▶</span>
+          <span style="font-size:11px;color:var(--muted)">▶</span>
         </div>
       </div>`;
     }).join('');
@@ -2320,6 +2397,12 @@ Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpsko
 function clearMealScore(mealId) {
   delete state.mealScores[mealId];
   saveMealScores(state.date, state.mealScores);
+  render();
+}
+
+function toggleHistoryMeal(id) {
+  if (state.expandedHistoryMealIds.has(id)) state.expandedHistoryMealIds.delete(id);
+  else state.expandedHistoryMealIds.add(id);
   render();
 }
 
