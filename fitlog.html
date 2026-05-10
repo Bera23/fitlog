@@ -135,20 +135,16 @@
   .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--sans); resize: none; outline: none; line-height: 1.5; }
   .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
 
-  /* SEND BUTTON — smaller, less aggressive */
-  .send-btn { padding: 11px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 8px; transition: opacity 0.2s; }
+  /* SEND BUTTON */
+  .send-btn { width: 100%; padding: 13px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 0; transition: opacity 0.2s; }
   .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .send-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-  .send-row .send-btn { flex: 1; margin-top: 0; }
 
-  /* INLINE IMAGE BUTTON */
-  .img-btn { position: relative; padding: 11px 14px; background: var(--s4); color: var(--muted); border: 1px solid var(--s6); border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
-  .img-btn.has-image { background: var(--blue)22; border-color: var(--blue)55; color: var(--blue); }
-  .img-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .img-preview { width: 100%; max-height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; display: none; }
-  .img-preview.show { display: block; }
-  .img-analyze-btn { width: 100%; padding: 8px; background: var(--blue)22; color: var(--blue); border: 1px solid var(--blue)44; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); margin-bottom: 8px; transition: opacity 0.2s; }
-  .img-analyze-btn:disabled { opacity: 0.5; }
+  /* INPUT AREA — unified image + text */
+  .msg-input { min-height: 90px; }
+  .input-img-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; position: relative; -webkit-tap-highlight-color: transparent; }
+  .input-img-label input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: var(--blue)11; border-radius: 8px; border: 1px solid var(--blue)33; }
+  .img-strip img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 
   /* STATS */
   .ring-wrap { position: relative; flex-shrink: 0; }
@@ -174,7 +170,6 @@
   .pills { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
   .pill { display: inline-block; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
   .log-note { margin-top: 6px; font-size: 11px; color: var(--muted); font-style: italic; }
-  .del-btn:active { color: var(--red); background: var(--red)11; }
 
   /* EMPTY */
   .empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
@@ -225,11 +220,6 @@
   .hist-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 90px; }
   .hist-date.today { color: var(--green); }
-  .hist-bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-  .hist-bar-row { display: flex; align-items: center; gap: 6px; }
-  .hist-bar-track { flex: 1; height: 4px; background: var(--s4); border-radius: 2px; overflow: hidden; }
-  .hist-bar-fill { height: 100%; border-radius: 2px; }
-  .hist-bar-label { font-size: 11px; font-family: var(--mono); min-width: 38px; text-align: right; }
   .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
   .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
 
@@ -253,12 +243,6 @@
   .workout-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 4px; }
   .workout-total-label { font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
   .workout-total-val { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--blue); }
-
-  /* IMAGE UPLOAD */
-  .img-upload-area:active { border-color: var(--green); }
-  .img-upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .img-preview { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; display: none; }
-  .img-preview.show { display: block; }
 
   /* HISTORY DETAIL */
   .hist-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -298,8 +282,7 @@
   .weight-chart-wrap { width: 100%; overflow: hidden; }
   .weight-chart-svg { width: 100%; overflow: visible; }
 
-  /* NUTRITION SCORE */
-  /* COLLAPSIBLE MEAL */
+  /* NUTRITION SCORE & COLLAPSIBLE MEAL */
   .meal-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; cursor: pointer; user-select: none; }
   .meal-header:active { background: var(--s4); }
   .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
@@ -322,7 +305,6 @@
   .meal-score-btn:active { background: var(--s4); }
   .meal-score-inline { margin-top: 8px; padding: 8px 10px; background: var(--s3); border-radius: 8px; font-size: 13px; color: var(--muted); display: flex; align-items: flex-start; gap: 8px; }
   .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 18px; line-height: 1; flex-shrink: 0; }
-  .score-card { background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; padding: 14px 16px; margin: 8px 16px 0; }
   .score-num { font-size: 48px; font-weight: 800; font-family: var(--mono); line-height: 1; }
   .score-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
   .score-row:last-child { border-bottom: none; }
@@ -555,12 +537,14 @@ Unos korisnika: ${text}`;
   return JSON.parse(raw.replace(/```json|```/g, '').trim());
 }
 
-async function parseFoodFromImage(base64, mimeType) {
+async function parseFoodFromImage(base64, mimeType, textContext) {
   const w = state.weight || 75;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+  // Append optional user text as extra context for the model
+  const contextNote = textContext ? `\nDodatni opis od korisnika: "${textContext}"` : '';
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
 Korisnikova telesna masa je ${w} kg.
-Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.
+Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.${contextNote}
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format:
 {"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena"}`;
@@ -917,6 +901,13 @@ function historyDayDetailHTML(date) {
           <span style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
         </div>
       </div>
+      ${!isExp ? `
+      <div style="padding:0 0 8px;display:flex;gap:4px;flex-wrap:wrap">
+        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--green)11;color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
+        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--blue)11;color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
+        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--orange)11;color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
+        ${(m.sugar||0) > 0 ? `<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--pink)11;color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+      </div>` : ''}
       ${isExp ? `
       <div style="padding-bottom:12px">
         ${m.items?.map(it => `<div style="font-size:13px;color:var(--tc);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s9)">· ${it.calories} kcal</span></div>`).join('') || ''}
@@ -1035,7 +1026,6 @@ function historyTabHTML() {
   }
 
   const goal = state.calorieGoal;
-  const maxConsumed = Math.max(...entries.map(e => e.consumed), goal);
   const todayDate = todayStr();
 
   const byMonth = {};
@@ -1046,7 +1036,6 @@ function historyTabHTML() {
   });
 
   const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
-  const dayNames = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su'];
 
   let html = '';
   Object.keys(byMonth).sort().reverse().forEach(month => {
@@ -1062,8 +1051,6 @@ function historyTabHTML() {
       const inDeficit = e.net < goal;
       const dotColor = inDeficit ? 'var(--green)' : 'var(--red)';
       const netColor = inDeficit ? 'var(--green)' : 'var(--red)';
-      const consumedPct = Math.min(100, (e.consumed / maxConsumed) * 100);
-      const burnedPct = Math.min(100, (e.burned / maxConsumed) * 100);
       const dayNum = e.date.slice(8).replace(/^0/, '');
       const dayLabel = `${dayNum}.${e.date.slice(5,7)}.`;
       const score = loadNutritionScore(e.date);
@@ -1648,7 +1635,7 @@ function render() {
   // API key screen
   if (!state.apiKey) {
     app.innerHTML = `
-      <div class="header"><div class="header-top"><span class="logo">FITLOG</span></div></div>
+      <div class="header"><span class="logo">FITLOG</span></div>
       <div class="api-screen">
         <h2>Gemini API ključ</h2>
         <p>Da bi app radio, potreban ti je besplatan Gemini API ključ.<br>
@@ -1664,7 +1651,7 @@ function render() {
   const profileComplete = !!(state.height && localStorage.getItem('fitlog_onboarding_done'));
   if (!profileComplete) {
     app.innerHTML = `
-      <div class="header"><div class="header-top"><span class="logo">FITLOG</span></div></div>
+      <div class="header"><span class="logo">FITLOG</span></div>
       <div class="onboard-screen">
         <div class="onboard-title">Podesi profil</div>
         <div class="onboard-sub">Ovi podaci se koriste za tačan izračun kalorija i makroa. Sve možeš da promeniš kasnije.</div>
@@ -1703,7 +1690,6 @@ function render() {
 
   const t = totals();
   const d = state.dayData;
-  const w = state.weight;
 
   // Streak & week data — only computed for stats tab
   let statsContent = '';
@@ -1771,7 +1757,6 @@ function render() {
         const isOpen = state.expandedMealIds.has(m.id);
         const mainName = m.items[0]?.name || 'Obrok';
         const extraCount = m.items.length > 1 ? ` +${m.items.length - 1}` : '';
-        const score = loadNutritionScore(state.date);
         return `
           <div class="log-item" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
             <div class="swipe-delete-bg">🗑</div>
@@ -1782,6 +1767,13 @@ function render() {
                 <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
                 <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
               </div>
+              ${!isOpen ? `
+              <div style="padding:0 16px 8px;display:flex;gap:4px;flex-wrap:wrap">
+                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--green)11;color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
+                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--blue)11;color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
+                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--orange)11;color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
+                ${m.sugar > 0 ? `<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--pink)11;color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+              </div>` : ''}
               ${isOpen ? `
               <div class="meal-details">
                 ${m.items.map(it => `
@@ -1863,9 +1855,6 @@ function render() {
     ? `${Math.round(t.net)} kcal — cilj premaše`
     : `${Math.round(t.net)} / ${state.calorieGoal} kcal`;
 
-  // Smart date label
-  const today = todayStr();
-
   app.innerHTML = `
     <div class="header">
       <span class="logo">FITLOG</span>
@@ -1891,21 +1880,23 @@ function render() {
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
           <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
         </div>
-        ${state.mode === 'food' && state.imageBase64 ? `
-          <img class="img-preview show" src="data:${state.imageMime || 'image/jpeg'};base64,${state.imageBase64}" />
-          <button class="img-analyze-btn" onclick="handleImageSubmit()" ${state.loading ? 'disabled' : ''}>
-            ${state.loading ? '⏳ Analiziram...' : '📷 Analiziraj sliku'}
-          </button>` : ''}
-        <textarea class="msg-input" id="msgInput" rows="3" placeholder="${placeholder}">${''}</textarea>
-        <div class="hint">Enter za novi red</div>
-        <div class="send-row">
+        <textarea class="msg-input" id="msgInput" rows="5" placeholder="${placeholder}"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:5px 0 8px">
           ${state.mode === 'food' ? `
-            <label class="img-btn ${state.imageBase64 ? 'has-image' : ''}" title="Dodaj sliku obroka">
-              📎
-              <input type="file" accept="image/*" onchange="handleImageSelect(this)" />
-            </label>` : ''}
-          <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
+          <label class="input-img-label" style="color:${state.imageBase64 ? 'var(--blue)' : 'var(--s9)'}">
+            <span style="font-size:16px">📷</span>
+            <span style="font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
+            <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
+          </label>` : '<div></div>'}
+          <span style="font-size:11px;color:var(--s6)">Enter za novi red</span>
         </div>
+        ${state.mode === 'food' && state.imageBase64 ? `
+        <div class="img-strip">
+          <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
+          <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
+          <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+        </div>` : ''}
+        <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
         <div class="settings-link" onclick="clearApiKey()">⚙ Promeni API ključ</div>
       </div>
       ${state.loading ? `
@@ -2118,38 +2109,6 @@ function handleImageSelect(input) {
   reader.readAsDataURL(file);
 }
 
-async function handleImageSubmit() {
-  if (!state.imageBase64) return;
-  state.loading = true;
-  render();
-  try {
-    const result = await parseFoodFromImage(state.imageBase64, state.imageMime || 'image/jpeg');
-    if (!result?.items?.length) throw new Error('Nije parsovano');
-    const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
-    const meal = {
-      id: Date.now(),
-      time: now,
-      items: result.items,
-      calories: result.total_calories,
-      protein: result.total_protein,
-      carbs: result.total_carbs,
-      fat: result.total_fat,
-      sugar: result.total_sugar || 0,
-      note: result.note || '',
-    };
-    state.dayData.meals.push(meal);
-    saveDay(state.date, state.dayData);
-    state.imageBase64 = null;
-    state.imageMime = null;
-    showToast(`+${Math.round(meal.calories)} kcal dodato ✓`);
-  } catch (e) {
-    showToast('Greška pri analizi slike. Pokušaj ponovo.', 'err');
-  } finally {
-    state.loading = false;
-    render();
-  }
-}
-
 // ── existing actions below ──
 
 function saveApiKey() {
@@ -2208,19 +2167,6 @@ function saveHeight() {
     localStorage.setItem('fitlog_height', v);
   }
   state.editHeight = false;
-  render();
-}
-
-function changeDate(val) {
-  state.date = val;
-  state.dayData = loadDay(val);
-  state.imageBase64 = null;
-  state.imageMime = null;
-  state.nutritionScore = loadNutritionScore(val);
-  state.expandedMealIds = new Set();
-  state.expandedExIds = new Set();
-  state.mealScores = loadMealScores(val);
-  state.mealScoreLoading = null;
   render();
 }
 
@@ -2481,7 +2427,8 @@ function deleteEx(id) {
 
 async function handleSubmit() {
   const input = document.getElementById('msgInput')?.value.trim();
-  if (!input) return;
+  // Require text OR image (image only valid in food mode)
+  if (!input && !(state.imageBase64 && state.mode === 'food')) return;
   state.loading = true;
   render();
 
@@ -2489,7 +2436,15 @@ async function handleSubmit() {
     const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
 
     if (state.mode === 'food') {
-      const result = await parseFood(input);
+      let result;
+      if (state.imageBase64) {
+        // Image path — optional text becomes context for the model
+        result = await parseFoodFromImage(state.imageBase64, state.imageMime || 'image/jpeg', input || null);
+        state.imageBase64 = null;
+        state.imageMime = null;
+      } else {
+        result = await parseFood(input);
+      }
       if (!result?.items?.length) throw new Error('Nije parsovano');
       const meal = {
         id: Date.now(),
