@@ -19,9 +19,11 @@
     --card: #111111;
     --border: #1e1e1e;
     --text: #f0f0f0;
+    --text-secondary: #ccc;  /* renamed from --tc */
     --muted: #555;
     --mono: 'Space Mono', monospace;
     --sans: 'DM Sans', sans-serif;
+    /* Surface scale */
     --s0: #0a0a0a;
     --s1: #0d0d0d;
     --s2: #111;
@@ -34,21 +36,36 @@
     --s9: #444;
     --s10: #555;
     --s11: #666;
-    --tc: #ccc;
+    --tc: #ccc; /* kept for compat */
     --white: #fff;
-    --red-dark: #900;
+    /* Elevation tokens */
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-nav: 0 -4px 24px rgba(0,0,0,0.5);
+    /* Easing */
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--sans); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
 
-  /* HEADER — slim, just logo + date */
-  .header { padding: 14px 16px 0; border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
+  /* Webkit scrollbar — minimal */
+  ::-webkit-scrollbar { width: 0; }
+
+  /* ── TAB CONTENT ANIMATION ─────────────────────────────── */
+  @keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .tab-content { animation: tabFadeIn 0.18s var(--ease); }
+
+  /* HEADER — logo + date */
+  .header { padding: 14px 16px 4px; border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
   .logo { font-family: var(--mono); font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--green), #47ffb5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
+
   /* HEADER PROGRESS BAR */
-  .header-progress-wrap { padding: 10px 16px 0; }
-  .header-progress-track { height: 3px; background: var(--s4); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
-  .header-progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease, background 0.3s; }
+  .header-progress-wrap { padding: 8px 16px 0; }
+  .header-progress-track { height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; margin-bottom: 5px; }
+  .header-progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease), background 0.3s; }
   .header-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 
   /* ZDRAVLJE SUBTABS */
@@ -111,10 +128,31 @@
   .prognoza-bar { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
   .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
 
-  /* BOTTOM NAV — replaces top tabs */
-  .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--bg); border-top: 1px solid var(--s4); display: flex; z-index: 100; padding: 6px 0 10px; }
-  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; padding: 6px 0; transition: color 0.15s; }
-  .nav-icon { font-size: 18px; line-height: 1; }
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--s4);
+    box-shadow: var(--shadow-nav);
+    display: flex; z-index: 100; padding: 6px 0 10px;
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; cursor: pointer; padding: 6px 0;
+    transition: opacity 0.15s; position: relative;
+  }
+  .nav-btn::after {
+    content: ''; position: absolute; bottom: 2px;
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--green);
+    opacity: 0; transition: opacity 0.2s var(--ease);
+  }
+  .nav-btn.active::after { opacity: 1; }
+  .nav-icon { font-size: 18px; line-height: 1; transition: transform 0.15s var(--ease); }
+  .nav-btn.active .nav-icon { transform: scale(1.12); }
   .nav-label { font-size: 11px; font-weight: 600; font-family: var(--sans); letter-spacing: 0.3px; }
   .nav-btn.active .nav-label { color: var(--green); }
   .nav-btn.inactive .nav-label { color: var(--s8); }
@@ -122,22 +160,24 @@
   .nav-btn.inactive .nav-icon { opacity: 0.35; }
 
   /* CARD */
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 16px 0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 16px 0; box-shadow: var(--shadow-sm); }
   .card-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
 
   /* MODE TOGGLE */
   .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
-  .mode-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; }
+  .mode-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s var(--ease), color 0.15s var(--ease); }
   .mode-btn.active { background: var(--green); color: var(--bg); }
   .mode-btn.inactive { background: var(--s4); color: var(--s11); }
 
   /* INPUT */
-  .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--sans); resize: none; outline: none; line-height: 1.5; }
+  .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: var(--sans); resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
+  .msg-input:focus { border-color: var(--s8); }
   .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
 
   /* SEND BUTTON */
-  .send-btn { width: 100%; padding: 13px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 0; transition: opacity 0.2s; }
-  .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .send-btn { width: 100%; padding: 14px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 2px; transition: opacity 0.2s, transform 0.1s; }
+  .send-btn:active:not(:disabled) { transform: scale(0.98); }
+  .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* INPUT AREA — unified image + text */
   .msg-input { min-height: 90px; }
@@ -172,14 +212,27 @@
   .log-note { margin-top: 6px; font-size: 11px; color: var(--muted); font-style: italic; }
 
   /* EMPTY */
-  .empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
-  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+  .empty { text-align: center; padding: 48px 20px 36px; color: var(--s9); font-size: 13px; line-height: 1.6; }
+  .empty-icon { font-size: 40px; margin-bottom: 14px; display: block; opacity: 0.6; }
+  .empty-title { font-size: 15px; font-weight: 700; color: var(--s10); margin-bottom: 6px; }
 
   /* TOAST — above bottom nav */
-  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 13px; z-index: 999; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.4); transition: opacity 0.3s; font-family: var(--sans); }
-  .toast.ok { background: var(--green); color: var(--bg); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translate(-50%, 10px) scale(0.96); }
+    to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  }
+  .toast {
+    position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
+    padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 13px;
+    z-index: 999; white-space: nowrap;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    transition: opacity 0.25s, transform 0.25s;
+    font-family: var(--sans);
+    animation: toastIn 0.2s var(--ease);
+  }
+  .toast.ok  { background: var(--green); color: var(--bg); }
   .toast.err { background: var(--red); color: var(--white); }
-  .toast.hide { opacity: 0; }
+  .toast.hide { opacity: 0; transform: translate(-50%, -4px) scale(0.97); }
 
   /* SETTINGS */
   .settings-link { font-size: 11px; color: var(--s7); text-align: center; margin-top: 8px; cursor: pointer; }
@@ -214,42 +267,47 @@
   .weight-log-diff { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
 
   /* HISTORY */
-  .hist-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--s3); cursor: pointer; transition: background 0.15s; }
+  .hist-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--s3); cursor: pointer; transition: background 0.12s; border-radius: 4px; }
   .hist-item:last-child { border-bottom: none; }
-  .hist-item:active { background: var(--s3); }
-  .hist-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hist-item:active { background: var(--s4); }
+  .hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 90px; }
   .hist-date.today { color: var(--green); }
   .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
   .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
 
   /* TRAINING TAB */
-  .ex-card { background: var(--s1); border: 1px solid var(--s4); border-radius: 12px; padding: 16px; margin-bottom: 8px; }
+  .ex-card { background: var(--s2); border: 1px solid var(--s5); border-radius: 12px; padding: 16px; margin-bottom: 8px; transition: border-color 0.15s; }
+  .ex-card:focus-within { border-color: var(--s8); }
   .ex-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .ex-icon { font-size: 22px; }
   .ex-name { font-size: 15px; font-weight: 700; }
   .ex-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ex-input-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .ex-input-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
-  .ex-input { width: 62px; background: var(--s4); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 8px 6px; font-size: 15px; font-family: var(--mono); font-weight: 700; text-align: center; outline: none; }
+  .ex-input-label { font-size: 10px; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; font-weight: 600; }
+  .ex-input { width: 62px; background: var(--s4); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 8px 6px; font-size: 15px; font-family: var(--mono); font-weight: 700; text-align: center; outline: none; transition: border-color 0.15s; }
+  .ex-input:focus { border-color: var(--s9); }
   .ex-sep { font-size: 18px; color: var(--s7); margin-top: 14px; }
-  .ex-add-btn { margin-left: auto; background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: var(--mono); white-space: nowrap; }
-  .ex-add-btn:active { opacity: 0.8; }
-  .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--s4); }
-  .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 3px 0; }
+  .ex-add-btn { margin-left: auto; background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: var(--mono); white-space: nowrap; transition: opacity 0.15s, transform 0.1s; }
+  .ex-add-btn:active { opacity: 0.85; transform: scale(0.97); }
+  .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--s5); }
+  .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 4px 0; }
   .ex-done-kcal { color: var(--blue); font-family: var(--mono); font-weight: 700; }
-  .ex-done-del { background: none; border: none; color: var(--s7); cursor: pointer; font-size: 15px; padding: 0 2px; }
-  .custom-ex-card { background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; padding: 16px; margin-bottom: 8px; border-style: dashed; }
+  .ex-done-del { background: none; border: none; color: var(--s8); cursor: pointer; font-size: 16px; padding: 2px 4px; transition: color 0.12s; }
+  .ex-done-del:hover { color: var(--red); }
+  /* Custom exercise — subtle dashed border with blue accent */
+  .custom-ex-card { background: var(--s2); border: 1.5px dashed var(--s7); border-radius: 12px; padding: 16px; margin-bottom: 8px; }
   .workout-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 4px; }
   .workout-total-label { font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
   .workout-total-val { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--blue); }
 
   /* HISTORY DETAIL */
   .hist-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .hist-back-btn { background: var(--s4); border: none; border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+  .hist-back-btn { background: var(--s4); border: none; border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.12s; }
+  .hist-back-btn:active { background: var(--s6); }
   .hist-detail-date { font-family: var(--mono); font-size: 13px; color: var(--green); font-weight: 700; }
-  .hist-progress-track { height: 10px; background: var(--s4); border-radius: 5px; overflow: hidden; margin: 6px 0; }
-  .hist-progress-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+  .hist-progress-track { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 6px 0; }
+  .hist-progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s var(--ease); }
   .hist-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
   .hist-meal-entry { padding: 10px 0; border-bottom: 1px solid var(--s3); }
   .hist-meal-entry:last-child { border-bottom: none; }
@@ -262,20 +320,27 @@
 
   /* WATER TRACKER */
   .water-drops { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-  .water-drop { width: 36px; height: 36px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: background 0.2s, border-color 0.2s; border: 1px solid var(--s5); }
-  .water-drop.filled { background: var(--blue)22; border-color: var(--blue)55; }
-  .water-drop.empty { background: var(--s2); }
+  .water-drop {
+    width: 36px; height: 38px;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    border: 1.5px solid var(--s6);
+  }
+  .water-drop.filled { background: rgba(71,200,255,0.12); border-color: rgba(71,200,255,0.4); }
+  .water-drop.empty  { background: var(--s3); filter: grayscale(1); opacity: 0.4; }
   .water-btns { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  .water-btn { flex: 1; padding: 10px 8px; border: 1px solid var(--s6); border-radius: 8px; background: var(--s2); color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; min-width: 70px; }
-  .water-btn:active { background: var(--blue)22; }
+  .water-btn { flex: 1; padding: 10px 8px; border: 1px solid var(--s6); border-radius: 8px; background: var(--s2); color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.15s, transform 0.1s; min-width: 70px; }
+  .water-btn:active { background: rgba(71,200,255,0.1); transform: scale(0.97); }
   .water-custom-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .water-custom-input { flex: 1; background: var(--s1); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 10px 12px; font-size: 13px; font-family: var(--mono); outline: none; text-align: center; }
-  .water-add-btn { padding: 10px 16px; background: var(--blue); color: var(--bg); border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); }
-  .water-hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--s2); }
+  .water-add-btn { padding: 10px 16px; background: var(--blue); color: var(--bg); border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: opacity 0.15s; }
+  .water-add-btn:active { opacity: 0.8; }
+  .water-hist-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--s3); }
   .water-hist-row:last-child { border-bottom: none; }
-  .water-hist-date { font-size: 11px; color: var(--muted); font-family: var(--mono); min-width: 50px; }
-  .water-hist-bar-wrap { flex: 1; height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; }
-  .water-hist-bar { height: 100%; border-radius: 3px; background: var(--blue); }
+  .water-hist-date { font-size: 11px; color: var(--muted); font-family: var(--mono); min-width: 28px; }
+  .water-hist-bar-wrap { flex: 1; height: 7px; background: var(--s4); border-radius: 4px; overflow: hidden; }
+  .water-hist-bar { height: 100%; border-radius: 4px; background: var(--blue); }
   .water-hist-val { font-size: 11px; font-family: var(--mono); min-width: 55px; text-align: right; }
 
   /* WEIGHT CHART */
@@ -288,36 +353,54 @@
   .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
   .meal-summary { flex: 1; font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
-  .meal-chevron { font-size: 11px; color: var(--muted); margin-left: 4px; transition: transform 0.2s; }
-  .meal-chevron.open { transform: rotate(180deg); }
-  .meal-details { padding: 0 16px 12px; border-top: 1px solid var(--s3); }
-  .meal-item { font-size: 13px; color: var(--muted); padding: 3px 0; }
-  .meal-item-name { color: var(--text); font-weight: 600; }
+  .meal-chevron { font-size: 11px; color: var(--s8); margin-left: 4px; transition: transform 0.2s var(--ease), color 0.15s; }
+  .meal-chevron.open { transform: rotate(180deg); color: var(--green); }
+  .meal-details { padding: 10px 16px 14px; border-top: 1px solid var(--s3); }
+  .meal-item { font-size: 13px; color: var(--muted); padding: 4px 0; }
+  .meal-item-name { color: var(--text-secondary); font-weight: 600; }
 
   /* SWIPE TO DELETE */
   .log-item { position: relative; overflow: hidden; }
-  .log-item-inner { transition: transform 0.25s ease; will-change: transform; }
+  .log-item-inner { transition: transform 0.25s var(--ease); will-change: transform; }
   .swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 72px; background: var(--red); display: flex; align-items: center; justify-content: center; color: var(--white); font-size: 18px; border-radius: 0 12px 12px 0; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
 
-  .score-btn { width: 100%; padding: 12px; background: var(--s2); border: 1px solid var(--s6); border-radius: 12px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; margin-top: 8px; }
+  .score-btn { width: 100%; padding: 13px; background: var(--s2); border: none; border-top: 1px solid var(--s6); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; }
   .score-btn:active { background: var(--s4); }
-  .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--s10); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; }
+  .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--s10); font-size: 11px; padding: 5px 12px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; }
   .meal-score-btn:active { background: var(--s4); }
-  .meal-score-inline { margin-top: 8px; padding: 8px 10px; background: var(--s3); border-radius: 8px; font-size: 13px; color: var(--muted); display: flex; align-items: flex-start; gap: 8px; }
-  .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .meal-score-inline { margin-top: 8px; padding: 10px 12px; background: var(--s3); border-radius: 10px; font-size: 13px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; }
+  .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 20px; line-height: 1; flex-shrink: 0; }
   .score-num { font-size: 48px; font-weight: 800; font-family: var(--mono); line-height: 1; }
-  .score-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
+  .score-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--s3); font-size: 13px; line-height: 1.5; }
   .score-row:last-child { border-bottom: none; }
 
   /* ONBOARDING */
   .onboard-screen { padding: 32px 20px; }
-  .onboard-title { font-family: var(--mono); color: var(--green); font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-  .onboard-sub { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 24px; }
-  .onboard-field { margin-bottom: 16px; }
-  .onboard-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .onboard-input { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 12px 14px; font-size: 15px; font-family: var(--mono); outline: none; box-sizing: border-box; }
-  .onboard-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
-  .onboard-btn { width: 100%; padding: 16px; background: var(--green); color: var(--bg); border: none; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: var(--sans); cursor: pointer; margin-top: 8px; }
+  .onboard-title { font-family: var(--mono); color: var(--green); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .onboard-sub { color: var(--muted); font-size: 13px; line-height: 1.65; margin-bottom: 28px; }
+  .onboard-field { margin-bottom: 18px; }
+  .onboard-label { font-size: 11px; color: var(--s10); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 7px; }
+  .onboard-input {
+    width: 100%; background: var(--s2); border: 1px solid var(--s6);
+    border-radius: 10px; color: var(--text); padding: 13px 14px;
+    font-size: 16px; font-family: var(--mono); outline: none; box-sizing: border-box;
+    transition: border-color 0.15s;
+  }
+  .onboard-input:focus { border-color: var(--green); }
+  .onboard-select {
+    width: 100%; background: var(--s2); border: 1px solid var(--s6);
+    border-radius: 10px; color: var(--text); padding: 13px 14px;
+    font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box;
+    transition: border-color 0.15s;
+  }
+  .onboard-select:focus { border-color: var(--green); }
+  .onboard-btn {
+    width: 100%; padding: 16px; background: var(--green); color: var(--bg);
+    border: none; border-radius: 12px; font-weight: 800; font-size: 15px;
+    font-family: var(--sans); cursor: pointer; margin-top: 12px;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .onboard-btn:active { transform: scale(0.98); }
 
   /* BOTTOM NAV placeholder */
   .spacer { height: 20px; }
@@ -488,14 +571,14 @@ function debounceRender() {
 
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
-async function callGemini(prompt) {
+async function callGemini(prompt, temperature = 0.1) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1 }
+      generationConfig: { temperature }
     })
   });
   if (!res.ok) {
@@ -902,11 +985,11 @@ function historyDayDetailHTML(date) {
         </div>
       </div>
       ${!isExp ? `
-      <div style="padding:0 0 8px;display:flex;gap:4px;flex-wrap:wrap">
-        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--green)11;color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
-        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--blue)11;color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
-        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--orange)11;color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
-        ${(m.sugar||0) > 0 ? `<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--pink)11;color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+      <div style="padding:0 0 10px;display:flex;gap:5px;flex-wrap:wrap">
+        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
+        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
+        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
+        ${(m.sugar||0) > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
       </div>` : ''}
       ${isExp ? `
       <div style="padding-bottom:12px">
@@ -1322,16 +1405,15 @@ function weightChartHTML(log) {
   const maxW = Math.max(...weights) + 1;
   const W = 300, H = 80;
   const xStep = entries.length > 1 ? W / (entries.length - 1) : W;
-  const points = entries.map((e, i) => {
+  const pts = entries.map((e, i) => {
     const x = i * xStep;
     const y = H - ((e.weight - minW) / (maxW - minW)) * H;
-    return `${x},${y}`;
-  }).join(' ');
-  const dots = entries.map((e, i) => {
-    const x = i * xStep;
-    const y = H - ((e.weight - minW) / (maxW - minW)) * H;
-    return `<circle cx="${x}" cy="${y}" r="3" fill="var(--green)"/>`;
-  }).join('');
+    return { x, y };
+  });
+  const points = pts.map(p => `${p.x},${p.y}`).join(' ');
+  // Filled area path
+  const areaPath = `M${pts[0].x},${H} ` + pts.map(p => `L${p.x},${p.y}`).join(' ') + ` L${pts[pts.length-1].x},${H} Z`;
+  const dots = pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="var(--green)"/>`).join('');
 
   // Linear regression trend line
   const n = entries.length;
@@ -1351,8 +1433,18 @@ function weightChartHTML(log) {
   return `
     <div class="weight-chart-wrap">
       <svg class="weight-chart-svg" viewBox="-10 -10 ${W+20} ${H+20}" height="90">
-        <line x1="0" y1="${trendY0}" x2="${W}" y2="${trendY1}" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
-        <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8fd42e" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#8fd42e" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- Gradient fill under line -->
+        <path d="${areaPath}" fill="url(#chartFill)"/>
+        <!-- Trend line -->
+        <line x1="0" y1="${trendY0}" x2="${W}" y2="${trendY1}" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+        <!-- Data line -->
+        <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         ${dots}
       </svg>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s9);margin-top:2px">
@@ -1399,7 +1491,7 @@ function zdravljeTabHTML() {
       </div>
       <div class="water-drops">
         ${Array.from({length: drops}, (_, i) =>
-          `<div class="water-drop ${i < filledDrops ? 'filled' : 'empty'}">${i < filledDrops ? '💧' : '○'}</div>`
+          `<div class="water-drop ${i < filledDrops ? 'filled' : 'empty'}">💧</div>`
         ).join('')}
       </div>
       <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden;margin-bottom:12px">
@@ -1768,11 +1860,11 @@ function render() {
                 <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
               </div>
               ${!isOpen ? `
-              <div style="padding:0 16px 8px;display:flex;gap:4px;flex-wrap:wrap">
-                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--green)11;color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
-                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--blue)11;color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
-                <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--orange)11;color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
-                ${m.sugar > 0 ? `<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--pink)11;color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+              <div style="padding:0 16px 10px;display:flex;gap:5px;flex-wrap:wrap">
+                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
+                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
+                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
+                ${m.sugar > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
               </div>` : ''}
               ${isOpen ? `
               <div class="meal-details">
@@ -1832,28 +1924,32 @@ function render() {
     </div>` : '';
 
   const hour = new Date().getHours();
-  const emptyMsg = hour < 11 ? '🌅 Dobro jutro! Šta si pojeo za doručak?' :
-                   hour < 15 ? '☀️ Vreme je za ručak! Unesi šta si jeo.' :
-                   hour < 19 ? '🌤 Kako ide popodne? Dodaj obrok ili vežbu.' :
-                                '🌙 Dobar večernji unos zatvara dan lepo.';
+
+  const emptyMsg = hour < 11 ? 'Šta si pojeo za doručak?' :
+                   hour < 15 ? 'Vreme je za ručak! Šta si jeo?' :
+                   hour < 19 ? 'Dodaj popodnevni obrok ili vežbu.' :
+                                'Večernji unos zatvara dan.';
+  const emptyIcon = hour < 11 ? '🌅' : hour < 15 ? '☀️' : hour < 19 ? '🌤' : '🌙';
 
   const emptyHTML = (!d.meals.length && !d.exercises.length) ? `
     <div class="empty">
-      <div class="empty-icon">🥗</div>
-      ${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}
+      <span class="empty-icon">${emptyIcon}</span>
+      <div class="empty-title">${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}</div>
+      <div style="font-size:12px;color:var(--s7);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
     </div>` : '';
 
   const placeholder = state.mode === 'food'
     ? 'npr. jeo sam 200g pilećih prsa sa 100g pirinča...'
     : 'npr. uradio sam 50 čučnjeva i prošetao 4000 koraka...';
 
-  const btnText = state.loading ? 'Analiziram...' : state.mode === 'food' ? 'Dodaj obrok' : 'Dodaj vežbu';
+  const btnText = state.loading ? '⏳ Analiziram...' : state.mode === 'food' ? '+ Dodaj obrok' : '+ Dodaj vežbu';
 
   const progressPct = state.calorieGoal > 0 ? Math.min(100, (t.net / state.calorieGoal) * 100) : 0;
-  const progressColor = progressPct >= 100 ? 'var(--red)' : 'var(--green)';
+  const progressColor = progressPct >= 100 ? 'var(--red)' : progressPct >= 85 ? 'var(--orange)' : 'var(--green)';
+  const remaining = state.calorieGoal - Math.round(t.net);
   const progressLabel = progressPct >= 100
-    ? `${Math.round(t.net)} kcal — cilj premaše`
-    : `${Math.round(t.net)} / ${state.calorieGoal} kcal`;
+    ? `<span style="color:var(--red);font-weight:700">+${Math.round(t.net - state.calorieGoal)} kcal preko cilja</span>`
+    : `<span style="color:${remaining < 200 ? 'var(--orange)' : 'var(--muted)'}">${remaining} kcal preostalo</span>`;
 
   app.innerHTML = `
     <div class="header">
@@ -1864,11 +1960,14 @@ function render() {
         <div class="header-progress-fill" style="width:${progressPct}%;background:${progressColor}"></div>
       </div>
       <div class="header-progress-labels">
-        <span>${progressLabel}</span>
-        <span style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--s6)'}">-${Math.round(t.burned)} kcal sagoreno</span>
+        ${progressLabel}
+        <span style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--s6)'}${t.burned > 0 ? ';font-weight:600' : ''}">
+          ${t.burned > 0 ? '-' + Math.round(t.burned) + ' kcal sagoreno' : Math.round(t.consumed) + ' / ' + state.calorieGoal + ' kcal'}
+        </span>
       </div>
     </div>
 
+    <div class="tab-content">
     ${state.activeTab === 'stats' ? statsContent : ''}
     ${state.activeTab === 'history' ? historyTabHTML() : ''}
     ${state.activeTab === 'training' ? trainingTabHTML() : ''}
@@ -1880,15 +1979,15 @@ function render() {
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
           <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
         </div>
-        <textarea class="msg-input" id="msgInput" rows="5" placeholder="${placeholder}"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:5px 0 8px">
+        <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
           ${state.mode === 'food' ? `
           <label class="input-img-label" style="color:${state.imageBase64 ? 'var(--blue)' : 'var(--s9)'}">
             <span style="font-size:16px">📷</span>
-            <span style="font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
+            <span style="font-size:12px;font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
             <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
           </label>` : '<div></div>'}
-          <span style="font-size:11px;color:var(--s6)">Enter za novi red</span>
+          <span style="font-size:11px;color:var(--s6)">AI analiza</span>
         </div>
         ${state.mode === 'food' && state.imageBase64 ? `
         <div class="img-strip">
@@ -1929,17 +2028,18 @@ function render() {
               <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
                 <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
                 <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                <button onclick="state.nutritionScore=null;localStorage.removeItem(SCORE_KEY + state.date);render()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:18px">×</button>
+                <button onclick="state.nutritionScore=null;localStorage.removeItem(SCORE_KEY + state.date);render()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
               </div>
               <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
               <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
               <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
               <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
-              <div style="margin-top:10px;font-size:12px;color:var(--muted)">${state.nutritionScore.tip}</div>
+              <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
             </div>` : `
-            <button class="score-btn" style="margin:0;border-radius:0;border:none;border-top:1px solid var(--s6)" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
+            <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
         </div>` : ''}
     ` : ''}
+    </div><!-- /tab-content -->
     <div class="spacer"></div>
 
     <!-- BOTTOM NAV -->
@@ -2190,17 +2290,9 @@ Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: ${ml.protMin}g.
 Vrati SAMO validan JSON bez markdown oznaka:
 {"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
-    });
-    const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = await callGemini(prompt, 0.3);
     const score = JSON.parse(raw.replace(/```json|```/g, '').trim());
     state.nutritionScore = score;
-    // Persist score so it survives tab switches
     saveNutritionScore(state.date, score);
   } catch(e) {
     showToast('Greška pri oceni ishrane', 'err');
@@ -2265,14 +2357,7 @@ Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
 Korisnik: ${state.weight}kg, cilj mršavljenje.
 Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpskom"}`;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2 } })
-    });
-    const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = await callGemini(prompt, 0.2);
     state.mealScores[mealId] = JSON.parse(raw.replace(/```json|```/g, '').trim());
     saveMealScores(state.date, state.mealScores);
   } catch(e) {
@@ -2312,6 +2397,8 @@ function setTab(tab) {
   state.imageMime = null;
   state.expandedMealIds = new Set();
   state.expandedExIds = new Set();
+  state.expandedHistoryMealIds = new Set();
+  state.expandedScoreDate = null;
   if (tab === 'log') {
     state.nutritionScore = loadNutritionScore(state.date);
     state.mealScores = loadMealScores(state.date);
