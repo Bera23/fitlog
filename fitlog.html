@@ -355,7 +355,12 @@
   .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
   .meal-chevron { font-size: 11px; color: var(--s8); margin-left: 4px; transition: transform 0.2s var(--ease), color 0.15s; }
   .meal-chevron.open { transform: rotate(180deg); color: var(--green); }
-  .meal-details { padding: 10px 16px 14px; border-top: 1px solid var(--s3); }
+  /* Pills row — shown when collapsed, hidden when expanded */
+  .meal-pills-row { padding: 0 16px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .meal-details { padding: 10px 16px 14px; border-top: 1px solid var(--s3); display: none; }
+  /* Expanded state — flip visibility without any re-render */
+  .log-item.expanded .meal-pills-row { display: none; }
+  .log-item.expanded .meal-details { display: block; }
   .meal-item { font-size: 13px; color: var(--muted); padding: 4px 0; }
   .meal-item-name { color: var(--text-secondary); font-weight: 600; }
 
@@ -1839,7 +1844,7 @@ function render() {
     ${weeklyReportHTML(weekData)}`;
   }
 
-  // Meals
+  // Meals — both pill row AND details always in DOM; .log-item.expanded controls visibility via CSS
   const mealsHTML = d.meals.length ? `
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
@@ -1849,51 +1854,48 @@ function render() {
         const isOpen = state.expandedMealIds.has(m.id);
         const mainName = m.items[0]?.name || 'Obrok';
         const extraCount = m.items.length > 1 ? ` +${m.items.length - 1}` : '';
+        const ms = state.mealScores[m.id];
+        const scoreHTML = state.mealScoreLoading === m.id
+          ? `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`
+          : ms
+            ? (() => { const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
+                return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore(${m.id})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`; })()
+            : `<button class="meal-score-btn" onclick="scoreMeal(${m.id})">🤖 Oceni obrok</button>`;
         return `
-          <div class="log-item" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
+          <div class="log-item${isOpen ? ' expanded' : ''}" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
             <div class="swipe-delete-bg">🗑</div>
             <div class="log-item-inner" id="swipe-meal-${m.id}" style="background:var(--card)">
               <div class="meal-header" onclick="toggleMeal(${m.id})">
                 <span class="meal-time-badge">${m.time}</span>
                 <span class="meal-summary">${mainName}${extraCount}</span>
                 <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
-                <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
+                <span class="meal-chevron${isOpen ? ' open' : ''}">▾</span>
               </div>
-              ${!isOpen ? `
-              <div style="padding:0 16px 10px;display:flex;gap:5px;flex-wrap:wrap">
+              <div class="meal-pills-row">
                 <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
                 <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
                 <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
                 ${m.sugar > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
-              </div>` : ''}
-              ${isOpen ? `
+              </div>
               <div class="meal-details">
                 ${m.items.map(it => `
                   <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.amount} · ${it.calories} kcal</div>`).join('')}
                 <div class="pills" style="margin-top:8px">
-                  <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein)}g</span>
-                  <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
-                  <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat)}g</span>
-                  ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+                  <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein)}g</span>
+                  <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
+                  <span class="pill" style="background:rgba(255,179,71,0.13);color:var(--orange)">M ${Math.round(m.fat)}g</span>
+                  ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
                 </div>
                 ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
-                ${(() => {
-                  const ms = state.mealScores[m.id];
-                  if (state.mealScoreLoading === m.id) return `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`;
-                  if (ms) {
-                    const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-                    return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore(${m.id})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`;
-                  }
-                  return `<button class="meal-score-btn" onclick="scoreMeal(${m.id})">🤖 Oceni obrok</button>`;
-                })()}
+                ${scoreHTML}
                 <button onclick="deleteMeal(${m.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
-              </div>` : ''}
+              </div>
             </div>
           </div>`;
       }).join('')}
     </div>` : '';
 
-  // Exercises
+  // Exercises — same pattern: details always in DOM, .log-item.expanded shows them
   const exHTML = d.exercises.length ? `
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
@@ -1903,21 +1905,21 @@ function render() {
         const isOpen = state.expandedExIds.has(e.id);
         const mainName = e.items[0]?.name || 'Aktivnost';
         return `
-          <div class="log-item">
+          <div class="log-item${isOpen ? ' expanded' : ''}" data-ex-id="${e.id}">
             <div class="log-item-inner" style="background:var(--card)">
               <div class="meal-header" onclick="toggleEx(${e.id})">
                 <span class="meal-time-badge" style="color:var(--blue)">${e.time}</span>
                 <span class="meal-summary">${mainName}</span>
                 <span class="meal-kcal-badge" style="color:var(--blue)">-${Math.round(e.burned)} kcal</span>
-                <span class="meal-chevron ${isOpen ? 'open' : ''}">▾</span>
+                <span class="meal-chevron${isOpen ? ' open' : ''}">▾</span>
               </div>
-              ${isOpen ? `
+              <div class="meal-pills-row"></div>
               <div class="meal-details">
                 ${e.items.map(it => `
                   <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.detail}</div>`).join('')}
                 ${e.note ? `<div class="log-note" style="margin-top:6px">${e.note}</div>` : ''}
                 <button onclick="deleteEx(${e.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši aktivnost</button>
-              </div>` : ''}
+              </div>
             </div>
           </div>`;
       }).join('')}
@@ -2334,15 +2336,25 @@ function saveOnboarding() {
 }
 
 function toggleMeal(id) {
-  if (state.expandedMealIds.has(id)) state.expandedMealIds.delete(id);
-  else state.expandedMealIds.add(id);
-  render();
+  // Direct DOM toggle — no render() call, no flash
+  const item = document.querySelector(`.log-item[data-id="${id}"]`);
+  if (!item) return;
+  const isExpanded = item.classList.toggle('expanded');
+  const chevron = item.querySelector('.meal-chevron');
+  if (chevron) chevron.classList.toggle('open', isExpanded);
+  if (isExpanded) state.expandedMealIds.add(id);
+  else state.expandedMealIds.delete(id);
 }
 
 function toggleEx(id) {
-  if (state.expandedExIds.has(id)) state.expandedExIds.delete(id);
-  else state.expandedExIds.add(id);
-  render();
+  // Direct DOM toggle — no render() call, no flash
+  const item = document.querySelector(`.log-item[data-ex-id="${id}"]`);
+  if (!item) return;
+  const isExpanded = item.classList.toggle('expanded');
+  const chevron = item.querySelector('.meal-chevron');
+  if (chevron) chevron.classList.toggle('open', isExpanded);
+  if (isExpanded) state.expandedExIds.add(id);
+  else state.expandedExIds.delete(id);
 }
 
 async function scoreMeal(mealId) {
