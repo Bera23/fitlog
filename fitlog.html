@@ -448,6 +448,8 @@
 <script>
 const SCORE_KEY = 'fitlog_score_';
 const MEAL_SCORE_KEY = 'fitlog_meal_scores_';
+// Base URL for Gemini API — model and key appended at call time
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -520,7 +522,20 @@ const EXERCISES = [
 const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  // Use local date parts to avoid UTC midnight rollover bug
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Convert any Date object to YYYY-MM-DD using local timezone
+function localDateStr(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
@@ -558,7 +573,7 @@ function loadWaterHistory(days) {
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = localDateStr(d);
     result.push({ date: dateStr, ml: parseInt(localStorage.getItem('fitlog_water_' + dateStr) || 0) });
   }
   return result;
@@ -651,7 +666,7 @@ function clearRenderCache() { _renderCache = {}; }
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
 async function callGemini(prompt, temperature = 0.1) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.geminiModel}:generateContent?key=${state.apiKey}`;
+  const url = `${GEMINI_BASE_URL}/${state.geminiModel}:generateContent?key=${state.apiKey}`;
   const start = Date.now();
   let res;
   try {
@@ -693,7 +708,11 @@ Napomena: sugar je dodati i prirodni šećer u gramima.
 Unos korisnika: ${text}`;
 
   const raw = await callGemini(prompt);
-  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch {
+    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
+  }
 }
 
 async function parseExercise(text) {
@@ -708,12 +727,16 @@ Format:
 Unos korisnika: ${text}`;
 
   const raw = await callGemini(prompt);
-  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch {
+    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
+  }
 }
 
 async function parseFoodFromImage(base64, mimeType, textContext) {
   const w = state.weight || 75;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.geminiModel}:generateContent?key=${state.apiKey}`;
+  const url = `${GEMINI_BASE_URL}/${state.geminiModel}:generateContent?key=${state.apiKey}`;
   // Append optional user text as extra context for the model
   const contextNote = textContext ? `\nDodatni opis od korisnika: "${textContext}"` : '';
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
@@ -751,7 +774,11 @@ Format:
   const data = await res.json();
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen: prompt.length, responseLen: raw.length });
-  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch {
+    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
+  }
 }
 
 // ─── SETTINGS DRAWER ─────────────────────────────────────────────────────────
@@ -1129,7 +1156,7 @@ function getWeekData() {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     d.setHours(0, 0, 0, 0);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = localDateStr(d);
     if (d > today) {
       result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: true });
       continue;
@@ -1171,7 +1198,7 @@ function calcStreak() {
   for (let i = todayInDeficit ? 0 : 1; i < 365; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = localDateStr(d);
     const net = getDayNet(dateStr);
     if (net === null) break;
     if (net < state.calorieGoal) streak++;
@@ -1253,7 +1280,7 @@ function getHistoryData(maxDays = 90) {
   for (let i = 0; i < maxDays; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = localDateStr(d);
     const day = safeParseLS('fitlog_day_' + dateStr);
     if (day) {
       const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
@@ -1811,7 +1838,7 @@ function zdravljeTabHTML() {
   let waterStreak = 0;
   for (let i = 0; i < 30; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
+    const ds = localDateStr(d);
     const ml = loadWater(ds);
     if (ml >= waterGoal) waterStreak++;
     else if (i > 0) break;
@@ -2842,7 +2869,7 @@ function addWorkoutEntry(exId) {
   }
   const calories = calcExerciseKcal(ex, inp.sets, inp.reps || 0, inp.secs || 0);
   const entry = {
-    uid: Date.now() + '_' + exId,
+    uid: crypto.randomUUID(),
     exId,
     name: ex.name,
     sets: inp.sets,
@@ -2869,7 +2896,7 @@ function addCustomWorkoutEntry() {
   const w = state.weight || 80;
   const calories = Math.round(ci.sets * ci.reps * 0.002 * w);
   const entry = {
-    uid: Date.now() + '_custom',
+    uid: crypto.randomUUID(),
     exId: 'custom',
     name,
     sets: ci.sets,
@@ -2991,6 +3018,9 @@ render();
 // Toast element (persistent)
 const toastEl = document.createElement('div');
 toastEl.id = 'toast';
+toastEl.setAttribute('role', 'alert');
+toastEl.setAttribute('aria-live', 'assertive');
+toastEl.setAttribute('aria-atomic', 'true');
 toastEl.style.display = 'none';
 document.body.appendChild(toastEl);
 </script>
