@@ -450,6 +450,8 @@ const SCORE_KEY = 'fitlog_score_';
 const MEAL_SCORE_KEY = 'fitlog_meal_scores_';
 // Base URL for Gemini API — model and key appended at call time
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+// localStorage schema version — bump when a breaking data migration is needed
+const LS_VERSION = 1;
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -536,6 +538,12 @@ function localDateStr(d) {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// Format YYYY-MM-DD storage key to DD.MM. for display
+function fmtDate(dateStr) {
+  const [, mm, dd] = dateStr.split('-');
+  return `${dd}.${mm}.`;
 }
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
@@ -1809,7 +1817,7 @@ function weightChartHTML(log) {
         ${dots}
       </svg>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s9);margin-top:2px">
-        <span>${entries[0].date.slice(5)}</span>
+        <span>${fmtDate(entries[0].date)}</span>
         <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
         <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
       </div>
@@ -1947,7 +1955,7 @@ function zdravljeTabHTML() {
       entryDiff = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d>0?'+':''}${d.toFixed(1)}</span>`;
     }
     return `<div class="weight-log-item">
-      <span class="weight-log-date">${e.date}</span>
+      <span class="weight-log-date">${fmtDate(e.date)}</span>
       <div style="display:flex;align-items:center;gap:8px">
         ${entryDiff}
         <span class="weight-log-val">${e.weight} kg</span>
@@ -3000,6 +3008,28 @@ async function handleSubmit() {
   }
 }
 
+// ─── SCHEMA MIGRATION ────────────────────────────────────────────────────────
+
+// Run all pending migrations from `from` up to `to`.
+// Add a new `if (from < N)` block here whenever LS_VERSION is bumped.
+function migrateSchema(from) {
+  // v0 → v1: backfill weight log from legacy fitlog_weight scalar if log is empty
+  if (from < 1) {
+    const w = parseFloat(localStorage.getItem('fitlog_weight'));
+    if (w && loadWeightLog().length === 0) {
+      saveWeightEntry(todayStr(), w);
+    }
+  }
+}
+
+function checkSchemaVersion() {
+  const stored = parseInt(localStorage.getItem('fitlog_version') || '0');
+  if (stored < LS_VERSION) {
+    migrateSchema(stored);
+    localStorage.setItem('fitlog_version', String(LS_VERSION));
+  }
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 
 state.dayData = loadDay(state.date);
@@ -3008,10 +3038,8 @@ state.heightInput = state.height || '';
 state.nutritionScore = loadNutritionScore(state.date);
 state.mealScores = loadMealScores(state.date);
 
-// Migrate: if weight exists but log is empty, add it as today's entry
-if (state.weight && loadWeightLog().length === 0) {
-  saveWeightEntry(todayStr(), state.weight);
-}
+// Run any pending localStorage schema migrations before first render
+checkSchemaVersion();
 
 render();
 
