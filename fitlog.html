@@ -36,7 +36,7 @@
     --s9: #444;
     --s10: #555;
     --s11: #666;
-    --tc: #ccc; /* kept for compat */
+    /* --tc removed; use --text-secondary instead */
     --white: #fff;
     /* Elevation tokens */
     --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
@@ -183,7 +183,7 @@
   .msg-input { min-height: 90px; }
   .input-img-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; position: relative; -webkit-tap-highlight-color: transparent; }
   .input-img-label input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: var(--blue)11; border-radius: 8px; border: 1px solid var(--blue)33; }
+  .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: rgba(71,200,255,0.07); border-radius: 8px; border: 1px solid rgba(71,200,255,0.2); }
   .img-strip img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 
   /* STATS */
@@ -308,7 +308,7 @@
   .hist-meal-entry { padding: 10px 0; border-bottom: 1px solid var(--s3); }
   .hist-meal-entry:last-child { border-bottom: none; }
   .hist-meal-time { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 4px; }
-  .hist-meal-name { font-size: 13px; color: var(--tc); }
+  .hist-meal-name { font-size: 13px; color: var(--text-secondary); }
   .hist-meal-kcal { font-size: 13px; font-family: var(--mono); font-weight: 700; }
   .hist-section-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 12px 0 6px; }
   .hist-workout-entry { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
@@ -365,6 +365,15 @@
   .log-item-inner { transition: transform 0.25s var(--ease); will-change: transform; }
   .swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 72px; background: var(--red); display: flex; align-items: center; justify-content: center; color: var(--white); font-size: 18px; border-radius: 0 12px 12px 0; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
 
+  /* HISTORY DETAIL — meal expand/collapse via DOM toggle (no render) */
+  .hist-meal-item .hist-meal-collapsed { display: flex; }
+  .hist-meal-item .hist-meal-expanded  { display: none; }
+  .hist-meal-item.expanded .hist-meal-collapsed { display: none; }
+  .hist-meal-item.expanded .hist-meal-expanded  { display: block; }
+  /* HISTORY SCORE — expand/collapse via DOM toggle */
+  .history-score-content { display: none; margin-top: 10px; }
+
+  /* NUTRITION SCORE CARD */
   .score-btn { width: 100%; padding: 13px; background: var(--s2); border: none; border-top: 1px solid var(--s6); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; }
   .score-btn:active { background: var(--s4); }
   .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--s10); font-size: 11px; padding: 5px 12px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; }
@@ -424,7 +433,7 @@
   .drawer-btn { width: 100%; padding: 11px; background: var(--s3); border: 1px solid var(--s5); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; text-align: left; margin-bottom: 8px; }
   .drawer-btn:last-child { margin-bottom: 0; }
   .drawer-btn:active { background: var(--s5); }
-  .drawer-btn.danger { color: var(--red); border-color: var(--red)44; }
+  .drawer-btn.danger { color: var(--red); border-color: rgba(255,79,79,0.27); }
   .drawer-input { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 13px; font-family: var(--mono); outline: none; transition: border-color 0.15s; box-sizing: border-box; }
   .drawer-input:focus { border-color: var(--s9); }
   .drawer-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
@@ -633,6 +642,11 @@ function debounceRender() {
   clearTimeout(trainingDebounceTimer);
   trainingDebounceTimer = setTimeout(render, 120);
 }
+
+// Per-render memoization cache — cleared at the start of each render() call.
+// Avoids repeated localStorage reads for the same key within one render cycle.
+let _renderCache = {};
+function clearRenderCache() { _renderCache = {}; }
 
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
@@ -1013,8 +1027,17 @@ function macroLimits() {
 }
 
 function loadNutritionScore(date) {
+  const cacheKey = 'ns_' + date;
+  if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
   const raw = localStorage.getItem(SCORE_KEY + date);
-  try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try {
+    const result = raw ? JSON.parse(raw) : null;
+    _renderCache[cacheKey] = result;
+    return result;
+  } catch {
+    _renderCache[cacheKey] = null;
+    return null;
+  }
 }
 
 function saveNutritionScore(date, score) {
@@ -1111,10 +1134,8 @@ function getWeekData() {
       result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: true });
       continue;
     }
-    const raw = localStorage.getItem('fitlog_day_' + dateStr);
-    if (raw) {
-      const day = safeParseLS('fitlog_day_' + dateStr);
-      if (!day) { result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: false }); continue; }
+    const day = safeParseLS('fitlog_day_' + dateStr);
+    if (day) {
       const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
       const exBurned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
       const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
@@ -1276,7 +1297,7 @@ function historyDayDetailHTML(date) {
 
   const histMealScores = loadMealScores(date);
 
-  // Meals — collapsible per meal
+  // Meals — collapsible per meal using CSS class toggle (no render() on toggle)
   const mealsHTML = day.meals?.length ? day.meals.map(m => {
     const ms = histMealScores[m.id];
     const isExp = state.expandedHistoryMealIds.has(m.id);
@@ -1286,36 +1307,36 @@ function historyDayDetailHTML(date) {
     })() : '';
 
     return `
-    <div style="border-top:1px solid var(--s3)">
+    <div class="hist-meal-item${isExp ? ' expanded' : ''}" data-hist-meal-id="${m.id}" style="border-top:1px solid var(--s3)">
       <div onclick="toggleHistoryMeal(${m.id})" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
         <div>
           <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green)">${m.time}</div>
-          <div style="font-size:13px;color:var(--tc);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${ms ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${ms.score>=7?'var(--green)':ms.score>=5?'var(--orange)':'var(--red)'}">${ms.score}/10</span>` : ''}
           <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--green)">${Math.round(m.calories)}</span>
-          <span style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
+          <span class="hist-meal-chevron" style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
         </div>
       </div>
-      ${!isExp ? `
-      <div style="padding:0 0 10px;display:flex;gap:5px;flex-wrap:wrap">
+      <!-- Collapsed view: macro pills — hidden when .expanded -->
+      <div class="hist-meal-collapsed" style="padding:0 0 10px;gap:5px;flex-wrap:wrap">
         <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
         <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
         <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
         ${(m.sugar||0) > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
-      </div>` : ''}
-      ${isExp ? `
-      <div style="padding-bottom:12px">
-        ${m.items?.map(it => `<div style="font-size:13px;color:var(--tc);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s9)">· ${it.calories} kcal</span></div>`).join('') || ''}
+      </div>
+      <!-- Expanded view: item details — shown when .expanded -->
+      <div class="hist-meal-expanded" style="padding-bottom:12px">
+        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s9)">· ${it.calories} kcal</span></div>`).join('') || ''}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-          <span class="pill" style="background:var(--green)22;color:var(--green)">P ${Math.round(m.protein||0)}g</span>
-          <span class="pill" style="background:var(--blue)22;color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
-          <span class="pill" style="background:var(--orange)22;color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
-          ${m.sugar ? `<span class="pill" style="background:var(--pink)22;color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
+          <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein||0)}g</span>
+          <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
+          <span class="pill" style="background:rgba(255,179,71,0.13);color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
+          ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
         </div>
         ${msHTML}
-      </div>` : ''}
+      </div>
     </div>`;
   }).join('') : `<div style="color:var(--s7);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
 
@@ -1326,7 +1347,7 @@ function historyDayDetailHTML(date) {
       <div class="hist-workout-entry">
         <div>
           <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
-          ${e.items?.map(it => `<div style="color:var(--tc)">${it.name} · ${it.detail}</div>`).join('') || ''}
+          ${e.items?.map(it => `<div style="color:var(--text-secondary)">${it.name} · ${it.detail}</div>`).join('') || ''}
         </div>
         <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${Math.round(e.burned)} kcal</div>
       </div>`).join('')}` : '';
@@ -1337,7 +1358,7 @@ function historyDayDetailHTML(date) {
       <div class="hist-workout-entry">
         <div>
           <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${e.time}</div>
-          <div style="color:var(--tc)">${e.name} · ${e.sets}×${e.reps || e.secs+'s'}</div>
+          <div style="color:var(--text-secondary)">${e.name} · ${e.sets}×${e.reps || e.secs+'s'}</div>
         </div>
         <div style="color:var(--blue);font-family:var(--mono);font-weight:700;flex-shrink:0">-${e.calories} kcal</div>
       </div>`).join('')}` : '';
@@ -1393,19 +1414,18 @@ function historyDayDetailHTML(date) {
       const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
       const isExpanded = state.expandedScoreDate === date;
       return `
-    <div style="margin-top:16px;padding:12px;background:var(--s3);border-radius:12px;cursor:pointer" onclick="toggleHistoryScore('${date}')">
+    <div id="history-score-${date}" style="margin-top:16px;padding:12px;background:var(--s3);border-radius:12px;cursor:pointer" onclick="toggleHistoryScore('${date}')">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:13px;color:var(--muted)">🤖 Analiza ishrane</span>
-        <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
+        <span class="history-score-chevron" style="font-family:var(--mono);font-size:15px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
       </div>
-      ${isExpanded ? `
-      <div style="margin-top:10px">
+      <div class="history-score-content" style="display:${isExpanded ? 'block' : 'none'}">
         <div class="score-row"><span>${score.calories}</span></div>
         <div class="score-row"><span>${score.protein}</span></div>
         <div class="score-row"><span>${score.fat}</span></div>
         <div class="score-row"><span>${score.sugar}</span></div>
         <div style="margin-top:8px;font-size:13px;color:var(--muted)">${score.tip}</div>
-      </div>` : ''}
+      </div>
     </div>`;
     })()}
   </div>`;
@@ -1792,7 +1812,7 @@ function zdravljeTabHTML() {
   for (let i = 0; i < 30; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const ds = d.toISOString().slice(0, 10);
-    const ml = parseInt(localStorage.getItem('fitlog_water_' + ds) || 0);
+    const ml = loadWater(ds);
     if (ml >= waterGoal) waterStreak++;
     else if (i > 0) break;
   }
@@ -1827,7 +1847,7 @@ function zdravljeTabHTML() {
         ${waterHistory.map(e => {
           const pct = Math.min(100, (e.ml / waterGoal) * 100);
           const dayObj = new Date(e.date + 'T12:00:00');
-          const col = e.ml >= waterGoal ? 'var(--blue)' : e.ml > 0 ? 'var(--blue)66' : 'var(--s4)';
+          const col = e.ml >= waterGoal ? 'var(--blue)' : e.ml > 0 ? 'rgba(71,200,255,0.4)' : 'var(--s4)';
           const isToday = e.date === todayStr();
           return `<div class="water-hist-row">
             <span class="water-hist-date" style="${isToday ? 'color:var(--blue)' : ''}">${dayNames[dayObj.getDay()]}</span>
@@ -1887,7 +1907,8 @@ function zdravljeTabHTML() {
   if (current && prev) {
     const diff = current.weight - prev.weight;
     const col = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
-    diffHTML = `<span class="weight-log-diff" style="background:${col}22;color:${col}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>`;
+    const colAlpha = diff < 0 ? 'rgba(143,212,46,0.13)' : diff > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
+    diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>`;
   }
 
   const logHTML = log.slice(0, 8).map((e, i) => {
@@ -1895,7 +1916,8 @@ function zdravljeTabHTML() {
     if (i < log.length - 1) {
       const d = e.weight - log[i+1].weight;
       const c = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
-      entryDiff = `<span class="weight-log-diff" style="background:${c}22;color:${c}">${d>0?'+':''}${d.toFixed(1)}</span>`;
+      const cAlpha = d < 0 ? 'rgba(143,212,46,0.13)' : d > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
+      entryDiff = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d>0?'+':''}${d.toFixed(1)}</span>`;
     }
     return `<div class="weight-log-item">
       <span class="weight-log-date">${e.date}</span>
@@ -2021,6 +2043,8 @@ function zdravljeTabHTML() {
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 
 function render() {
+  // Clear per-render memoization cache on every new render cycle
+  clearRenderCache();
   const app = document.getElementById('app');
 
   // API key screen
@@ -2106,7 +2130,7 @@ function render() {
           <div><div class="stat-label">Uneseno</div><div class="stat-val" style="color:var(--green)">${Math.round(t.consumed)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
           <div><div class="stat-label">Sagoreno</div><div class="stat-val" style="color:var(--blue)">${Math.round(t.burned)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
           <div><div class="stat-label">Neto</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'}">${Math.round(t.net)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
-          <div><div class="stat-label">Preostalo</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--tc)'}">
+          <div><div class="stat-label">Preostalo</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)'}">
             ${t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net)}
             <span style="color:var(--s9);font-size:10px">kcal</span>
           </div></div>
@@ -2181,7 +2205,9 @@ function render() {
                   ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
                 </div>
                 ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
+                <div class="meal-score-area">
                 ${scoreHTML}
+                </div>
                 <button onclick="deleteMeal(${m.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
               </div>
             </div>
@@ -2314,7 +2340,7 @@ function render() {
       ${exHTML}
       ${emptyHTML}
       ${d.meals.length ? `
-        <div class="card" style="padding:0;overflow:hidden">
+        <div id="nutrition-score-card" class="card" style="padding:0;overflow:hidden">
           ${state.nutritionScoreLoading ? `
             <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
               🤖 AI analizira tvoj unos...
@@ -2324,7 +2350,7 @@ function render() {
               <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
                 <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
                 <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                <button onclick="state.nutritionScore=null;localStorage.removeItem(SCORE_KEY + state.date);render()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+                <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
               </div>
               <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
               <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
@@ -2557,9 +2583,16 @@ function saveHeight() {
 async function scoreNutrition() {
   const d = state.dayData;
   if (!d.meals.length) { showToast('Nema unesenih obroka za danas', 'err'); return; }
+
+  // Helper — always re-query to guard against stale ref if render() fires during async
+  const getCard = () => document.getElementById('nutrition-score-card');
+
+  if (getCard()) {
+    getCard().innerHTML = `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">🤖 AI analizira tvoj unos...</div>`;
+  }
   state.nutritionScoreLoading = true;
   state.nutritionScore = null;
-  render();
+
   try {
     const t = totals();
     const ml = macroLimits();
@@ -2578,11 +2611,34 @@ Vrati SAMO validan JSON bez markdown oznaka:
     const score = JSON.parse(raw.replace(/```json|```/g, '').trim());
     state.nutritionScore = score;
     saveNutritionScore(state.date, score);
+
+    // Re-query after await — element may have been replaced if render() fired during loading
+    const resultCard = getCard();
+    if (resultCard) {
+      const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      resultCard.innerHTML = `
+        <div style="padding:16px">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+            <div class="score-num" style="color:${scoreColor}">${score.score}</div>
+            <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
+            <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+          </div>
+          <div class="score-row"><span>${score.calories}</span></div>
+          <div class="score-row"><span>${score.protein}</span></div>
+          <div class="score-row"><span>${score.fat}</span></div>
+          <div class="score-row"><span>${score.sugar}</span></div>
+          <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${score.tip}</div>
+        </div>`;
+    }
   } catch(e) {
     showToast('Greška pri oceni ishrane', 'err');
+    const errCard = getCard();
+    if (errCard) {
+      errCard.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`;
+    }
   } finally {
     state.nutritionScoreLoading = false;
-    render();
+    // No render() — DOM already updated above
   }
 }
 
@@ -2642,8 +2698,15 @@ function toggleEx(id) {
 async function scoreMeal(mealId) {
   const meal = state.dayData.meals.find(m => m.id === mealId);
   if (!meal) return;
+
+  // Helper — always re-query to guard against stale ref if render() fires during async
+  const getArea = () => document.querySelector(`.log-item[data-id="${mealId}"] .meal-score-area`);
+
+  if (getArea()) {
+    getArea().innerHTML = `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`;
+  }
   state.mealScoreLoading = mealId;
-  render();
+
   try {
     const items = meal.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ');
     const prompt = `Oceni ovaj obrok u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
@@ -2652,31 +2715,83 @@ Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Mat
 Korisnik: ${state.weight}kg, cilj mršavljenje.
 Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpskom"}`;
     const raw = await callGemini(prompt, 0.2);
-    state.mealScores[mealId] = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    state.mealScores[mealId] = result;
     saveMealScores(state.date, state.mealScores);
+
+    // Re-query after await — element may have been replaced if render() fired during loading
+    const resultArea = getArea();
+    if (resultArea) {
+      const c = result.score >= 7 ? 'var(--green)' : result.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      resultArea.innerHTML = `
+        <div class="meal-score-inline">
+          <span class="meal-score-num" style="color:${c}">${result.score}/10</span>
+          <span style="flex:1;font-size:12px;line-height:1.4">${result.comment}</span>
+          <button onclick="clearMealScore(${mealId})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
+        </div>`;
+    }
   } catch(e) {
     state.mealScores[mealId] = { score: null, comment: 'Greška pri analizi.' };
+    const errArea = getArea();
+    if (errArea) {
+      errArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal(${mealId})">🤖 Oceni ponovo</button>`;
+    }
   } finally {
     state.mealScoreLoading = null;
-    render();
+    // No render() — DOM already updated above
   }
 }
 
 function clearMealScore(mealId) {
   delete state.mealScores[mealId];
   saveMealScores(state.date, state.mealScores);
-  render();
+  // Restore score button in place without full render
+  const scoreArea = document.querySelector(`.log-item[data-id="${mealId}"] .meal-score-area`);
+  if (scoreArea) {
+    scoreArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal(${mealId})">🤖 Oceni obrok</button>`;
+  }
+}
+
+function clearNutritionScore() {
+  state.nutritionScore = null;
+  localStorage.removeItem(SCORE_KEY + state.date);
+  // Restore score button in place without full render
+  const card = document.getElementById('nutrition-score-card');
+  if (card) {
+    card.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`;
+  }
 }
 
 function toggleHistoryMeal(id) {
-  if (state.expandedHistoryMealIds.has(id)) state.expandedHistoryMealIds.delete(id);
-  else state.expandedHistoryMealIds.add(id);
-  render();
+  // Direct DOM class toggle — no render() call, no page flash
+  const item = document.querySelector(`.hist-meal-item[data-hist-meal-id="${id}"]`);
+  if (!item) return;
+  const isExpanded = item.classList.toggle('expanded');
+  const chevron = item.querySelector('.hist-meal-chevron');
+  if (chevron) chevron.textContent = isExpanded ? '▲' : '▼';
+  if (isExpanded) state.expandedHistoryMealIds.add(id);
+  else state.expandedHistoryMealIds.delete(id);
 }
 
 function toggleHistoryScore(date) {
-  state.expandedScoreDate = state.expandedScoreDate === date ? null : date;
-  render();
+  // Direct DOM toggle — no render() call, no page flash
+  const card = document.getElementById('history-score-' + date);
+  if (!card) return;
+  const content = card.querySelector('.history-score-content');
+  const chevronEl = card.querySelector('.history-score-chevron');
+  const isExpanded = state.expandedScoreDate === date;
+
+  if (isExpanded) {
+    // Collapse
+    state.expandedScoreDate = null;
+    if (content) content.style.display = 'none';
+    if (chevronEl) chevronEl.textContent = chevronEl.textContent.replace('▲', '▼');
+  } else {
+    // Expand
+    state.expandedScoreDate = date;
+    if (content) content.style.display = 'block';
+    if (chevronEl) chevronEl.textContent = chevronEl.textContent.replace('▼', '▲');
+  }
 }
 
 function setZdravljeTab(sub) {
