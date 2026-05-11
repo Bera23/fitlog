@@ -234,10 +234,6 @@
   .toast.err { background: var(--red); color: var(--white); }
   .toast.hide { opacity: 0; transform: translate(-50%, -4px) scale(0.97); }
 
-  /* SETTINGS */
-  .settings-link { font-size: 11px; color: var(--s7); text-align: center; margin-top: 8px; cursor: pointer; }
-  .settings-link:hover { color: var(--muted); }
-
   /* STREAK */
   .streak-wrap { display: flex; align-items: center; gap: 16px; }
   .streak-num { font-family: var(--mono); font-size: 48px; font-weight: 700; line-height: 1; color: var(--green); }
@@ -409,6 +405,31 @@
 
   /* BOTTOM NAV placeholder */
   .spacer { height: 20px; }
+
+  /* SETTINGS DRAWER */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s var(--ease); }
+  .drawer-overlay.open { opacity: 1; pointer-events: all; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 300px; max-width: 92vw; background: var(--s1); border-left: 1px solid var(--s5); z-index: 201; transform: translateX(100%); transition: transform 0.28s var(--ease); overflow-y: auto; padding-bottom: 40px; }
+  .drawer.open { transform: translateX(0); }
+  .drawer-header { padding: 18px 16px 14px; border-bottom: 1px solid var(--s4); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--s1); z-index: 1; }
+  .drawer-title { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--green); }
+  .drawer-close { background: var(--s4); border: none; border-radius: 8px; color: var(--text); padding: 6px 14px; font-size: 15px; cursor: pointer; transition: background 0.12s; }
+  .drawer-close:active { background: var(--s6); }
+  .drawer-section { padding: 16px; border-bottom: 1px solid var(--s3); }
+  .drawer-section-title { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 12px; }
+  .drawer-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
+  .drawer-row:last-child { border-bottom: none; }
+  .drawer-row-label { color: var(--muted); }
+  .drawer-row-val { font-family: var(--mono); font-weight: 700; }
+  .drawer-btn { width: 100%; padding: 11px; background: var(--s3); border: 1px solid var(--s5); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; text-align: left; margin-bottom: 8px; }
+  .drawer-btn:last-child { margin-bottom: 0; }
+  .drawer-btn:active { background: var(--s5); }
+  .drawer-btn.danger { color: var(--red); border-color: var(--red)44; }
+  .drawer-input { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 13px; font-family: var(--mono); outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+  .drawer-input:focus { border-color: var(--s9); }
+  .drawer-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
+  .drawer-field { margin-bottom: 10px; }
+  .drawer-field-label { font-size: 11px; color: var(--s9); margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px; }
 </style>
 </head>
 <body>
@@ -457,6 +478,8 @@ const state = {
   selectedHistoryDate: null,
   imageBase64: null,
   imageMime: null,
+  drawerOpen: false,
+  geminiModel: localStorage.getItem('fitlog_model') || 'gemini-2.0-flash-lite',
   targetWeight: parseFloat(localStorage.getItem('fitlog_target_weight')) || null,
   targetWeightInput: '',
   editTargetWeight: false,
@@ -483,6 +506,9 @@ const EXERCISES = [
   { id: 'iskoraci',  name: 'Bočni iskoraci',     icon: '⚡', type: 'reps', kcalPerRepPerKg: 0.0028 },
   { id: 'podizanje', name: 'Podizanje nogu',     icon: '🦶', type: 'reps', kcalPerRepPerKg: 0.0018 },
 ];
+
+// Human-readable activity labels used across tabs and drawer
+const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -567,6 +593,40 @@ function safeParseLS(key) {
   } catch { return null; }
 }
 
+// ─── API STATS ────────────────────────────────────────────────────────────────
+
+function loadApiStats() {
+  return safeParseLS('fitlog_api_stats') || {
+    requests: { total: 0, today: 0, todayDate: '' },
+    errors: {},
+    responseTimes: [],
+    tokensApprox: 0,
+  };
+}
+
+function saveApiStats(s) {
+  localStorage.setItem('fitlog_api_stats', JSON.stringify(s));
+}
+
+// Called after every Gemini request to record metrics
+function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
+  const s = loadApiStats();
+  const today = todayStr();
+  // Reset daily counter on new day
+  if (s.requests.todayDate !== today) { s.requests.today = 0; s.requests.todayDate = today; }
+  s.requests.total++;
+  s.requests.today++;
+  if (!success && errorType) {
+    s.errors[errorType] = (s.errors[errorType] || 0) + 1;
+  }
+  // Keep last 50 response times for rolling average
+  s.responseTimes.push(ms);
+  if (s.responseTimes.length > 50) s.responseTimes = s.responseTimes.slice(-50);
+  // Rough token approximation: 4 chars ≈ 1 token
+  s.tokensApprox = (s.tokensApprox || 0) + Math.round((promptLen + responseLen) / 4);
+  saveApiStats(s);
+}
+
 // Debounce helper for training inputs
 let trainingDebounceTimer = null;
 function debounceRender() {
@@ -577,21 +637,33 @@ function debounceRender() {
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
 async function callGemini(prompt, temperature = 0.1) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature }
-    })
-  });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.geminiModel}:generateContent?key=${state.apiKey}`;
+  const start = Date.now();
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature }
+      })
+    });
+  } catch (fetchErr) {
+    trackApiCall({ success: false, errorType: 'NetworkError', ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
+    throw fetchErr;
+  }
   if (!res.ok) {
     const err = await res.json();
+    const code = res.status;
+    const errType = code === 429 ? '429 TooManyRequests' : code === 503 ? '503 ServiceUnavailable' : code === 404 ? '404 NotFound' : `${code} Error`;
+    trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
     throw new Error(err.error?.message || 'API greška');
   }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen: prompt.length, responseLen: text.length });
+  return text;
 }
 
 async function parseFood(text) {
@@ -627,7 +699,7 @@ Unos korisnika: ${text}`;
 
 async function parseFoodFromImage(base64, mimeType, textContext) {
   const w = state.weight || 75;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${state.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.geminiModel}:generateContent?key=${state.apiKey}`;
   // Append optional user text as extra context for the model
   const contextNote = textContext ? `\nDodatni opis od korisnika: "${textContext}"` : '';
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
@@ -637,21 +709,258 @@ Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format:
 {"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena"}`;
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { text: prompt },
-        { inline_data: { mime_type: mimeType, data: base64 } }
-      ]}],
-      generationConfig: { temperature: 0.1 }
-    })
-  });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API greška'); }
+  const start = Date.now();
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64 } }
+        ]}],
+        generationConfig: { temperature: 0.1 }
+      })
+    });
+  } catch (fetchErr) {
+    trackApiCall({ success: false, errorType: 'NetworkError', ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
+    throw fetchErr;
+  }
+  if (!res.ok) {
+    const e = await res.json();
+    const code = res.status;
+    const errType = code === 429 ? '429 TooManyRequests' : code === 503 ? '503 ServiceUnavailable' : `${code} Error`;
+    trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
+    throw new Error(e.error?.message || 'API greška');
+  }
   const data = await res.json();
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen: prompt.length, responseLen: raw.length });
   return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+// ─── SETTINGS DRAWER ─────────────────────────────────────────────────────────
+
+function openDrawer() {
+  state.drawerOpen = true;
+  renderDrawer();
+}
+
+function closeDrawer() {
+  state.drawerOpen = false;
+  renderDrawer();
+}
+
+// Persistent DOM element outside #app — survives render() calls
+function renderDrawer() {
+  let wrap = document.getElementById('settings-drawer-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'settings-drawer-wrap';
+    document.body.appendChild(wrap);
+  }
+  wrap.innerHTML = `
+    <div class="drawer-overlay ${state.drawerOpen ? 'open' : ''}" onclick="closeDrawer()"></div>
+    <div class="drawer ${state.drawerOpen ? 'open' : ''}">
+      ${settingsDrawerHTML()}
+    </div>`;
+}
+
+function settingsDrawerHTML() {
+  const stats = loadApiStats();
+  const avgTime = stats.responseTimes.length
+    ? Math.round(stats.responseTimes.reduce((s, t) => s + t, 0) / stats.responseTimes.length)
+    : 0;
+  const errorEntries = Object.entries(stats.errors || {}).filter(([, v]) => v > 0);
+  const maskedKey = state.apiKey ? state.apiKey.slice(0, 8) + '•••••••••••' : '—';
+  // Display tokens: show 0 when none, k suffix above 1000
+  const tokensDisplay = stats.tokensApprox > 1000
+    ? Math.round(stats.tokensApprox / 1000) + 'k'
+    : String(stats.tokensApprox || 0);
+
+  return `
+    <div class="drawer-header">
+      <span class="drawer-title">⚙ Podešavanja</span>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <!-- API KLJUČ -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Gemini API</div>
+      <div class="drawer-field">
+        <div class="drawer-field-label">Aktivan ključ</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--s9);padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5)">${maskedKey}</div>
+      </div>
+      <div class="drawer-field">
+        <div class="drawer-field-label">Model</div>
+        <select class="drawer-select" onchange="updateModel(this.value)">
+          <option value="gemini-2.0-flash-lite" ${state.geminiModel === 'gemini-2.0-flash-lite' ? 'selected' : ''}>gemini-2.0-flash-lite (preporučen)</option>
+          <option value="gemini-2.0-flash" ${state.geminiModel === 'gemini-2.0-flash' ? 'selected' : ''}>gemini-2.0-flash</option>
+          <option value="gemini-1.5-flash" ${state.geminiModel === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
+          <option value="gemini-3.1-flash-lite-preview" ${state.geminiModel === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview ⚠</option>
+        </select>
+      </div>
+      <div class="drawer-field">
+        <div class="drawer-field-label">Promeni ključ</div>
+        <input class="drawer-input" id="drawerApiInput" type="password" placeholder="AIzaSy..." style="margin-bottom:6px"/>
+        <button onclick="saveDrawerApiKey()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj novi ključ</button>
+      </div>
+      <button onclick="clearApiKey()" class="drawer-btn danger">🗑 Obriši API ključ</button>
+    </div>
+
+    <!-- PROFIL -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Profil</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="flex:1">
+          <div class="drawer-field-label">Godine</div>
+          <input class="drawer-input" type="number" id="drawerAge" value="${state.age}" min="10" max="100"/>
+        </div>
+        <div style="flex:1">
+          <div class="drawer-field-label">Pol</div>
+          <select class="drawer-select" id="drawerGender">
+            <option value="male" ${state.gender === 'male' ? 'selected' : ''}>Muško</option>
+            <option value="female" ${state.gender === 'female' ? 'selected' : ''}>Žensko</option>
+          </select>
+        </div>
+      </div>
+      <div class="drawer-field">
+        <div class="drawer-field-label">Nivo aktivnosti</div>
+        <select class="drawer-select" id="drawerActivity">
+          <option value="sedentary" ${state.activity === 'sedentary' ? 'selected' : ''}>Sedentarni</option>
+          <option value="light" ${state.activity === 'light' ? 'selected' : ''}>Lako aktivan (1-3x/ned)</option>
+          <option value="moderate" ${state.activity === 'moderate' ? 'selected' : ''}>Umeren (3-5x/ned)</option>
+          <option value="active" ${state.activity === 'active' ? 'selected' : ''}>Aktivan (6-7x/ned)</option>
+        </select>
+      </div>
+      <button onclick="saveDrawerProfile()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj profil</button>
+    </div>
+
+    <!-- KALORIJSKI CILJ -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Kalorijski cilj</div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Trenutni cilj</span>
+        <span class="drawer-row-val" style="color:var(--green)">${state.calorieGoal} kcal</span>
+      </div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Način</span>
+        <span style="font-size:12px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}">${state.calorieGoalManual ? 'Ručno' : 'Auto (TDEE−500)'}</span>
+      </div>
+      <div class="drawer-field" style="margin-top:10px">
+        <div class="drawer-field-label">Postavi ručno (kcal)</div>
+        <div style="display:flex;gap:8px">
+          <input class="drawer-input" type="number" id="drawerGoalInput" value="${state.calorieGoal}" style="flex:1"/>
+          <button onclick="saveDrawerGoal()" style="background:var(--green);color:var(--bg);border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0">Sačuvaj</button>
+        </div>
+      </div>
+      ${state.calorieGoalManual ? `<button onclick="resetGoalToAuto()" class="drawer-btn" style="margin-top:4px">↺ Vrati na auto (TDEE−500)</button>` : ''}
+    </div>
+
+    <!-- API USAGE — sve počinje od 0 -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">API Usage</div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Zahtevi danas</span>
+        <span class="drawer-row-val" style="color:var(--blue)">${stats.requests?.today || 0}</span>
+      </div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Zahtevi ukupno</span>
+        <span class="drawer-row-val">${stats.requests?.total || 0}</span>
+      </div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Prosečno vreme odgovora</span>
+        <span class="drawer-row-val" style="color:${avgTime > 3000 ? 'var(--red)' : avgTime > 1500 ? 'var(--orange)' : avgTime > 0 ? 'var(--green)' : 'var(--s7)'}">${avgTime > 0 ? avgTime + ' ms' : '0 ms'}</span>
+      </div>
+      <div class="drawer-row">
+        <span class="drawer-row-label">Tokeni (aproks.)</span>
+        <span class="drawer-row-val">${tokensDisplay}</span>
+      </div>
+      ${errorEntries.length ? `
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--s3)">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:700;letter-spacing:0.8px">GREŠKE</div>
+        ${errorEntries.map(([type, count]) => `
+          <div class="drawer-row">
+            <span style="font-size:12px;color:var(--red)">${type}</span>
+            <span class="drawer-row-val" style="color:var(--red)">${count}</span>
+          </div>`).join('')}
+      </div>` : `<div style="font-size:12px;color:var(--s7);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
+      <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Podaci</div>
+      <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>
+    </div>`;
+}
+
+function saveDrawerApiKey() {
+  const val = document.getElementById('drawerApiInput')?.value.trim();
+  if (!val) { showToast('Unesi API ključ', 'err'); return; }
+  state.apiKey = val;
+  localStorage.setItem('fitlog_apikey', val);
+  showToast('API ključ sačuvan ✓');
+  renderDrawer();
+}
+
+function saveDrawerProfile() {
+  const age = parseInt(document.getElementById('drawerAge')?.value);
+  const gender = document.getElementById('drawerGender')?.value;
+  const activity = document.getElementById('drawerActivity')?.value;
+  if (!age || isNaN(age) || age < 10) { showToast('Unesi validne godine', 'err'); return; }
+  state.age = age; localStorage.setItem('fitlog_age', age);
+  state.gender = gender; localStorage.setItem('fitlog_gender', gender);
+  state.activity = activity; localStorage.setItem('fitlog_activity', activity);
+  autoCalorieGoal();
+  showToast('Profil sačuvan ✓');
+  render(); // updates zdravlje kalorije tab, header progress, ring
+}
+
+function saveDrawerGoal() {
+  const val = parseInt(document.getElementById('drawerGoalInput')?.value);
+  if (!val || isNaN(val) || val < 500) { showToast('Unesi validan cilj (min 500 kcal)', 'err'); return; }
+  state.calorieGoal = val;
+  state.calorieGoalManual = true;
+  localStorage.setItem('fitlog_goal', val);
+  localStorage.setItem('fitlog_goal_manual', '1');
+  showToast('Kalorijski cilj sačuvan ✓');
+  render(); // updates ring, progress bar, stats tab
+}
+
+function updateModel(val) {
+  state.geminiModel = val;
+  localStorage.setItem('fitlog_model', val);
+  showToast(`Model: ${val}`);
+  renderDrawer();
+}
+
+function clearApiStats() {
+  localStorage.removeItem('fitlog_api_stats');
+  showToast('Statistika resetovana');
+  renderDrawer();
+}
+
+function exportData() {
+  // Collect all fitlog_ prefixed keys from localStorage
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('fitlog_')) {
+      try { data[key] = JSON.parse(localStorage.getItem(key)); }
+      catch { data[key] = localStorage.getItem(key); }
+    }
+  }
+  data._exportedAt = new Date().toISOString();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fitlog_backup_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Podaci izvezeni ✓');
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
@@ -1611,27 +1920,9 @@ function zdravljeTabHTML() {
   if (sub === 'kalorije') return subNav + `
     <div class="card">
       <div class="card-label">🔥 Kalorije — preporuka</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <div style="flex:1;min-width:70px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Godine</div>
-          <input class="goal-input" type="number" value="${state.age}" onchange="updateProfile('age',this.value)" style="width:100%"/>
-        </div>
-        <div style="flex:1;min-width:80px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Pol</div>
-          <select onchange="updateProfile('gender',this.value)" style="width:100%;background:var(--s1);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 6px;font-size:12px;outline:none">
-            <option value="male" ${state.gender==='male'?'selected':''}>Muško</option>
-            <option value="female" ${state.gender==='female'?'selected':''}>Žensko</option>
-          </select>
-        </div>
-        <div style="flex:2;min-width:140px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Aktivnost</div>
-          <select onchange="updateProfile('activity',this.value)" style="width:100%;background:var(--s1);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 6px;font-size:12px;outline:none">
-            <option value="sedentary" ${state.activity==='sedentary'?'selected':''}>Sedentarni</option>
-            <option value="light" ${state.activity==='light'?'selected':''}>Lako aktivan (1-3x/ned)</option>
-            <option value="moderate" ${state.activity==='moderate'?'selected':''}>Umeren (3-5x/ned)</option>
-            <option value="active" ${state.activity==='active'?'selected':''}>Aktivan (6-7x/ned)</option>
-          </select>
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5);margin-bottom:12px">
+        <span style="font-size:12px;color:var(--s9);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
+        <button onclick="openDrawer()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s9);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)">⚙ Uredi profil</button>
       </div>
       <div class="zdravlje-stat">
         <span class="zdravlje-stat-label">Bazalni metabolizam (BMR)</span>
@@ -1647,7 +1938,10 @@ function zdravljeTabHTML() {
       </div>
       <div class="zdravlje-stat">
         <span class="zdravlje-stat-label">Tvoj trenutni cilj</span>
-        <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}</span>
+        <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">
+          ${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}
+          <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:10px;cursor:pointer;text-decoration:underline;margin-left:4px;font-family:var(--sans)">uredi</button>
+        </span>
       </div>
     </div>`;
 
@@ -1803,10 +2097,10 @@ function render() {
     <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px">
       ${ringHTML(t.consumed, t.burned, state.calorieGoal)}
       <div style="width:100%">
-        <div class="goal-row" style="justify-content:center;margin-bottom:12px">Cilj:
-          <input class="goal-input" type="number" value="${state.calorieGoal}" onchange="updateGoal(this.value)"/>
-          <span style="color:var(--s9)">kcal</span>
-          ${state.calorieGoalManual ? `<span onclick="resetGoalToAuto()" style="font-size:10px;color:var(--s9);cursor:pointer;text-decoration:underline;margin-left:4px">auto</span>` : `<span style="font-size:10px;color:var(--s8);margin-left:4px">TDEE-500</span>`}
+        <div class="goal-row" style="justify-content:center;margin-bottom:12px">
+          Cilj: <strong style="font-family:var(--mono);color:var(--green);margin:0 4px">${state.calorieGoal}</strong> kcal
+          <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'TDEE−500'}</span>
+          <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:11px;cursor:pointer;text-decoration:underline;margin-left:6px;font-family:var(--sans)">⚙ uredi</button>
         </div>
         <div class="stats-grid">
           <div><div class="stat-label">Uneseno</div><div class="stat-val" style="color:var(--green)">${Math.round(t.consumed)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
@@ -1956,6 +2250,7 @@ function render() {
   app.innerHTML = `
     <div class="header">
       <span class="logo">FITLOG</span>
+      <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:8px;line-height:1;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--s9)'">⚙</button>
     </div>
     <div class="header-progress-wrap">
       <div class="header-progress-track">
@@ -1998,7 +2293,6 @@ function render() {
           <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
         </div>` : ''}
         <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
-        <div class="settings-link" onclick="clearApiKey()">⚙ Promeni API ključ</div>
       </div>
       ${state.loading ? `
         <div class="skeleton-card">
@@ -2067,6 +2361,8 @@ function render() {
         <span class="nav-label">Istorija</span>
       </button>
     </div>`;
+  // Sync drawer after every render (drawer is a separate DOM element)
+  renderDrawer();
 }
 
 function addWater(ml) {
@@ -2094,22 +2390,6 @@ function updateWaterGoal(val) {
     localStorage.setItem('fitlog_water_goal', v);
     localStorage.setItem('fitlog_water_goal_manual', '1');
   }
-}
-
-function updateProfile(field, value) {
-  if (field === 'age') {
-    const v = parseInt(value);
-    if (!isNaN(v) && v > 0) { state.age = v; localStorage.setItem('fitlog_age', v); }
-  } else if (field === 'gender') {
-    state.gender = value;
-    localStorage.setItem('fitlog_gender', value);
-  } else if (field === 'activity') {
-    state.activity = value;
-    localStorage.setItem('fitlog_activity', value);
-  }
-  // Recalculate calorie goal if not manually set
-  autoCalorieGoal();
-  render();
 }
 
 function startEditTargetWeight() {
@@ -2224,9 +2504,11 @@ function saveApiKey() {
 
 function clearApiKey() {
   if (confirm('Obriši API ključ?')) {
+    state.drawerOpen = false; // close drawer before transitioning to API key screen
     state.apiKey = '';
     localStorage.removeItem('fitlog_apikey');
-    render();
+    renderDrawer(); // visually close drawer first
+    render(); // then show API key screen
   }
 }
 
@@ -2493,16 +2775,6 @@ function deleteWorkoutEntry(uid) {
   const workout = loadWorkout(state.date).filter(e => e.uid !== uid);
   saveWorkout(state.date, workout);
   render();
-}
-
-function updateGoal(val) {
-  const v = parseInt(val);
-  if (!isNaN(v) && v > 0) {
-    state.calorieGoal = v;
-    state.calorieGoalManual = true;
-    localStorage.setItem('fitlog_goal', v);
-    localStorage.setItem('fitlog_goal_manual', '1');
-  }
 }
 
 function resetGoalToAuto() {
