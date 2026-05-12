@@ -64,8 +64,9 @@
 
   /* HEADER PROGRESS BAR */
   .header-progress-wrap { padding: 8px 16px 0; }
-  .header-progress-track { height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; margin-bottom: 5px; }
-  .header-progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease), background 0.3s; }
+  .header-progress-track { height: 9px; background: var(--s4); border-radius: 99px; overflow: hidden; margin-bottom: 5px; }
+  /* Gradient fill: green → cyan as bar fills up */
+  .header-progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), #47ffb5); transition: width 0.6s var(--ease), background 0.3s; }
   .header-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 
   /* ZDRAVLJE SUBTABS */
@@ -94,8 +95,8 @@
   .report-day-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
   .report-day-row:last-child { border-bottom: none; }
   .report-day-name { color: var(--muted); min-width: 28px; font-family: var(--mono); }
-  .report-day-bar-wrap { flex: 1; height: 5px; background: var(--s4); border-radius: 3px; overflow: hidden; }
-  .report-day-bar { height: 100%; border-radius: 3px; }
+  .report-day-bar-wrap { flex: 1; height: 7px; background: var(--s4); border-radius: 99px; overflow: hidden; }
+  .report-day-bar { height: 100%; border-radius: 99px; }
   .report-day-val { min-width: 50px; text-align: right; font-family: var(--mono); font-weight: 700; font-size: 11px; }
   .report-grade { font-size: 48px; text-align: center; margin: 8px 0 4px; }
   .report-grade-label { text-align: center; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
@@ -192,17 +193,29 @@
   .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .ring-kcal { font-size: 22px; font-weight: 800; font-family: var(--mono); }
   .ring-label { font-size: 11px; color: var(--s11); letter-spacing: 1px; }
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
-  .stat-label { color: var(--muted); }
+  /* stats-grid replaced by stats-chain horizontal layout */
+  /* Horizontal chain layout for the 4 daily stats */
+  .stats-chain { display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; margin-top: 4px; }
+  .stats-chain-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .stats-chain-divider { color: var(--s7); font-size: 16px; font-weight: 300; flex-shrink: 0; margin-bottom: 14px; }
+  .stats-chain-result { width: 100%; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 6px; display: flex; justify-content: space-between; align-items: center; }
+  /* Uppercase micro-label with tracking */
+  .stat-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
   .stat-val { font-family: var(--mono); font-weight: 700; }
   .goal-row { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 3px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; }
 
   /* MACRO BAR */
-  .macro-row { margin-bottom: 8px; }
-  .macro-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
-  .macro-track { height: 5px; background: var(--s2); border-radius: 3px; overflow: hidden; }
-  .macro-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .macro-row { margin-bottom: 10px; }
+  .macro-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  /* Pill shape track with subtle inner shadow */
+  .macro-track { height: 8px; background: var(--s3); border-radius: 99px; overflow: visible; position: relative; }
+  /* Fill as pill; box-shadow glow color is set inline via --glow-color */
+  .macro-fill {
+    height: 100%; border-radius: 99px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 8px 1px var(--glow-color, transparent);
+  }
 
   /* LOG ITEMS — better hierarchy */
   .log-item { position: relative; overflow: hidden; border-bottom: 1px solid var(--s3); }
@@ -1153,7 +1166,7 @@ function macroBar(label, value, min, max, color, unit) {
         </div>
       </div>
       <div class="macro-track">
-        <div class="macro-fill" style="width:${pct}%;background:${statusColor}"></div>
+        <div class="macro-fill" style="width:${pct}%;background:${statusColor};--glow-color:${statusColor}44"></div>
       </div>
     </div>`;
 }
@@ -1238,12 +1251,17 @@ function weekChartHTML(weekData) {
     const dayLabel = days[date.getDay()];
     const isToday = d.date === todayDate;
     const heightPct = d.hasData ? Math.max(4, (d.net / maxNet) * 100) : 4;
-    const color = d.future ? 'var(--s2)' : !d.hasData ? 'var(--s4)' : d.net < goal ? 'var(--green)' : 'var(--red)';
+    // Today: full opacity; past with data: 0.85; past no data: 0.3; future: 0.12
+    const opacity = isToday ? 1 : d.future ? 0.12 : d.hasData ? 0.85 : 0.3;
+    // Future bars use s3, past no-data s5, today/past with data use green/red
+    const color = d.future ? 'var(--s5)' : !d.hasData ? 'var(--s6)' : d.net < goal ? 'var(--green)' : 'var(--red)';
+    // Today gets a subtle top border highlight
+    const todayStyle = isToday ? 'outline:1.5px solid var(--green);outline-offset:-1px;border-radius:4px 4px 0 0;' : '';
     const kcalLabel = d.hasData ? (d.net >= 1000 ? Math.round(d.net/100)/10 + 'k' : Math.round(d.net)) : '';
     return `
       <div class="chart-col">
         <div class="chart-kcal">${kcalLabel}</div>
-        <div class="chart-bar" style="height:${heightPct}%;background:${color};opacity:${isToday ? 1 : 0.7}"></div>
+        <div class="chart-bar" style="height:${heightPct}%;background:${color};opacity:${opacity};${todayStyle}"></div>
         <div class="chart-day ${isToday ? 'today' : ''}">${dayLabel}</div>
       </div>`;
   }).join('');
@@ -2176,14 +2194,43 @@ function render() {
           <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'TDEE−500'}</span>
           <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:11px;cursor:pointer;text-decoration:underline;margin-left:6px;font-family:var(--sans)">⚙ uredi</button>
         </div>
-        <div class="stats-grid">
-          <div><div class="stat-label">Uneseno</div><div class="stat-val" style="color:var(--green)">${Math.round(t.consumed)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
-          <div><div class="stat-label">Sagoreno</div><div class="stat-val" style="color:var(--blue)">${Math.round(t.burned)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
-          <div><div class="stat-label">Neto</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'}">${Math.round(t.net)} <span style="color:var(--s9);font-size:10px">kcal</span></div></div>
-          <div><div class="stat-label">Preostalo</div><div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)'}">
+        <div class="stats-chain">
+          <!-- Uneseno -->
+          <div class="stats-chain-item">
+            <div class="stat-label">Uneseno</div>
+            <div class="stat-val" style="color:var(--green);font-size:18px">
+              ${Math.round(t.consumed)}
+              <span style="color:var(--s11);font-size:10px">kcal</span>
+            </div>
+          </div>
+          <!-- Minus divider -->
+          <div class="stats-chain-divider">−</div>
+          <!-- Sagoreno: gray when 0, blue when active -->
+          <div class="stats-chain-item">
+            <div class="stat-label">Sagoreno</div>
+            <div class="stat-val" style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--muted)'};font-size:18px">
+              ${Math.round(t.burned)}
+              <span style="color:var(--s11);font-size:10px">kcal</span>
+            </div>
+          </div>
+          <!-- Equals divider -->
+          <div class="stats-chain-divider">=</div>
+          <!-- Neto -->
+          <div class="stats-chain-item">
+            <div class="stat-label">Neto</div>
+            <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'};font-size:18px">
+              ${Math.round(t.net)}
+              <span style="color:var(--s11);font-size:10px">kcal</span>
+            </div>
+          </div>
+        </div>
+        <!-- Preostalo as result row below the chain -->
+        <div class="stats-chain-result">
+          <div class="stat-label">Preostalo do cilja</div>
+          <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)'}">
             ${t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net)}
-            <span style="color:var(--s9);font-size:10px">kcal</span>
-          </div></div>
+            <span style="color:var(--s11);font-size:10px">kcal</span>
+          </div>
         </div>
       </div>
     </div>
@@ -2330,7 +2377,7 @@ function render() {
     </div>
     <div class="header-progress-wrap">
       <div class="header-progress-track">
-        <div class="header-progress-fill" style="width:${progressPct}%;background:${progressColor}"></div>
+        <div class="header-progress-fill" style="width:${progressPct}%;${progressPct >= 85 ? 'background:' + progressColor : ''}"></div>
       </div>
       <div class="header-progress-labels">
         ${progressLabel}
