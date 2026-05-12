@@ -454,10 +454,18 @@ const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models
 const LS_VERSION = 1;
 
 // ─── DOMAIN CONSTANTS ────────────────────────────────────────────────────────
-const KCAL_PER_KG_FAT     = 7700;   // approximate kcal needed to burn 1 kg of body fat
-const WATER_ML_PER_KG     = 30;     // recommended daily water intake in ml per kg bodyweight
-const DEFAULT_WATER_GOAL_ML = 2000; // fallback water goal when weight is unknown
-const CUSTOM_EX_KCAL_COEFF = 0.002; // rough kcal per rep per kg for unknown exercises
+const KCAL_PER_KG_FAT      = 7700;   // approximate kcal needed to burn 1 kg of body fat
+const WATER_ML_PER_KG      = 30;     // recommended daily water intake in ml per kg bodyweight
+const DEFAULT_WATER_GOAL_ML = 2000;  // fallback water goal when weight is unknown
+const CUSTOM_EX_KCAL_COEFF  = 0.002; // rough kcal per rep per kg for unknown exercises
+const DEBOUNCE_MS           = 120;   // ms delay before re-render after training input changes
+
+// ─── GEMINI PROMPT SCHEMAS ───────────────────────────────────────────────────
+// JSON output format strings shared across prompt functions — single source of truth
+const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}';
+const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
+const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}';
+const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom"}';
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -544,8 +552,8 @@ function localDateStr(d) {
 
 // Format YYYY-MM-DD storage key to DD.MM. for display
 function fmtDate(dateStr) {
-  const [, mm, dd] = dateStr.split('-');
-  return `${dd}.${mm}.`;
+  const [, month, day] = dateStr.split('-');
+  return `${day}.${month}.`;
 }
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
@@ -579,13 +587,17 @@ function saveWater(date, ml) {
 }
 
 function loadWaterHistory(days) {
+  const cacheKey = 'waterHistory_' + days;
+  if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = localDateStr(d);
-    result.push({ date: dateStr, ml: parseInt(localStorage.getItem('fitlog_water_' + dateStr) || 0) });
+    // parseInt first, then || 0 — avoids parseInt(null || 0) === parseInt(0) edge case
+    result.push({ date: dateStr, ml: parseInt(localStorage.getItem('fitlog_water_' + dateStr)) || 0 });
   }
+  _renderCache[cacheKey] = result;
   return result;
 }
 
@@ -688,12 +700,18 @@ function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
   saveApiStats(s);
 }
 
-// Debounce helper for training inputs
-let trainingDebounceTimer = null;
-function debounceRender() {
-  clearTimeout(trainingDebounceTimer);
-  trainingDebounceTimer = setTimeout(render, 120);
+// Generic debounce — returns a debounced wrapper that delays fn execution by ms
+// after the last call, encapsulating the timer so callers stay clean.
+function debounce(fn, ms) {
+  let timer = null;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
 }
+
+// Debounced render for training inputs — avoids re-render on every keystroke
+const debounceRender = debounce(render, DEBOUNCE_MS);
 
 // Per-render memoization cache — cleared at the start of each render() call.
 // Avoids repeated localStorage reads for the same key within one render cycle.
@@ -742,8 +760,7 @@ async function parseFood(text) {
 Korisnikova telesna masa je ${w} kg.
 Iz opisa izvuci namirnice i proceni kalorije, makronutrijente i šećer.
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
-Format:
-{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}
+Format: ${GEMINI_FOOD_SCHEMA}
 Napomena: sugar je dodati i prirodni šećer u gramima.
 
 Unos korisnika: ${text}`;
@@ -758,8 +775,7 @@ async function parseExercise(text) {
 Korisnikova telesna masa je ${w} kg.
 Iz opisa izvuci aktivnosti i proceni potrošnju kalorija.
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
-Format:
-{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}
+Format: ${GEMINI_EXERCISE_SCHEMA}
 
 Unos korisnika: ${text}`;
 
@@ -775,8 +791,7 @@ async function parseFoodFromImage(base64, mimeType, textContext) {
 Korisnikova telesna masa je ${w} kg.
 Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.${contextNote}
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
-Format:
-{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena"}`;
+Format: ${GEMINI_FOOD_SCHEMA}`;
 
   // Pass text and image as parts — callGemini handles fetch, error handling, and tracking
   const raw = await callGemini([
@@ -989,15 +1004,14 @@ function clearApiStats() {
 }
 
 function exportData() {
-  // Collect all fitlog_ prefixed keys from localStorage
+  // Collect all fitlog_ prefixed keys — Object.keys is safer than index-based iteration
   const data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('fitlog_')) {
+  Object.keys(localStorage)
+    .filter(key => key.startsWith('fitlog_'))
+    .forEach(key => {
       try { data[key] = JSON.parse(localStorage.getItem(key)); }
       catch { data[key] = localStorage.getItem(key); }
-    }
-  }
+    });
   data._exportedAt = new Date().toISOString();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1005,7 +1019,8 @@ function exportData() {
   a.href = url;
   a.download = `fitlog_backup_${todayStr()}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoke after a tick — immediate revoke can race with the browser download trigger
+  setTimeout(() => URL.revokeObjectURL(url), 100);
   showToast('Podaci izvezeni ✓');
 }
 
@@ -1281,6 +1296,8 @@ function bmiCategory(bmi) {
 
 
 function getHistoryData(maxDays = 90) {
+  const cacheKey = 'historyData_' + maxDays;
+  if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
   const entries = [];
   for (let i = 0; i < maxDays; i++) {
     const d = new Date();
@@ -1299,6 +1316,7 @@ function getHistoryData(maxDays = 90) {
       }
     }
   }
+  _renderCache[cacheKey] = entries;
   return entries;
 }
 
@@ -2209,13 +2227,13 @@ function render() {
           ? `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`
           : ms
             ? (() => { const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-                return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore(${m.id})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`; })()
-            : `<button class="meal-score-btn" onclick="scoreMeal(${m.id})">🤖 Oceni obrok</button>`;
+                return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore('${m.id}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`; })()
+            : `<button class="meal-score-btn" onclick="scoreMeal('${m.id}')">🤖 Oceni obrok</button>`;
         return `
-          <div class="log-item${isOpen ? ' expanded' : ''}" data-id="${m.id}" ontouchstart="swipeStart(event,${m.id},'meal')" ontouchmove="swipeMove(event,${m.id})" ontouchend="swipeEnd(event,${m.id},'meal')" ontouchcancel="swipeCancel(${m.id})">
+          <div class="log-item${isOpen ? ' expanded' : ''}" data-id="${m.id}" ontouchstart="swipeStart(event,'${m.id}','meal')" ontouchmove="swipeMove(event,'${m.id}')" ontouchend="swipeEnd(event,'${m.id}','meal')" ontouchcancel="swipeCancel('${m.id}')">
             <div class="swipe-delete-bg">🗑</div>
             <div class="log-item-inner" id="swipe-meal-${m.id}" style="background:var(--card)">
-              <div class="meal-header" onclick="toggleMeal(${m.id})">
+              <div class="meal-header" onclick="toggleMeal('${m.id}')">
                 <span class="meal-time-badge">${m.time}</span>
                 <span class="meal-summary">${mainName}${extraCount}</span>
                 <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
@@ -2240,7 +2258,7 @@ function render() {
                 <div class="meal-score-area">
                 ${scoreHTML}
                 </div>
-                <button onclick="deleteMeal(${m.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
+                <button onclick="deleteMeal('${m.id}')" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
               </div>
             </div>
           </div>`;
@@ -2259,7 +2277,7 @@ function render() {
         return `
           <div class="log-item${isOpen ? ' expanded' : ''}" data-ex-id="${e.id}">
             <div class="log-item-inner" style="background:var(--card)">
-              <div class="meal-header" onclick="toggleEx(${e.id})">
+              <div class="meal-header" onclick="toggleEx('${e.id}')">
                 <span class="meal-time-badge" style="color:var(--blue)">${e.time}</span>
                 <span class="meal-summary">${mainName}</span>
                 <span class="meal-kcal-badge" style="color:var(--blue)">-${Math.round(e.burned)} kcal</span>
@@ -2270,7 +2288,7 @@ function render() {
                 ${e.items.map(it => `
                   <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.detail}</div>`).join('')}
                 ${e.note ? `<div class="log-note" style="margin-top:6px">${e.note}</div>` : ''}
-                <button onclick="deleteEx(${e.id})" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši aktivnost</button>
+                <button onclick="deleteEx('${e.id}')" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši aktivnost</button>
               </div>
             </div>
           </div>`;
@@ -2636,8 +2654,7 @@ Obroci: ${mealsSummary}
 Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
 Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: ${ml.protMin}g.
 
-Vrati SAMO validan JSON bez markdown oznaka:
-{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}`;
+Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
 
     const raw = await callGemini([{ text: prompt }], 0.3);
     const score = parseGeminiJson(raw);
@@ -2745,7 +2762,7 @@ async function scoreMeal(mealId) {
 Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
 Korisnik: ${state.weight}kg, cilj mršavljenje.
-Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpskom"}`;
+Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const raw = await callGemini([{ text: prompt }], 0.2);
     const result = parseGeminiJson(raw);
     state.mealScores[mealId] = result;
@@ -2759,14 +2776,14 @@ Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpsko
         <div class="meal-score-inline">
           <span class="meal-score-num" style="color:${c}">${result.score}/10</span>
           <span style="flex:1;font-size:12px;line-height:1.4">${result.comment}</span>
-          <button onclick="clearMealScore(${mealId})" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
+          <button onclick="clearMealScore('${mealId}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
         </div>`;
     }
   } catch(e) {
     state.mealScores[mealId] = { score: null, comment: 'Greška pri analizi.' };
     const errArea = getArea();
     if (errArea) {
-      errArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal(${mealId})">🤖 Oceni ponovo</button>`;
+      errArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal('${mealId}')">🤖 Oceni ponovo</button>`;
     }
   } finally {
     state.mealScoreLoading = null;
@@ -2780,7 +2797,7 @@ function clearMealScore(mealId) {
   // Restore score button in place without full render
   const scoreArea = document.querySelector(`.log-item[data-id="${mealId}"] .meal-score-area`);
   if (scoreArea) {
-    scoreArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal(${mealId})">🤖 Oceni obrok</button>`;
+    scoreArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal('${mealId}')">🤖 Oceni obrok</button>`;
   }
 }
 
@@ -2965,7 +2982,7 @@ async function handleSubmit() {
       }
       if (!result?.items?.length) throw new Error('Nije parsovano');
       const meal = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         time: now,
         items: result.items,
         calories: result.total_calories,
@@ -2982,7 +2999,7 @@ async function handleSubmit() {
       const result = await parseExercise(input);
       if (!result?.items?.length) throw new Error('Nije parsovano');
       const ex = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         time: now,
         items: result.items,
         burned: result.total_burned,
