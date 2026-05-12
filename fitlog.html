@@ -453,6 +453,12 @@ const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models
 // localStorage schema version — bump when a breaking data migration is needed
 const LS_VERSION = 1;
 
+// ─── DOMAIN CONSTANTS ────────────────────────────────────────────────────────
+const KCAL_PER_KG_FAT     = 7700;   // approximate kcal needed to burn 1 kg of body fat
+const WATER_ML_PER_KG     = 30;     // recommended daily water intake in ml per kg bodyweight
+const DEFAULT_WATER_GOAL_ML = 2000; // fallback water goal when weight is unknown
+const CUSTOM_EX_KCAL_COEFF = 0.002; // rough kcal per rep per kg for unknown exercises
+
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
   try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
@@ -499,7 +505,7 @@ const state = {
   age: parseInt(localStorage.getItem('fitlog_age')) || 30,
   gender: localStorage.getItem('fitlog_gender') || 'male',
   activity: localStorage.getItem('fitlog_activity') || 'sedentary',
-  waterGoal: parseInt(localStorage.getItem('fitlog_water_goal')) || (parseFloat(localStorage.getItem('fitlog_weight')) ? Math.round(parseFloat(localStorage.getItem('fitlog_weight')) * 30) : 2000),
+  waterGoal: initWaterGoal(),
   // Training inputs state per exercise
   trainingInputs: {
     cucnjevi:  { sets: 3, reps: 10 },
@@ -524,12 +530,8 @@ const EXERCISES = [
 const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
 
 function todayStr() {
-  // Use local date parts to avoid UTC midnight rollover bug
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  // Delegate to localDateStr to avoid duplicating the date-formatting logic
+  return localDateStr(new Date());
 }
 
 // Convert any Date object to YYYY-MM-DD using local timezone
@@ -610,6 +612,16 @@ function saveWorkout(date, entries) {
   localStorage.setItem('fitlog_workout_' + date, JSON.stringify(entries));
 }
 
+// Cached loadWorkout — reads from localStorage once per render cycle per date.
+// Uses the per-render _renderCache so the cache is automatically cleared on next render().
+function cachedLoadWorkout(date) {
+  const cacheKey = 'workout_' + date;
+  if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
+  const result = loadWorkout(date);
+  _renderCache[cacheKey] = result;
+  return result;
+}
+
 function calcExerciseKcal(ex, sets, reps, secs) {
   const w = state.weight || 80;
   if (ex.type === 'reps') return Math.round(sets * reps * ex.kcalPerRepPerKg * w);
@@ -623,6 +635,23 @@ function safeParseLS(key) {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
+}
+
+// Compute initial water goal: use saved value, else derive from weight, else default
+function initWaterGoal() {
+  const saved = parseInt(localStorage.getItem('fitlog_water_goal'));
+  if (saved) return saved;
+  const weight = parseFloat(localStorage.getItem('fitlog_weight'));
+  return weight ? Math.round(weight * WATER_ML_PER_KG) : DEFAULT_WATER_GOAL_ML;
+}
+
+// Strip markdown fences and parse Gemini JSON response — throws on invalid JSON
+function parseGeminiJson(raw) {
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch {
+    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
+  }
 }
 
 // ─── API STATS ────────────────────────────────────────────────────────────────
@@ -673,33 +702,37 @@ function clearRenderCache() { _renderCache = {}; }
 
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
-async function callGemini(prompt, temperature = 0.1) {
+// Low-level Gemini call — accepts a `parts` array so callers can pass text-only
+// or multimodal (text + image) content without duplicating fetch/error logic.
+async function callGemini(parts, temperature = 0.1) {
   const url = `${GEMINI_BASE_URL}/${state.geminiModel}:generateContent?key=${state.apiKey}`;
   const start = Date.now();
+  // Estimate prompt length from text parts only (inline_data skipped)
+  const promptLen = parts.filter(p => p.text).reduce((s, p) => s + p.text.length, 0);
   let res;
   try {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: { temperature }
       })
     });
   } catch (fetchErr) {
-    trackApiCall({ success: false, errorType: 'NetworkError', ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
+    trackApiCall({ success: false, errorType: 'NetworkError', ms: Date.now() - start, promptLen, responseLen: 0 });
     throw fetchErr;
   }
   if (!res.ok) {
     const err = await res.json();
     const code = res.status;
     const errType = code === 429 ? '429 TooManyRequests' : code === 503 ? '503 ServiceUnavailable' : code === 404 ? '404 NotFound' : `${code} Error`;
-    trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
+    trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen, responseLen: 0 });
     throw new Error(err.error?.message || 'API greška');
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen: prompt.length, responseLen: text.length });
+  trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen, responseLen: text.length });
   return text;
 }
 
@@ -715,12 +748,8 @@ Napomena: sugar je dodati i prirodni šećer u gramima.
 
 Unos korisnika: ${text}`;
 
-  const raw = await callGemini(prompt);
-  try {
-    return JSON.parse(raw.replace(/```json|```/g, '').trim());
-  } catch {
-    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
-  }
+  const raw = await callGemini([{ text: prompt }]);
+  return parseGeminiJson(raw);
 }
 
 async function parseExercise(text) {
@@ -734,17 +763,12 @@ Format:
 
 Unos korisnika: ${text}`;
 
-  const raw = await callGemini(prompt);
-  try {
-    return JSON.parse(raw.replace(/```json|```/g, '').trim());
-  } catch {
-    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
-  }
+  const raw = await callGemini([{ text: prompt }]);
+  return parseGeminiJson(raw);
 }
 
 async function parseFoodFromImage(base64, mimeType, textContext) {
   const w = state.weight || 75;
-  const url = `${GEMINI_BASE_URL}/${state.geminiModel}:generateContent?key=${state.apiKey}`;
   // Append optional user text as extra context for the model
   const contextNote = textContext ? `\nDodatni opis od korisnika: "${textContext}"` : '';
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
@@ -754,39 +778,12 @@ Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format:
 {"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena"}`;
 
-  const start = Date.now();
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mimeType, data: base64 } }
-        ]}],
-        generationConfig: { temperature: 0.1 }
-      })
-    });
-  } catch (fetchErr) {
-    trackApiCall({ success: false, errorType: 'NetworkError', ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
-    throw fetchErr;
-  }
-  if (!res.ok) {
-    const e = await res.json();
-    const code = res.status;
-    const errType = code === 429 ? '429 TooManyRequests' : code === 503 ? '503 ServiceUnavailable' : `${code} Error`;
-    trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen: prompt.length, responseLen: 0 });
-    throw new Error(e.error?.message || 'API greška');
-  }
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  trackApiCall({ success: true, errorType: null, ms: Date.now() - start, promptLen: prompt.length, responseLen: raw.length });
-  try {
-    return JSON.parse(raw.replace(/```json|```/g, '').trim());
-  } catch {
-    throw new Error('Nije moguće parsovati odgovor — pokušaj ponovo');
-  }
+  // Pass text and image as parts — callGemini handles fetch, error handling, and tracking
+  const raw = await callGemini([
+    { text: prompt },
+    { inline_data: { mime_type: mimeType, data: base64 } }
+  ]);
+  return parseGeminiJson(raw);
 }
 
 // ─── SETTINGS DRAWER ─────────────────────────────────────────────────────────
@@ -1109,7 +1106,7 @@ function totals() {
   const consumed    = d.meals.reduce((s, m) => s + (m.calories || 0), 0);
   const exBurned    = d.exercises.reduce((s, e) => s + (e.burned || 0), 0);
   // Include training tab workout calories in burned total
-  const workout     = loadWorkout(state.date);
+  const workout     = cachedLoadWorkout(state.date);
   const workoutBurned = workout.reduce((s, e) => s + (e.calories || 0), 0);
   const burned      = exBurned + workoutBurned;
   const protein     = d.meals.reduce((s, m) => s + (m.protein || 0), 0);
@@ -1173,7 +1170,7 @@ function getWeekData() {
     if (day) {
       const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
       const exBurned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
-      const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+      const workoutDay = cachedLoadWorkout(dateStr);
       const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
       const burned = exBurned + workoutBurned;
       result.push({ date: dateStr, consumed, burned, net: consumed - burned, hasData: consumed > 0, future: false });
@@ -1194,7 +1191,7 @@ function calcStreak() {
     const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
     if (consumed === 0) return null;
     const exBurned = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
-    const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+    const workoutDay = cachedLoadWorkout(dateStr);
     const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
     return consumed - exBurned - workoutBurned;
   }
@@ -1293,7 +1290,7 @@ function getHistoryData(maxDays = 90) {
     if (day) {
       const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
       const exBurned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
-      const workoutDay = safeParseLS('fitlog_workout_' + dateStr) || [];
+      const workoutDay = cachedLoadWorkout(dateStr);
       const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
       const burned = exBurned + workoutBurned;
       const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
@@ -1307,7 +1304,7 @@ function getHistoryData(maxDays = 90) {
 
 function historyDayDetailHTML(date) {
   const day = loadDay(date);
-  const workout = loadWorkout(date);
+  const workout = cachedLoadWorkout(date);
   const goal = state.calorieGoal;
   const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
   const workoutBurned = workout.reduce((s, e) => s + (e.calories || 0), 0);
@@ -1532,7 +1529,7 @@ function historyTabHTML() {
 }
 
 function trainingTabHTML() {
-  const workout = loadWorkout(state.date);
+  const workout = cachedLoadWorkout(state.date);
   const totalKcal = workout.reduce((s, e) => s + (e.calories || 0), 0);
 
   // Group done entries by exercise id
@@ -1671,7 +1668,7 @@ function weeklyReportHTML(weekData) {
   const avgNet        = Math.round(totalNet / daysWithData.length);
   const deficitDays   = daysWithData.filter(d => d.net < goal).length;
   const avgDeficit    = Math.round(goal - avgNet);
-  const projectedLoss = ((avgDeficit * 7) / 7700).toFixed(2); // ~7700 kcal per kg fat
+  const projectedLoss = ((avgDeficit * 7) / KCAL_PER_KG_FAT).toFixed(2); // ~7700 kcal per kg fat
 
   // Grade
   const deficitRatio = deficitDays / daysWithData.length;
@@ -1921,7 +1918,7 @@ function zdravljeTabHTML() {
   let progHTML = '';
   if (tw && tw < w) {
     const toTarget = w - tw;
-    const weeklyDeficit = goal < tdee ? (tdee - goal) * 7 / 7700 : 0;
+    const weeklyDeficit = goal < tdee ? (tdee - goal) * 7 / KCAL_PER_KG_FAT : 0;
     const weeksNeeded = weeklyDeficit > 0 ? Math.ceil(toTarget / weeklyDeficit) : null;
     const startWeight = log.length > 1 ? log[log.length-1].weight : w;
     const progressPct = startWeight > tw ? Math.min(100, Math.max(0, ((startWeight - w) / (startWeight - tw)) * 100)) : 0;
@@ -2422,8 +2419,8 @@ function render() {
         <span class="nav-label">Istorija</span>
       </button>
     </div>`;
-  // Sync drawer after every render (drawer is a separate DOM element)
-  renderDrawer();
+  // Sync drawer after every render — only rebuild if it's actually open
+  if (state.drawerOpen) renderDrawer();
 }
 
 function addWater(ml) {
@@ -2589,7 +2586,7 @@ function saveWeight() {
     // Auto-update water goal only if user hasn't manually set it
     const manualGoal = localStorage.getItem('fitlog_water_goal_manual');
     if (!manualGoal) {
-      state.waterGoal = Math.round(v * 30);
+      state.waterGoal = Math.round(v * WATER_ML_PER_KG);
     }
     // Recalculate calorie goal if not manually set
     autoCalorieGoal();
@@ -2642,8 +2639,8 @@ Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: ${ml.protMin}g.
 Vrati SAMO validan JSON bez markdown oznaka:
 {"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}`;
 
-    const raw = await callGemini(prompt, 0.3);
-    const score = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const raw = await callGemini([{ text: prompt }], 0.3);
+    const score = parseGeminiJson(raw);
     state.nutritionScore = score;
     saveNutritionScore(state.date, score);
 
@@ -2697,7 +2694,7 @@ function saveOnboarding() {
   saveWeightEntry(todayStr(), w);
 
   // Auto water goal
-  state.waterGoal = Math.round(w * 30);
+  state.waterGoal = Math.round(w * WATER_ML_PER_KG);
 
   // Auto calorie goal
   state.calorieGoalManual = false;
@@ -2749,8 +2746,8 @@ Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
 Korisnik: ${state.weight}kg, cilj mršavljenje.
 Vrati SAMO JSON bez markdown: {"score":broj,"comment":"jedna rečenica na srpskom"}`;
-    const raw = await callGemini(prompt, 0.2);
-    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const raw = await callGemini([{ text: prompt }], 0.2);
+    const result = parseGeminiJson(raw);
     state.mealScores[mealId] = result;
     saveMealScores(state.date, state.mealScores);
 
@@ -2902,7 +2899,7 @@ function addCustomWorkoutEntry() {
   state.trainingInputs.custom.name = name;
   const ci = state.trainingInputs.custom;
   const w = state.weight || 80;
-  const calories = Math.round(ci.sets * ci.reps * 0.002 * w);
+  const calories = Math.round(ci.sets * ci.reps * CUSTOM_EX_KCAL_COEFF * w);
   const entry = {
     uid: crypto.randomUUID(),
     exId: 'custom',
