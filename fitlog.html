@@ -497,8 +497,8 @@ const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","
 const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
 const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}';
 const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom"}';
-// Schema for product/label analysis — nutritional data per 100g + AI rating
-const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
+// Schema for product/label analysis — nutritional data per 100g + serving size + AI rating
+const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
 // localStorage key prefix for scanned products
 const PRODUCT_KEY = 'fitlog_products_';
 
@@ -874,6 +874,7 @@ async function analyzeProduct(text, base64, mimeType) {
 ${imageNote}${contextNote}
 
 Iz deklaracije izvuci nutritivne vrednosti na 100g i oceni da li je ovaj proizvod zdrav.
+Za serving_size_g: ako vidiš na etiketi standardnu porciju (npr. "1 kesica 30g"), koristi tu vrednost. Ako vidiš ukupnu masu pakovanja (npr. "220g"), koristi to. Ako nema podatka, proceni tipičnu porciju.
 Crvene zastavice su: visok sadržaj šećera (>15g/100g), palmino ulje, šećerni alkoholi (sorbitol, maltitol itd), trans masti, HFCS, aditivi E-102, E-104, E-110, E-122, E-124, E-129, E-211, E-621.
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PRODUCT_SCHEMA}`;
@@ -1603,8 +1604,8 @@ function deleteCurrentProduct(id) {
 
 // Core product card renderer — shared by today log and history views
 function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
-  const rating  = p.rating || 'moderate';
-  const badge   = rating === 'good'
+  const rating = p.rating || 'moderate';
+  const badge  = rating === 'good'
     ? `<span class="product-rating-badge rating-good">✅ Dobro</span>`
     : rating === 'avoid'
     ? `<span class="product-rating-badge rating-avoid">❌ Izbegavaj</span>`
@@ -1614,12 +1615,55 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
     ? `<div style="margin-bottom:8px">${p.red_flags.map(f => `<span class="red-flag-chip">⚑ ${f}</span>`).join('')}</div>`
     : '';
 
+  // Calculate total values for the serving size (if available)
+  const srv   = p.serving_size_g || null;
+  const ratio = srv ? srv / 100 : null;
+  const tot   = ratio ? {
+    cal:     Math.round((p.calories_per_100g || 0) * ratio),
+    protein: Math.round((p.protein_per_100g  || 0) * ratio * 10) / 10,
+    carbs:   Math.round((p.carbs_per_100g    || 0) * ratio * 10) / 10,
+    fat:     Math.round((p.fat_per_100g      || 0) * ratio * 10) / 10,
+    sugar:   Math.round((p.sugar_per_100g    || 0) * ratio * 10) / 10,
+    fiber:   Math.round((p.fiber_per_100g    || 0) * ratio * 10) / 10,
+  } : null;
+
+  // Collapsed pills — show total if we have serving size, otherwise per-100g
+  const pillProtein = tot
+    ? `<span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${tot.protein}g</span>`
+    : `<span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${p.protein_per_100g||0}g/100g</span>`;
+  const pillSugar = tot
+    ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${tot.sugar}g</span>`
+    : `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${p.sugar_per_100g||0}g/100g</span>`;
+  const pillCal = tot
+    ? `<span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${tot.cal} kcal</span>`
+    : `<span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${p.calories_per_100g||0} kcal/100g</span>`;
+
+  // Serving size label shown in expanded view
+  const srvLabel = srv
+    ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono)">Porcija: <strong style="color:var(--text)">${srv}g</strong></div>`
+    : '';
+
+  // Helper for one macro row: total value (big) + per-100g label (small)
+  const macroCell = (totalVal, per100Val, label, color) => `
+    <div class="product-macro-cell">
+      <div class="product-macro-val" style="color:${color}">${totalVal !== null ? totalVal + 'g' : '–'}</div>
+      <div class="product-macro-lbl">${label}</div>
+      ${per100Val !== null ? `<div style="font-size:9px;color:var(--s6);margin-top:1px">${per100Val}g/100g</div>` : ''}
+    </div>`;
+
+  const calCell = `
+    <div class="product-macro-cell">
+      <div class="product-macro-val" style="color:var(--text)">${tot ? tot.cal : p.calories_per_100g||0}</div>
+      <div class="product-macro-lbl">kcal${tot ? '' : '/100g'}</div>
+      ${tot ? `<div style="font-size:9px;color:var(--s6);margin-top:1px">${p.calories_per_100g||0}/100g</div>` : ''}
+    </div>`;
+
   return `
     <div class="product-card${isExp ? ' expanded' : ''}" ${dataAttr}="${p.id}">
       <div class="product-card-header" onclick="${toggleFn}(${p.id})">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}${p.brand ? `<span style="font-size:12px;font-weight:400;color:var(--muted)"> · ${p.brand}</span>` : ''}</div>
-          ${p.time ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${p.time}</div>` : ''}
+          ${p.time ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${p.time}${srv ? ` · ${srv}g` : ''}</div>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           ${badge}
@@ -1628,43 +1672,24 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
       </div>
       <!-- Collapsed pills — hidden when .expanded -->
       <div class="product-collapsed">
-        <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${p.protein_per_100g||0}g</span>
-        <span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${p.sugar_per_100g||0}g</span>
-        <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${p.calories_per_100g||0} kcal</span>
+        ${pillProtein}${pillSugar}${pillCal}
       </div>
       <!-- Expanded full detail — shown when .expanded -->
       <div class="product-expanded">
+        ${srvLabel}
         <div class="product-macro-grid">
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--green)">${p.protein_per_100g||0}g</div>
-            <div class="product-macro-lbl">Proteini</div>
-          </div>
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--blue)">${p.carbs_per_100g||0}g</div>
-            <div class="product-macro-lbl">Ugljeni hidrati</div>
-          </div>
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--orange)">${p.fat_per_100g||0}g</div>
-            <div class="product-macro-lbl">Masti</div>
-          </div>
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--pink)">${p.sugar_per_100g||0}g</div>
-            <div class="product-macro-lbl">Šećeri</div>
-          </div>
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--muted)">${p.fiber_per_100g||0}g</div>
-            <div class="product-macro-lbl">Vlakna</div>
-          </div>
-          <div class="product-macro-cell">
-            <div class="product-macro-val" style="color:var(--text)">${p.calories_per_100g||0}</div>
-            <div class="product-macro-lbl">kcal/100g</div>
-          </div>
+          ${macroCell(tot?.protein ?? null, p.protein_per_100g||0, 'Proteini',      'var(--green)')}
+          ${macroCell(tot?.carbs   ?? null, p.carbs_per_100g  ||0, 'Ugljeni hidrati','var(--blue)')}
+          ${macroCell(tot?.fat     ?? null, p.fat_per_100g    ||0, 'Masti',          'var(--orange)')}
+          ${macroCell(tot?.sugar   ?? null, p.sugar_per_100g  ||0, 'Šećeri',         'var(--pink)')}
+          ${macroCell(tot?.fiber   ?? null, p.fiber_per_100g  ||0, 'Vlakna',         'var(--muted)')}
+          ${calCell}
         </div>
         ${flagsHTML}
         ${p.rating_reason ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-style:italic">${p.rating_reason}</div>` : ''}
         ${p.summary ? `<div style="font-size:13px;color:var(--muted);line-height:1.6">${p.summary}</div>` : ''}
         ${deleteOnClick ? `
-        <button onclick="${deleteOnClick}" style="margin-top:10px;background:none;border:1px solid var(--s5);border-radius:8px;color:var(--s9);font-size:12px;padding:5px 10px;cursor:pointer">🗑 Ukloni</button>` : ''}
+        <button onclick="${deleteOnClick}" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši proizvod</button>` : ''}
       </div>
     </div>`;
 }
