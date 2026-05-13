@@ -1615,7 +1615,7 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
     ? `<div style="margin-bottom:8px">${p.red_flags.map(f => `<span class="red-flag-chip">⚑ ${f}</span>`).join('')}</div>`
     : '';
 
-  // Calculate total values for the serving size (if available)
+  // Calculate total values for the serving size
   const srv   = p.serving_size_g || null;
   const ratio = srv ? srv / 100 : null;
   const tot   = ratio ? {
@@ -1627,7 +1627,7 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
     fiber:   Math.round((p.fiber_per_100g    || 0) * ratio * 10) / 10,
   } : null;
 
-  // Collapsed pills — show total if we have serving size, otherwise per-100g
+  // Collapsed pills — total values when serving known, otherwise per-100g with label
   const pillProtein = tot
     ? `<span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${tot.protein}g</span>`
     : `<span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${p.protein_per_100g||0}g/100g</span>`;
@@ -1638,12 +1638,12 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
     ? `<span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${tot.cal} kcal</span>`
     : `<span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${p.calories_per_100g||0} kcal/100g</span>`;
 
-  // Serving size label shown in expanded view
-  const srvLabel = srv
-    ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono)">Porcija: <strong style="color:var(--text)">${srv}g</strong></div>`
+  // Date formatted as "13.05." — same style as meal-time-badge
+  const dateStr = p.date
+    ? `${p.date.slice(8)}.${p.date.slice(5,7)}.`
     : '';
 
-  // Helper for one macro row: total value (big) + per-100g label (small)
+  // Helper: one macro cell with total value (large) + per-100g label (small)
   const macroCell = (totalVal, per100Val, label, color) => `
     <div class="product-macro-cell">
       <div class="product-macro-val" style="color:${color}">${totalVal !== null ? totalVal + 'g' : '–'}</div>
@@ -1660,15 +1660,12 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
 
   return `
     <div class="product-card${isExp ? ' expanded' : ''}" ${dataAttr}="${p.id}">
+      <!-- Header: date | name (truncated) | badge | chevron — mirrors meal-header layout -->
       <div class="product-card-header" onclick="${toggleFn}(${p.id})">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}${p.brand ? `<span style="font-size:12px;font-weight:400;color:var(--muted)"> · ${p.brand}</span>` : ''}</div>
-          ${p.time ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${p.time}${srv ? ` · ${srv}g` : ''}</div>` : ''}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          ${badge}
-          <span style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
-        </div>
+        ${dateStr ? `<span class="meal-time-badge">${dateStr}</span>` : ''}
+        <span class="meal-summary">${p.name}</span>
+        ${badge}
+        <span class="meal-chevron${isExp ? ' open' : ''}">▾</span>
       </div>
       <!-- Collapsed pills — hidden when .expanded -->
       <div class="product-collapsed">
@@ -1676,13 +1673,17 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
       </div>
       <!-- Expanded full detail — shown when .expanded -->
       <div class="product-expanded">
-        ${srvLabel}
+        <!-- Full name + brand + serving size — visible only when expanded -->
+        <div style="padding-bottom:10px;border-bottom:1px solid var(--s3);margin-bottom:10px">
+          <div style="font-size:15px;font-weight:700;line-height:1.4">${p.name}</div>
+          ${(p.brand || srv) ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${[p.brand, srv ? srv + 'g' : null].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
         <div class="product-macro-grid">
-          ${macroCell(tot?.protein ?? null, p.protein_per_100g||0, 'Proteini',      'var(--green)')}
+          ${macroCell(tot?.protein ?? null, p.protein_per_100g||0, 'Proteini',       'var(--green)')}
           ${macroCell(tot?.carbs   ?? null, p.carbs_per_100g  ||0, 'Ugljeni hidrati','var(--blue)')}
-          ${macroCell(tot?.fat     ?? null, p.fat_per_100g    ||0, 'Masti',          'var(--orange)')}
-          ${macroCell(tot?.sugar   ?? null, p.sugar_per_100g  ||0, 'Šećeri',         'var(--pink)')}
-          ${macroCell(tot?.fiber   ?? null, p.fiber_per_100g  ||0, 'Vlakna',         'var(--muted)')}
+          ${macroCell(tot?.fat     ?? null, p.fat_per_100g    ||0, 'Masti',           'var(--orange)')}
+          ${macroCell(tot?.sugar   ?? null, p.sugar_per_100g  ||0, 'Šećeri',          'var(--pink)')}
+          ${macroCell(tot?.fiber   ?? null, p.fiber_per_100g  ||0, 'Vlakna',          'var(--muted)')}
           ${calCell}
         </div>
         ${flagsHTML}
@@ -1774,7 +1775,6 @@ function historyTabHTML() {
 // Renders the products history sub-tab — grouped by month, collapsible cards per product
 function productsHistoryHTML() {
   const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
-  const todayDate = todayStr();
 
   // Collect all dates with products from the last 90 days
   const byMonth = {};
@@ -1801,7 +1801,6 @@ function productsHistoryHTML() {
     const totalProducts = days.reduce((s, d) => s + d.products.length, 0);
 
     const dayBlocks = days.map(({ date, products }) => {
-      const isToday = date === todayDate;
       const dayNum  = date.slice(8).replace(/^0/, '');
       const dayLabel = `${dayNum}.${date.slice(5,7)}.`;
 
@@ -1812,8 +1811,8 @@ function productsHistoryHTML() {
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:${isToday ? 'var(--green)' : 'var(--muted)'};font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
-            ${isToday ? 'Danas' : dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
+          <div style="font-size:12px;font-weight:700;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
+            ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
           </div>
           ${cards}
         </div>`;
@@ -2938,6 +2937,7 @@ async function handleProductSubmit() {
 
     const product = {
       id:   Date.now(),
+      date: state.date,  // stored for display in history and log cards
       time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
       ...result,
     };
