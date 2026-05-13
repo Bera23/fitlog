@@ -129,6 +129,24 @@
   .prognoza-bar { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
   .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
 
+  /* PRODUCT CARDS */
+  .product-card { position: relative; border-bottom: 1px solid var(--s3); }
+  .product-card:last-child { border-bottom: none; }
+  .product-card-header { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; cursor: pointer; gap: 8px; }
+  .product-rating-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .rating-good  { background: rgba(143,212,46,0.15);  color: var(--green); }
+  .rating-mod   { background: rgba(255,179,71,0.15);  color: var(--orange); }
+  .rating-avoid { background: rgba(255,79,79,0.15);   color: var(--red); }
+  .product-collapsed { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 10px; }
+  .product-expanded  { display: none; padding-bottom: 12px; }
+  .product-card.expanded .product-collapsed { display: none; }
+  .product-card.expanded .product-expanded  { display: block; }
+  .red-flag-chip { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: rgba(255,79,79,0.12); color: var(--red); margin: 2px 2px 2px 0; }
+  .product-macro-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 10px 0; padding: 10px; background: var(--s3); border-radius: 8px; }
+  .product-macro-cell { text-align: center; }
+  .product-macro-val  { font-family: var(--mono); font-size: 14px; font-weight: 800; }
+  .product-macro-lbl  { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
   /* BOTTOM NAV */
   .bottom-nav {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
@@ -479,6 +497,10 @@ const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","
 const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
 const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}';
 const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom"}';
+// Schema for product/label analysis — nutritional data per 100g + AI rating
+const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
+// localStorage key prefix for scanned products
+const PRODUCT_KEY = 'fitlog_products_';
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -510,6 +532,12 @@ const state = {
   expandedHistoryMealIds: new Set(),
   expandedMealIds: new Set(),
   expandedExIds: new Set(),
+  expandedProductIds: new Set(),       // product cards expanded on today's log
+  expandedHistoryProductIds: new Set(), // product cards expanded in history view
+  historySubTab: 'obroci',             // 'obroci' | 'proizvodi'
+  productLoading: false,               // loading state for product analysis
+  productImageBase64: null,            // selected image for product scanner
+  productImageMime: null,
   loading: false,
   editWeight: false,
   weightInput: '',
@@ -580,6 +608,26 @@ function loadDay(date) {
 
 function saveDay(date, data) {
   localStorage.setItem('fitlog_day_' + date, JSON.stringify(data));
+}
+
+// Load scanned products for a given date — returns array of product objects
+function loadProducts(date) {
+  try {
+    const raw = localStorage.getItem(PRODUCT_KEY + date);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+// Persist product array for a given date
+function saveProducts(date, products) {
+  localStorage.setItem(PRODUCT_KEY + date, JSON.stringify(products));
+}
+
+// Remove a single product by id from a given date
+function deleteProductEntry(date, id) {
+  const products = loadProducts(date).filter(p => p.id !== id);
+  saveProducts(date, products);
+  render();
 }
 
 // Weight log: [{date, weight}] sorted by date desc
@@ -811,6 +859,30 @@ Format: ${GEMINI_FOOD_SCHEMA}`;
     { text: prompt },
     { inline_data: { mime_type: mimeType, data: base64 } }
   ]);
+  return parseGeminiJson(raw);
+}
+
+// Analyze a food product (label/packaging) — returns structured nutritional data + AI rating.
+// Accepts optional image (base64 + mimeType) and/or text description from user.
+async function analyzeProduct(text, base64, mimeType) {
+  const contextNote = text ? `\nDodatni opis od korisnika: "${text}"` : '';
+  const imageNote   = base64
+    ? 'Analiziraj deklaraciju/etiketu na slici.'
+    : 'Korisnik je opisao proizvod tekstom, analiziraj na osnovu toga.';
+
+  const prompt = `Ti si nutricionistički ekspert koji analizira prehrambene proizvode.
+${imageNote}${contextNote}
+
+Iz deklaracije izvuci nutritivne vrednosti na 100g i oceni da li je ovaj proizvod zdrav.
+Crvene zastavice su: visok sadržaj šećera (>15g/100g), palmino ulje, šećerni alkoholi (sorbitol, maltitol itd), trans masti, HFCS, aditivi E-102, E-104, E-110, E-122, E-124, E-129, E-211, E-621.
+Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
+Format: ${GEMINI_PRODUCT_SCHEMA}`;
+
+  const parts = [{ text: prompt }];
+  // Attach image as second part if provided
+  if (base64) parts.push({ inline_data: { mime_type: mimeType, data: base64 } });
+
+  const raw = await callGemini(parts, 0.1);
   return parseGeminiJson(raw);
 }
 
@@ -1499,15 +1571,125 @@ function historyDayDetailHTML(date) {
   </div>`;
 }
 
+// ─── PRODUCT CARD HTML ───────────────────────────────────────────────────────
+
+// Renders today's scanned products list for the log tab
+function productsLogHTML() {
+  const products = loadProducts(state.date);
+  if (!products.length) {
+    return `<div class="card"><div class="empty">
+      <span class="empty-icon">🏷</span>
+      <div class="empty-title">Nema skeniranih proizvoda</div>
+      <div>Dodaj sliku deklaracije ili opiši proizvod</div>
+    </div></div>`;
+  }
+  return `<div class="card" style="padding:4px 16px">
+    <div class="card-label" style="padding-top:12px">🏷 Skenirani proizvodi danas</div>
+    ${products.map(p => productCardTodayHTML(p)).join('')}
+    <div style="padding-bottom:4px"></div>
+  </div>`;
+}
+
+// Wrapper for today's product card — passes the delete callback with today's date
+function productCardTodayHTML(p) {
+  const isExp = state.expandedProductIds.has(p.id);
+  return productCardInnerHTML(p, isExp, 'toggleProduct', `deleteCurrentProduct(${p.id})`, 'data-product-id');
+}
+
+// Delete wrapper scoped to today's date — avoids embedding date string in onclick HTML
+function deleteCurrentProduct(id) {
+  deleteProductEntry(state.date, id);
+}
+
+// Core product card renderer — shared by today log and history views
+function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
+  const rating  = p.rating || 'moderate';
+  const badge   = rating === 'good'
+    ? `<span class="product-rating-badge rating-good">✅ Dobro</span>`
+    : rating === 'avoid'
+    ? `<span class="product-rating-badge rating-avoid">❌ Izbegavaj</span>`
+    : `<span class="product-rating-badge rating-mod">⚠️ Umereno</span>`;
+
+  const flagsHTML = p.red_flags?.length
+    ? `<div style="margin-bottom:8px">${p.red_flags.map(f => `<span class="red-flag-chip">⚑ ${f}</span>`).join('')}</div>`
+    : '';
+
+  return `
+    <div class="product-card${isExp ? ' expanded' : ''}" ${dataAttr}="${p.id}">
+      <div class="product-card-header" onclick="${toggleFn}(${p.id})">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}${p.brand ? `<span style="font-size:12px;font-weight:400;color:var(--muted)"> · ${p.brand}</span>` : ''}</div>
+          ${p.time ? `<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${p.time}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          ${badge}
+          <span style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      <!-- Collapsed pills — hidden when .expanded -->
+      <div class="product-collapsed">
+        <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${p.protein_per_100g||0}g</span>
+        <span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${p.sugar_per_100g||0}g</span>
+        <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">${p.calories_per_100g||0} kcal</span>
+      </div>
+      <!-- Expanded full detail — shown when .expanded -->
+      <div class="product-expanded">
+        <div class="product-macro-grid">
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--green)">${p.protein_per_100g||0}g</div>
+            <div class="product-macro-lbl">Proteini</div>
+          </div>
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--blue)">${p.carbs_per_100g||0}g</div>
+            <div class="product-macro-lbl">Ugljeni hidrati</div>
+          </div>
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--orange)">${p.fat_per_100g||0}g</div>
+            <div class="product-macro-lbl">Masti</div>
+          </div>
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--pink)">${p.sugar_per_100g||0}g</div>
+            <div class="product-macro-lbl">Šećeri</div>
+          </div>
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--muted)">${p.fiber_per_100g||0}g</div>
+            <div class="product-macro-lbl">Vlakna</div>
+          </div>
+          <div class="product-macro-cell">
+            <div class="product-macro-val" style="color:var(--text)">${p.calories_per_100g||0}</div>
+            <div class="product-macro-lbl">kcal/100g</div>
+          </div>
+        </div>
+        ${flagsHTML}
+        ${p.rating_reason ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-style:italic">${p.rating_reason}</div>` : ''}
+        ${p.summary ? `<div style="font-size:13px;color:var(--muted);line-height:1.6">${p.summary}</div>` : ''}
+        ${deleteOnClick ? `
+        <button onclick="${deleteOnClick}" style="margin-top:10px;background:none;border:1px solid var(--s5);border-radius:8px;color:var(--s9);font-size:12px;padding:5px 10px;cursor:pointer">🗑 Ukloni</button>` : ''}
+      </div>
+    </div>`;
+}
+
 function historyTabHTML() {
-  // Show detail view if a date is selected
-  if (state.selectedHistoryDate) {
+  // Show detail view if a date is selected (only for obroci sub-tab)
+  if (state.selectedHistoryDate && state.historySubTab === 'obroci') {
     return historyDayDetailHTML(state.selectedHistoryDate);
   }
 
+  // Sub-tab switcher — Obroci | Proizvodi
+  const subTabBar = `
+    <div class="sub-tabs">
+      <button class="sub-tab ${state.historySubTab === 'obroci' ? 'active' : 'inactive'}" onclick="setHistoryTab('obroci')">🍽 Obroci</button>
+      <button class="sub-tab ${state.historySubTab === 'proizvodi' ? 'active' : 'inactive'}" onclick="setHistoryTab('proizvodi')">🏷 Proizvodi</button>
+    </div>`;
+
+  if (state.historySubTab === 'proizvodi') {
+    return subTabBar + productsHistoryHTML();
+  }
+
+  // ── OBROCI sub-tab (existing logic) ──────────────────────────────────────────
   const entries = getHistoryData();
   if (entries.length === 0) {
-    return `<div class="card"><div class="hist-empty">📭 Još nema istorije.<br>Počni da unosiš obroke u Dnevniku!</div></div>`;
+    return subTabBar + `<div class="card"><div class="hist-empty">📭 Još nema istorije.<br>Počni da unosiš obroke u Dnevniku!</div></div>`;
   }
 
   const goal = state.calorieGoal;
@@ -1561,7 +1743,65 @@ function historyTabHTML() {
     </div>`;
   });
 
-  return html;
+  return subTabBar + html;
+}
+
+// Renders the products history sub-tab — grouped by month, collapsible cards per product
+function productsHistoryHTML() {
+  const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
+  const todayDate = todayStr();
+
+  // Collect all dates with products from the last 90 days
+  const byMonth = {};
+  for (let i = 0; i < 90; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = localDateStr(d);
+    const products = loadProducts(dateStr);
+    if (!products.length) continue;
+    const month = dateStr.slice(0, 7);
+    if (!byMonth[month]) byMonth[month] = [];
+    byMonth[month].push({ date: dateStr, products });
+  }
+
+  const months = Object.keys(byMonth).sort().reverse();
+  if (!months.length) {
+    return `<div class="card"><div class="hist-empty">📦 Još nema skeniranih proizvoda.<br>Dodaj ih na Dnevnik tabu!</div></div>`;
+  }
+
+  return months.map(month => {
+    const [yr, mo] = month.split('-');
+    const monthLabel = `${srMonths[parseInt(mo)]} ${yr}`;
+    const days = byMonth[month];
+    const totalProducts = days.reduce((s, d) => s + d.products.length, 0);
+
+    const dayBlocks = days.map(({ date, products }) => {
+      const isToday = date === todayDate;
+      const dayNum  = date.slice(8).replace(/^0/, '');
+      const dayLabel = `${dayNum}.${date.slice(5,7)}.`;
+
+      const cards = products.map(p => {
+        const isExp = state.expandedHistoryProductIds.has(p.id);
+        return productCardInnerHTML(p, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id');
+      }).join('');
+
+      return `
+        <div style="margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:${isToday ? 'var(--green)' : 'var(--muted)'};font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
+            ${isToday ? 'Danas' : dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
+          </div>
+          ${cards}
+        </div>`;
+    }).join('');
+
+    return `<div class="card">
+      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${monthLabel}</span>
+        <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
+      </div>
+      ${dayBlocks}
+    </div>`;
+  }).join('');
 }
 
 function trainingTabHTML() {
@@ -2398,32 +2638,55 @@ function render() {
         <div class="mode-toggle">
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
           <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
+          <button class="mode-btn ${state.mode === 'product' ? 'active' : 'inactive'}" onclick="setMode('product')">🏷 Proizvod</button>
         </div>
-        <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
-          ${state.mode === 'food' ? `
-          <label class="input-img-label" style="color:${state.imageBase64 ? 'var(--blue)' : 'var(--s9)'}">
-            <span style="font-size:16px">📷</span>
-            <span style="font-size:12px;font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
-            <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
-          </label>` : '<div></div>'}
-          <span style="font-size:11px;color:var(--s6)">AI analiza</span>
-        </div>
-        ${state.mode === 'food' && state.imageBase64 ? `
-        <div class="img-strip">
-          <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
-          <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
-          <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
-        </div>` : ''}
-        <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
+
+        ${state.mode === 'product' ? `
+          <textarea class="msg-input" id="productInput" rows="3" placeholder="Opiši proizvod ili dodaj sliku deklaracije..."></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
+            <label class="input-img-label" style="color:${state.productImageBase64 ? 'var(--blue)' : 'var(--s9)'}">
+              <span style="font-size:16px">📷</span>
+              <span style="font-size:12px;font-weight:${state.productImageBase64 ? '700' : '400'}">${state.productImageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku etikete'}</span>
+              <input type="file" accept="image/*" onchange="handleProductImageSelect(this)"/>
+            </label>
+            <span style="font-size:11px;color:var(--s6)">AI skeniranje</span>
+          </div>
+          ${state.productImageBase64 ? `
+          <div class="img-strip">
+            <img src="data:${state.productImageMime||'image/jpeg'};base64,${state.productImageBase64}"/>
+            <span style="font-size:12px;color:var(--blue);flex:1">Etiketa priložena — analiziraće se</span>
+            <button onclick="state.productImageBase64=null;state.productImageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+          </div>` : ''}
+          <button class="send-btn" onclick="handleProductSubmit()" ${state.productLoading ? 'disabled' : ''}>${state.productLoading ? '🔍 Analiziram...' : '🔍 Analiziraj proizvod'}</button>
+        ` : `
+          <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
+            ${state.mode === 'food' ? `
+            <label class="input-img-label" style="color:${state.imageBase64 ? 'var(--blue)' : 'var(--s9)'}">
+              <span style="font-size:16px">📷</span>
+              <span style="font-size:12px;font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
+              <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
+            </label>` : '<div></div>'}
+            <span style="font-size:11px;color:var(--s6)">AI analiza</span>
+          </div>
+          ${state.mode === 'food' && state.imageBase64 ? `
+          <div class="img-strip">
+            <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
+            <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
+            <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+          </div>` : ''}
+          <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
+        `}
       </div>
-      ${state.loading ? `
+
+      ${state.mode === 'product' ? `
+        ${state.productLoading ? `
         <div class="skeleton-card">
           <div class="skeleton skeleton-time"></div>
           <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
             <div style="flex:1">
-              <div class="skeleton skeleton-line" style="width:80%"></div>
-              <div class="skeleton skeleton-line" style="width:60%"></div>
+              <div class="skeleton skeleton-line" style="width:75%"></div>
+              <div class="skeleton skeleton-line" style="width:55%"></div>
             </div>
             <div class="skeleton skeleton-kcal"></div>
           </div>
@@ -2433,30 +2696,49 @@ function render() {
             <div class="skeleton skeleton-pill"></div>
           </div>
         </div>` : ''}
-      ${mealsHTML}
-      ${exHTML}
-      ${emptyHTML}
-      ${d.meals.length ? `
-        <div id="nutrition-score-card" class="card" style="padding:0;overflow:hidden">
-          ${state.nutritionScoreLoading ? `
-            <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
-              🤖 AI analizira tvoj unos...
-            </div>` :
-          state.nutritionScore ? `
-            <div style="padding:16px">
-              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
-                <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
-                <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+        ${productsLogHTML()}
+      ` : `
+        ${state.loading ? `
+          <div class="skeleton-card">
+            <div class="skeleton skeleton-time"></div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
+              <div style="flex:1">
+                <div class="skeleton skeleton-line" style="width:80%"></div>
+                <div class="skeleton skeleton-line" style="width:60%"></div>
               </div>
-              <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
-              <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
-              <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
-              <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
-              <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
-            </div>` : `
-            <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
-        </div>` : ''}
+              <div class="skeleton skeleton-kcal"></div>
+            </div>
+            <div class="skeleton-pills">
+              <div class="skeleton skeleton-pill"></div>
+              <div class="skeleton skeleton-pill"></div>
+              <div class="skeleton skeleton-pill"></div>
+            </div>
+          </div>` : ''}
+        ${mealsHTML}
+        ${exHTML}
+        ${emptyHTML}
+        ${d.meals.length ? `
+          <div id="nutrition-score-card" class="card" style="padding:0;overflow:hidden">
+            ${state.nutritionScoreLoading ? `
+              <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
+                🤖 AI analizira tvoj unos...
+              </div>` :
+            state.nutritionScore ? `
+              <div style="padding:16px">
+                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+                  <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
+                  <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
+                  <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+                </div>
+                <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
+                <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
+                <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
+                <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
+                <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
+              </div>` : `
+              <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
+          </div>` : ''}
+      `}
     ` : ''}
     </div><!-- /tab-content -->
     <div class="spacer"></div>
@@ -2592,6 +2874,94 @@ function openHistoryDetail(date) {
 
 function closeHistoryDetail() {
   state.selectedHistoryDate = null;
+  render();
+}
+
+// Handle image selection specifically for product scanner tab
+function handleProductImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    showToast('Slika je prevelika (max 8MB). Smanji rezoluciju.', 'err');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.productImageBase64 = e.target.result.split(',')[1];
+    state.productImageMime   = file.type || 'image/jpeg';
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+// Submit handler for the product analyzer — separate from food/exercise flow
+async function handleProductSubmit() {
+  const input = document.getElementById('productInput')?.value.trim();
+  if (!input && !state.productImageBase64) return;
+
+  state.productLoading = true;
+  render();
+
+  try {
+    const result = await analyzeProduct(
+      input || null,
+      state.productImageBase64 || null,
+      state.productImageMime || 'image/jpeg'
+    );
+    if (!result?.name) throw new Error('Nije parsovano');
+
+    const product = {
+      id:   Date.now(),
+      time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+      ...result,
+    };
+
+    const products = loadProducts(state.date);
+    products.unshift(product); // newest first
+    saveProducts(state.date, products);
+
+    // Clear inputs after successful scan
+    state.productImageBase64 = null;
+    state.productImageMime   = null;
+    // Clear textarea via DOM (avoids full re-render before state.loading resets)
+    const ta = document.getElementById('productInput');
+    if (ta) ta.value = '';
+
+    showToast(`${result.name} analiziran ✓`);
+  } catch (e) {
+    const msg = e.message?.includes('API_KEY') ? '❌ Neispravan API ključ' :
+                e.message?.includes('RESOURCE_EXHAUSTED') ? '⏳ API limit — sačekaj minut' :
+                e.message?.includes('fetch') ? '📡 Proveri internet konekciju' :
+                `Greška: ${e.message?.slice(0, 55) || 'Pokušaj ponovo'}`;
+    showToast(msg, 'err');
+  } finally {
+    state.productLoading = false;
+    render();
+  }
+}
+
+// Toggle expand/collapse of a product card on the today log tab
+function toggleProduct(id) {
+  if (state.expandedProductIds.has(id)) state.expandedProductIds.delete(id);
+  else state.expandedProductIds.add(id);
+  // DOM-only toggle — no full render needed
+  const el = document.querySelector(`[data-product-id="${id}"]`);
+  if (el) el.classList.toggle('expanded');
+}
+
+// Toggle expand/collapse of a product card in history view
+function toggleHistoryProduct(id) {
+  if (state.expandedHistoryProductIds.has(id)) state.expandedHistoryProductIds.delete(id);
+  else state.expandedHistoryProductIds.add(id);
+  const el = document.querySelector(`[data-hist-product-id="${id}"]`);
+  if (el) el.classList.toggle('expanded');
+}
+
+// Switch history sub-tab between 'obroci' and 'proizvodi'
+function setHistoryTab(tab) {
+  state.historySubTab     = tab;
+  state.selectedHistoryDate = null; // clear any open day detail on sub-tab switch
   render();
 }
 
@@ -2913,10 +3283,14 @@ function setTab(tab) {
 
 function setMode(mode) {
   state.mode = mode;
+  // Clear both food and product image state on mode switch
   state.imageBase64 = null;
-  state.imageMime = null;
+  state.imageMime   = null;
+  state.productImageBase64 = null;
+  state.productImageMime   = null;
   render();
   document.getElementById('msgInput')?.focus();
+  document.getElementById('productInput')?.focus();
 }
 
 function updateTrainingInput(exId, field, value) {
