@@ -1591,10 +1591,11 @@ function productsLogHTML() {
   </div>`;
 }
 
-// Wrapper for today's product card — passes the delete callback with today's date
+// Wrapper for today's product card — injects today's date if product was saved before date field was added
 function productCardTodayHTML(p) {
   const isExp = state.expandedProductIds.has(p.id);
-  return productCardInnerHTML(p, isExp, 'toggleProduct', `deleteCurrentProduct(${p.id})`, 'data-product-id');
+  const pWithDate = p.date ? p : { ...p, date: state.date };
+  return productCardInnerHTML(pWithDate, isExp, 'toggleProduct', `deleteCurrentProduct(${p.id})`, 'data-product-id');
 }
 
 // Delete wrapper scoped to today's date — avoids embedding date string in onclick HTML
@@ -1806,12 +1807,14 @@ function productsHistoryHTML() {
 
       const cards = products.map(p => {
         const isExp = state.expandedHistoryProductIds.has(p.id);
-        return productCardInnerHTML(p, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id');
+        // Inject date from storage key for products saved before date field was added
+        const pWithDate = p.date ? p : { ...p, date };
+        return productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id');
       }).join('');
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
+          <div style="font-size:11px;font-weight:700;color:var(--green);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
             ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
           </div>
           ${cards}
