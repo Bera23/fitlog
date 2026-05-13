@@ -189,21 +189,21 @@
   .card-hero {
     background: var(--s2);
     border: 1px solid var(--s5);
-    border-radius: 20px;
+    border-radius: 16px;
     padding: 20px 16px 16px;
     margin: 12px 16px 0;
     box-shadow: 0 2px 16px rgba(0,0,0,0.4);
     position: relative;
     overflow: hidden;
   }
-  /* Subtle top accent line that shifts color with progress */
+  /* Subtle top accent line */
   .card-hero::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 2px;
     background: linear-gradient(90deg, var(--green), #47ffb5);
-    border-radius: 20px 20px 0 0;
+    border-radius: 16px 16px 0 0;
   }
 
   /* Accent card — used for macro/nutrition sections */
@@ -212,7 +212,7 @@
     border: 1px solid var(--s5);
     border-radius: 16px;
     padding: 16px;
-    margin: 10px 16px 0;
+    margin: 12px 16px 0;
     box-shadow: var(--shadow-sm);
   }
 
@@ -222,7 +222,7 @@
     border: 1px solid var(--s5);
     border-radius: 16px;
     padding: 14px;
-    margin: 10px 16px 0;
+    margin: 12px 16px 0;
     box-shadow: var(--shadow-sm);
   }
 
@@ -493,6 +493,19 @@
     transition: opacity 0.15s, transform 0.1s;
   }
   .onboard-btn:active { transform: scale(0.98); }
+
+  /* STATS TAB — full-width cards, no side margins */
+  .stats-tab .card,
+  .stats-tab .card-hero,
+  .stats-tab .card-accent {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  /* Keep top/bottom radius only on first and last card */
+  .stats-tab > :first-child { border-radius: 0 0 0 0; }
 
   /* BOTTOM NAV placeholder */
   .spacer { height: 20px; }
@@ -2479,7 +2492,7 @@ function render() {
       : streak === 1 ? 'Odličan početak! Nastavi sutra.'
       : `${streak} dana zaredom ispod cilja!`;
 
-    statsContent = `
+    statsContent = `<div class="stats-tab">
     <div class="card-hero" style="display:flex;flex-direction:column;align-items:center;gap:16px">
       ${ringHTML(t.consumed, t.burned, state.calorieGoal)}
       <div style="width:100%">
@@ -2539,7 +2552,7 @@ function render() {
       <div class="card-label">Nedeljni bilans</div>
       ${weekChartHTML(weekData)}
     </div>
-    <div class="card" style="border-left: 3px solid var(--green);background:var(--s2)">
+    <div class="card" style="box-shadow:inset 3px 0 0 var(--green);background:var(--s2)">
       <div class="card-label">Streak — dani ispod cilja</div>
       <div class="streak-wrap">
         <div class="streak-num ${streak === 0 ? 'zero' : ''}">${streak}</div>
@@ -2549,7 +2562,8 @@ function render() {
         </div>
       </div>
     </div>
-    ${weeklyReportHTML(weekData)}`;
+    ${weeklyReportHTML(weekData)}
+    </div>`;
   }
 
   // Meals — both pill row AND details always in DOM; .log-item.expanded controls visibility via CSS
