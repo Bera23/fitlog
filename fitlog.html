@@ -19,12 +19,11 @@
     --card: #111111;
     --border: #1e1e1e;
     --text: #f0f0f0;
-    --text-secondary: #ccc;  /* renamed from --tc */
+    --text-secondary: #ccc;
     --muted: #555;
     --mono: 'Space Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     /* Surface scale */
-    --s0: #0a0a0a;
     --s1: #0d0d0d;
     --s2: #111;
     --s3: #161616;
@@ -36,16 +35,22 @@
     --s9: #444;
     --s10: #555;
     --s11: #666;
-    /* --tc removed; use --text-secondary instead */
     --white: #fff;
     /* Elevation tokens */
     --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
     --shadow-nav: 0 -4px 24px rgba(0,0,0,0.5);
     /* Easing */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    /* ── TYPOGRAPHY SCALE ─────────────────────────── */
+    --t-hero:    32px;   /* ring number, streak big number  */
+    --t-primary: 22px;   /* kcal primary values             */
+    --t-value:   15px;   /* secondary values, macro numbers */
+    --t-body:    14px;   /* body copy, inputs               */
+    --t-label:   11px;   /* uppercase micro-labels          */
+    --t-micro:   10px;   /* de-emphasized, hints            */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--sans); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: var(--t-body); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
 
   /* Webkit scrollbar — minimal */
   ::-webkit-scrollbar { width: 0; }
@@ -59,7 +64,7 @@
 
   /* HEADER — logo + date */
   .header { padding: 14px 16px 4px; border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
-  .logo { font-family: var(--mono); font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--green), #47ffb5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .logo { font-family: var(--mono); font-size: 24px; font-weight: 700; background: linear-gradient(135deg, var(--green), #47ffb5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px; }
 
 
   /* HEADER PROGRESS BAR */
@@ -151,36 +156,75 @@
   .bottom-nav {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
     width: 100%; max-width: 480px;
-    background: rgba(10,10,10,0.95);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(10,10,10,0.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--s4);
     box-shadow: var(--shadow-nav);
-    display: flex; z-index: 100; padding: 6px 0 10px;
+    display: flex; z-index: 100; padding: 6px 4px 10px;
+    gap: 2px;
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-    background: none; border: none; cursor: pointer; padding: 6px 0;
-    transition: opacity 0.15s; position: relative;
+    background: none; border: none; cursor: pointer; padding: 6px 4px;
+    transition: background 0.18s var(--ease); position: relative;
+    border-radius: 12px;
   }
-  .nav-btn::after {
-    content: ''; position: absolute; bottom: 2px;
-    width: 4px; height: 4px; border-radius: 50%;
-    background: var(--green);
-    opacity: 0; transition: opacity 0.2s var(--ease);
+  /* Active pill — subtle green tint replaces the barely-visible dot */
+  .nav-btn.active {
+    background: rgba(143, 212, 46, 0.12);
   }
-  .nav-btn.active::after { opacity: 1; }
   .nav-icon { font-size: 18px; line-height: 1; transition: transform 0.15s var(--ease); }
-  .nav-btn.active .nav-icon { transform: scale(1.12); }
+  .nav-btn.active .nav-icon { transform: scale(1.1); }
   .nav-label { font-size: 11px; font-weight: 600; font-family: var(--sans); letter-spacing: 0.3px; }
   .nav-btn.active .nav-label { color: var(--green); }
   .nav-btn.inactive .nav-label { color: var(--s8); }
-  .nav-btn.active .nav-icon { filter: none; }
   .nav-btn.inactive .nav-icon { opacity: 0.35; }
 
   /* CARD */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 16px 0; box-shadow: var(--shadow-sm); }
-  .card-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+  .card-label { font-size: var(--t-label); color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+
+  /* Hero card — elevated surface for the ring/stats section */
+  .card-hero {
+    background: var(--s2);
+    border: 1px solid var(--s5);
+    border-radius: 20px;
+    padding: 20px 16px 16px;
+    margin: 12px 16px 0;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Subtle top accent line that shifts color with progress */
+  .card-hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green), #47ffb5);
+    border-radius: 20px 20px 0 0;
+  }
+
+  /* Accent card — used for macro/nutrition sections */
+  .card-accent {
+    background: var(--card);
+    border: 1px solid var(--s5);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 10px 16px 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Input card — slightly elevated for the input area */
+  .card-input {
+    background: var(--s2);
+    border: 1px solid var(--s5);
+    border-radius: 16px;
+    padding: 14px;
+    margin: 10px 16px 0;
+    box-shadow: var(--shadow-sm);
+  }
 
   /* MODE TOGGLE */
   .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -189,7 +233,7 @@
   .mode-btn.inactive { background: var(--s4); color: var(--s11); }
 
   /* INPUT */
-  .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: var(--sans); resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
+  .msg-input { width: 100%; min-height: 90px; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: var(--sans); resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
   .msg-input:focus { border-color: var(--s8); }
   .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
 
@@ -199,7 +243,6 @@
   .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* INPUT AREA — unified image + text */
-  .msg-input { min-height: 90px; }
   .input-img-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; position: relative; -webkit-tap-highlight-color: transparent; }
   .input-img-label input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: rgba(71,200,255,0.07); border-radius: 8px; border: 1px solid rgba(71,200,255,0.2); }
@@ -209,9 +252,8 @@
   .ring-wrap { position: relative; flex-shrink: 0; }
   .ring-wrap svg { display: block; }
   .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .ring-kcal { font-size: 22px; font-weight: 800; font-family: var(--mono); }
-  .ring-label { font-size: 11px; color: var(--s11); letter-spacing: 1px; }
-  /* stats-grid replaced by stats-chain horizontal layout */
+  .ring-kcal { font-size: 36px; font-weight: 800; font-family: var(--mono); }
+  .ring-label { font-size: 11px; color: var(--s11); letter-spacing: 1px; margin-top: 2px; }
   /* Horizontal chain layout for the 4 daily stats */
   .stats-chain { display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; margin-top: 4px; }
   .stats-chain-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -224,16 +266,26 @@
   .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 3px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; }
 
   /* MACRO BAR */
-  .macro-row { margin-bottom: 10px; }
-  .macro-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
-  /* Pill shape track with subtle inner shadow */
-  .macro-track { height: 8px; background: var(--s3); border-radius: 99px; overflow: visible; position: relative; }
-  /* Fill as pill; box-shadow glow color is set inline via --glow-color */
+  .macro-row { margin-bottom: 12px; }
+  .macro-top { display: flex; justify-content: space-between; font-size: var(--t-label); color: var(--muted); margin-bottom: 6px; }
+  /* Taller pill track — more presence on dark background */
+  .macro-track { height: 11px; background: var(--s3); border-radius: 99px; overflow: hidden; position: relative; }
+  /* Fill with inner label when wide enough */
   .macro-fill {
     height: 100%; border-radius: 99px;
     transition: width 0.5s ease;
-    box-shadow: 0 0 8px 1px var(--glow-color, transparent);
+    box-shadow: 0 0 10px 1px var(--glow-color, transparent);
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 6px; overflow: hidden;
   }
+  /* Inner bar label — only visible when bar is > 40% wide */
+  .macro-fill-label {
+    font-size: 8px; font-weight: 800; font-family: var(--mono);
+    color: rgba(0,0,0,0.65); letter-spacing: 0.5px;
+    white-space: nowrap; opacity: 0;
+    transition: opacity 0.3s ease 0.3s;
+  }
+  .macro-fill.wide .macro-fill-label { opacity: 1; }
 
   /* LOG ITEMS — better hierarchy */
   .log-item { position: relative; overflow: hidden; border-bottom: 1px solid var(--s3); }
@@ -265,13 +317,12 @@
   .toast.err { background: var(--red); color: var(--white); }
   .toast.hide { opacity: 0; transform: translate(-50%, -4px) scale(0.97); }
 
-  /* STREAK */
   .streak-wrap { display: flex; align-items: center; gap: 16px; }
-  .streak-num { font-family: var(--mono); font-size: 48px; font-weight: 700; line-height: 1; color: var(--green); }
+  .streak-num { font-family: var(--mono); font-size: var(--t-hero); font-weight: 700; line-height: 1; color: var(--green); }
   .streak-num.zero { color: var(--s7); }
   .streak-info { flex: 1; }
-  .streak-title { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
-  .streak-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .streak-title { font-size: var(--t-value); font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .streak-sub { font-size: var(--t-body); color: var(--muted); line-height: 1.5; }
 
   /* WEEK CHART */
   .week-chart { width: 100%; overflow: hidden; }
@@ -298,9 +349,9 @@
   .hist-item:last-child { border-bottom: none; }
   .hist-item:active { background: var(--s4); }
   .hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 90px; }
+  .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 44px; }
   .hist-date.today { color: var(--green); }
-  .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .hist-net { font-family: var(--mono); font-size: 18px; font-weight: 800; min-width: 42px; text-align: right; }
   .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
 
   /* TRAINING TAB */
@@ -1193,8 +1244,8 @@ function ringHTML(consumed, burned, goal) {
           stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
       </svg>
       <div class="ring-center">
-        <span class="ring-kcal" style="color:${color};font-size:36px;line-height:1">${Math.round(net)}</span>
-        <span class="ring-label" style="font-size:11px;margin-top:2px">NET kcal</span>
+        <span class="ring-kcal" style="color:${color}">${Math.round(net)}</span>
+        <span class="ring-label">NET kcal</span>
       </div>
     </div>`;
 }
@@ -1226,19 +1277,22 @@ function macroBar(label, value, min, max, color, unit) {
   const overageText = overMax
     ? `<span style="font-size:11px;color:var(--red);font-weight:700;margin-left:4px">+${Math.round(value - max)}${unit}</span>`
     : '';
+  // Inner label shown when bar is wide enough (> 40%)
+  const isWide = pct > 40;
+  const innerLabel = isWide ? `<span class="macro-fill-label">${Math.round(value)}${unit}</span>` : '';
   return `
     <div class="macro-row">
       <div class="macro-top">
-        <span style="color:${color};font-weight:600">${label}</span>
+        <span style="color:${color};font-weight:600;font-size:var(--t-body)">${label}</span>
         <div style="display:flex;align-items:center;gap:4px">
           <span style="display:inline-block;width:12px;text-align:center;font-size:11px;color:${statusColor};font-weight:700">${statusIcon}</span>
-          <span style="color:${statusColor};font-weight:700;min-width:36px;text-align:right">${Math.round(value)}${unit}</span>
-          <span style="color:var(--s8);font-size:11px">/ ${max}${unit}</span>
+          <span style="color:${statusColor};font-weight:700;font-size:var(--t-value);font-family:var(--mono);min-width:36px;text-align:right">${Math.round(value)}${unit}</span>
+          <span style="color:var(--s8);font-size:var(--t-label)">/ ${max}${unit}</span>
           ${overageText}
         </div>
       </div>
       <div class="macro-track">
-        <div class="macro-fill" style="width:${pct}%;background:${statusColor};--glow-color:${statusColor}44"></div>
+        <div class="macro-fill${isWide ? ' wide' : ''}" style="width:${pct}%;background:${statusColor};--glow-color:${statusColor}44">${innerLabel}</div>
       </div>
     </div>`;
 }
@@ -1724,11 +1778,11 @@ function historyTabHTML() {
 
       return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
         <div class="hist-dot" style="background:${dotColor}"></div>
-        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:44px;font-size:13px;font-family:var(--mono)">${dayLabel}</div>
+        <div class="hist-date ${isToday ? 'today' : ''}">${dayLabel}</div>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:6px">
           ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
-          <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
+          <div class="hist-net" style="color:${netColor}">${Math.round(e.net)}</div>
           <span style="font-size:11px;color:var(--muted)">▶</span>
         </div>
       </div>`;
@@ -2426,7 +2480,7 @@ function render() {
       : `${streak} dana zaredom ispod cilja!`;
 
     statsContent = `
-    <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div class="card-hero" style="display:flex;flex-direction:column;align-items:center;gap:16px">
       ${ringHTML(t.consumed, t.burned, state.calorieGoal)}
       <div style="width:100%">
         <div class="goal-row" style="justify-content:center;margin-bottom:12px">
@@ -2438,9 +2492,9 @@ function render() {
           <!-- Uneseno -->
           <div class="stats-chain-item">
             <div class="stat-label">Uneseno</div>
-            <div class="stat-val" style="color:var(--green);font-size:18px">
+            <div class="stat-val" style="color:var(--green);font-size:var(--t-primary)">
               ${Math.round(t.consumed)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--s11);font-size:var(--t-micro)">kcal</span>
             </div>
           </div>
           <!-- Minus divider -->
@@ -2448,9 +2502,9 @@ function render() {
           <!-- Sagoreno: gray when 0, blue when active -->
           <div class="stats-chain-item">
             <div class="stat-label">Sagoreno</div>
-            <div class="stat-val" style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--muted)'};font-size:18px">
+            <div class="stat-val" style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--muted)'};font-size:var(--t-primary)">
               ${Math.round(t.burned)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--s11);font-size:var(--t-micro)">kcal</span>
             </div>
           </div>
           <!-- Equals divider -->
@@ -2458,9 +2512,9 @@ function render() {
           <!-- Neto -->
           <div class="stats-chain-item">
             <div class="stat-label">Neto</div>
-            <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'};font-size:18px">
+            <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'};font-size:var(--t-primary)">
               ${Math.round(t.net)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--s11);font-size:var(--t-micro)">kcal</span>
             </div>
           </div>
         </div>
@@ -2472,9 +2526,8 @@ function render() {
             <span style="color:var(--s11);font-size:10px">kcal</span>
           </div>
         </div>
-      </div>
     </div>
-    <div class="card">
+    <div class="card-accent">
       <div class="card-label">Makronutrijenti</div>
       ${(() => { const ml = macroLimits(); return `
       ${macroBar('Proteini', t.protein, ml.protMin, ml.protMax, 'var(--green)')}
@@ -2482,11 +2535,11 @@ function render() {
       ${macroBar('Masti', t.fat, ml.fatMin, ml.fatMax, 'var(--orange)')}
       ${macroBar('Šećer', t.sugar, 0, ml.sugarMax, 'var(--pink)')}`; })()}
     </div>
-    <div class="card">
+    <div class="card" style="border-color:var(--s5)">
       <div class="card-label">Nedeljni bilans</div>
       ${weekChartHTML(weekData)}
     </div>
-    <div class="card">
+    <div class="card" style="border-left: 3px solid var(--green);background:var(--s2)">
       <div class="card-label">Streak — dani ispod cilja</div>
       <div class="streak-wrap">
         <div class="streak-num ${streak === 0 ? 'zero' : ''}">${streak}</div>
@@ -2501,9 +2554,9 @@ function render() {
 
   // Meals — both pill row AND details always in DOM; .log-item.expanded controls visibility via CSS
   const mealsHTML = d.meals.length ? `
-    <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
-        <div class="card-label" style="margin:0">Obroci · ${Math.round(t.consumed)} kcal</div>
+    <div class="card" style="padding:0;overflow:hidden;border-color:var(--s5)">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3);background:var(--s2);border-radius:16px 16px 0 0">
+        <div class="card-label" style="margin:0">Obroci · <span style="color:var(--green);font-family:var(--mono);font-size:var(--t-value)">${Math.round(t.consumed)}</span> kcal</div>
       </div>
       ${d.meals.map(m => {
         const isOpen = state.expandedMealIds.has(m.id);
@@ -2554,9 +2607,9 @@ function render() {
 
   // Exercises — same pattern: details always in DOM, .log-item.expanded shows them
   const exHTML = d.exercises.length ? `
-    <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
-        <div class="card-label" style="margin:0">Aktivnosti · -${Math.round(t.burned)} kcal</div>
+    <div class="card" style="padding:0;overflow:hidden;border-color:rgba(71,200,255,0.2)">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3);background:var(--s2);border-radius:16px 16px 0 0">
+        <div class="card-label" style="margin:0;color:var(--blue)">Aktivnosti · <span style="font-family:var(--mono);font-size:var(--t-value)">-${Math.round(t.burned)}</span> kcal</div>
       </div>
       ${d.exercises.map(e => {
         const isOpen = state.expandedExIds.has(e.id);
@@ -2634,7 +2687,7 @@ function render() {
     ${state.activeTab === 'zdravlje' ? zdravljeTabHTML() : ''}
 
     ${state.activeTab === 'log' ? `
-      <div class="card">
+      <div class="card-input">
         <div class="mode-toggle">
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
           <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
