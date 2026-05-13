@@ -67,7 +67,7 @@
   .header-progress-track { height: 9px; background: var(--s4); border-radius: 99px; overflow: hidden; margin-bottom: 5px; }
   /* Gradient fill: green → cyan as bar fills up */
   .header-progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), #47ffb5); transition: width 0.6s var(--ease), background 0.3s; }
-  .header-progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .header-progress-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); padding-bottom: 10px; border-bottom: 1px solid var(--border); font-weight: 500; }
 
   /* ZDRAVLJE SUBTABS */
   .sub-tabs { display: flex; gap: 4px; margin: 12px 16px 0; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
@@ -119,7 +119,7 @@
   .bmi-scale-wrap { margin: 12px 0 8px; }
   .bmi-scale-track { height: 10px; border-radius: 5px; background: linear-gradient(to right, var(--blue) 0%, var(--green) 30%, var(--orange) 55%, var(--red) 75%, #900 100%); position: relative; margin-bottom: 6px; }
   .bmi-scale-marker { position: absolute; top: -4px; width: 4px; height: 18px; background: var(--white); border-radius: 2px; transform: translateX(-50%); }
-  .bmi-scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--s9); font-family: var(--mono); }
+  .bmi-scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); font-family: var(--mono); }
   .zdravlje-stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--s3); }
   .zdravlje-stat:last-child { border-bottom: none; }
   .zdravlje-stat-label { font-size: 13px; color: var(--muted); }
@@ -160,16 +160,16 @@
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-    background: none; border: none; cursor: pointer; padding: 6px 0;
-    transition: opacity 0.15s; position: relative;
+    background: none; border: none; cursor: pointer; padding: 8px 4px;
+    transition: opacity 0.15s; position: relative; border-radius: 12px;
+    margin: 0 2px;
   }
-  .nav-btn::after {
-    content: ''; position: absolute; bottom: 2px;
-    width: 4px; height: 4px; border-radius: 50%;
-    background: var(--green);
-    opacity: 0; transition: opacity 0.2s var(--ease);
+  /* Active chip — pill background replaces the invisible 4px dot */
+  .nav-btn.active {
+    background: rgba(143, 212, 46, 0.10);
   }
-  .nav-btn.active::after { opacity: 1; }
+  /* Remove the barely-visible dot — chip communicates state clearly enough */
+  .nav-btn::after { display: none; }
   .nav-icon { font-size: 18px; line-height: 1; transition: transform 0.15s var(--ease); }
   .nav-btn.active .nav-icon { transform: scale(1.12); }
   .nav-label { font-size: 11px; font-weight: 600; font-family: var(--sans); letter-spacing: 0.3px; }
@@ -194,13 +194,22 @@
   .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
 
   /* SEND BUTTON */
-  .send-btn { width: 100%; padding: 14px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; margin-top: 2px; transition: opacity 0.2s, transform 0.1s; }
+  .send-btn { width: 100%; padding: 14px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; transition: opacity 0.2s, transform 0.1s; }
   .send-btn:active:not(:disabled) { transform: scale(0.98); }
   .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* INPUT AREA — unified image + text */
   .msg-input { min-height: 90px; }
-  .input-img-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; position: relative; -webkit-tap-highlight-color: transparent; }
+  /* Camera upload styled as a tappable button chip */
+  .input-img-label {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 600; position: relative;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--s3); border: 1px solid var(--s6);
+    border-radius: 8px; padding: 7px 12px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .input-img-label:active { background: var(--s4); }
   .input-img-label input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: rgba(71,200,255,0.07); border-radius: 8px; border: 1px solid rgba(71,200,255,0.2); }
   .img-strip img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
@@ -1577,13 +1586,9 @@ function historyDayDetailHTML(date) {
 // Renders today's scanned products list for the log tab
 function productsLogHTML() {
   const products = loadProducts(state.date);
-  if (!products.length) {
-    return `<div class="card"><div class="empty">
-      <span class="empty-icon">🏷</span>
-      <div class="empty-title">Nema skeniranih proizvoda</div>
-      <div>Dodaj sliku deklaracije ili opiši proizvod</div>
-    </div></div>`;
-  }
+  // Return nothing when empty — placeholder in textarea is sufficient guidance,
+  // matching the Obrok tab which also shows no container until entries exist.
+  if (!products.length) return '';
   return `<div class="card" style="padding:4px 16px">
     <div class="card-label" style="padding-top:12px">🏷 Skenirani proizvodi danas</div>
     ${products.map(p => productCardTodayHTML(p)).join('')}
@@ -2318,7 +2323,7 @@ function zdravljeTabHTML() {
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
         <div style="font-size:48px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1">${current ? current.weight : '—'}</div>
         <div style="font-size:14px;color:var(--muted)">kg ${diffHTML}</div>
-        <button class="weight-btn" onclick="startEditWeight()" style="margin-left:auto;font-size:11px">${current ? '✏ Izmeri' : '+ Unesi težinu'}</button>
+        <button class="weight-btn" onclick="startEditWeight()" style="margin-left:auto;font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
       </div>
       ${state.editWeight ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
         <span style="font-size:12px;color:var(--muted)">Nova težina:</span>
@@ -2640,7 +2645,7 @@ function render() {
   app.innerHTML = `
     <div class="header">
       <span class="logo">FITLOG</span>
-      <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:8px;line-height:1;transition:color 0.15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--s9)'">⚙</button>
+      <button onclick="openDrawer()" style="background:var(--s3);border:1px solid var(--s5);color:var(--text-secondary);cursor:pointer;padding:6px 10px;border-radius:10px;line-height:1;transition:background 0.15s,color 0.15s;display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:13px;font-weight:600" onmouseover="this.style.background='var(--s5)'" onmouseout="this.style.background='var(--s3)'">⚙ <span>Podešavanja</span></button>
     </div>
     <div class="header-progress-wrap">
       <div class="header-progress-track">
@@ -2665,44 +2670,44 @@ function render() {
         <div class="mode-toggle">
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
           <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
-          <button class="mode-btn ${state.mode === 'product' ? 'active' : 'inactive'}" onclick="setMode('product')">🏷 Proizvod</button>
+          <button class="mode-btn ${state.mode === 'product' ? 'active' : 'inactive'}" onclick="setMode('product')">📦 Proizvod</button>
         </div>
 
         ${state.mode === 'product' ? `
-          <textarea class="msg-input" id="productInput" rows="3" placeholder="Opiši proizvod ili dodaj sliku deklaracije..."></textarea>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
-            <label class="input-img-label" style="color:${state.productImageBase64 ? 'var(--blue)' : 'var(--s9)'}">
-              <span style="font-size:16px">📷</span>
-              <span style="font-size:12px;font-weight:${state.productImageBase64 ? '700' : '400'}">${state.productImageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku etikete'}</span>
-              <input type="file" accept="image/*" onchange="handleProductImageSelect(this)"/>
-            </label>
-            <span style="font-size:11px;color:var(--s6)">AI skeniranje</span>
-          </div>
+          <textarea class="msg-input" id="productInput" rows="4" placeholder="Opiši proizvod ili dodaj sliku deklaracije..."></textarea>
           ${state.productImageBase64 ? `
-          <div class="img-strip">
+          <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.productImageMime||'image/jpeg'};base64,${state.productImageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Etiketa priložena — analiziraće se</span>
             <button onclick="state.productImageBase64=null;state.productImageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
           </div>` : ''}
-          <button class="send-btn" onclick="handleProductSubmit()" ${state.productLoading ? 'disabled' : ''}>${state.productLoading ? '🔍 Analiziram...' : '🔍 Analiziraj proizvod'}</button>
+          <!-- Photo + Send in one row: secondary | primary -->
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <label class="input-img-label" style="flex-shrink:0;${state.productImageBase64 ? 'color:var(--blue);border-color:rgba(71,200,255,0.4);background:rgba(71,200,255,0.07)' : 'color:var(--text-secondary)'}">
+              <span style="font-size:16px;line-height:1">📷</span>
+              <span>${state.productImageBase64 ? '✓' : 'Slika'}</span>
+              <input type="file" accept="image/*" onchange="handleProductImageSelect(this)"/>
+            </label>
+            <button class="send-btn" onclick="handleProductSubmit()" ${state.productLoading ? 'disabled' : ''} style="flex:1;margin-top:0">${state.productLoading ? 'Analiziram...' : '+ Analiziraj proizvod'}</button>
+          </div>
         ` : `
           <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}"></textarea>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px">
-            ${state.mode === 'food' ? `
-            <label class="input-img-label" style="color:${state.imageBase64 ? 'var(--blue)' : 'var(--s9)'}">
-              <span style="font-size:16px">📷</span>
-              <span style="font-size:12px;font-weight:${state.imageBase64 ? '700' : '400'}">${state.imageBase64 ? 'Slika priložena ✓' : 'Dodaj sliku'}</span>
-              <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
-            </label>` : '<div></div>'}
-            <span style="font-size:11px;color:var(--s6)">AI analiza</span>
-          </div>
           ${state.mode === 'food' && state.imageBase64 ? `
-          <div class="img-strip">
+          <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
             <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
           </div>` : ''}
-          <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''}>${btnText}</button>
+          <!-- Photo + Send in one row: secondary | primary -->
+          <div style="display:flex;gap:8px;margin-top:8px">
+            ${state.mode === 'food' ? `
+            <label class="input-img-label" style="flex-shrink:0;${state.imageBase64 ? 'color:var(--blue);border-color:rgba(71,200,255,0.4);background:rgba(71,200,255,0.07)' : 'color:var(--text-secondary)'}">
+              <span style="font-size:16px;line-height:1">📷</span>
+              <span>${state.imageBase64 ? '✓' : 'Slika'}</span>
+              <input type="file" accept="image/*" onchange="handleImageSelect(this)"/>
+            </label>` : ''}
+            <button class="send-btn" id="sendBtn" onclick="handleSubmit()" ${state.loading ? 'disabled' : ''} style="flex:1;margin-top:0">${btnText}</button>
+          </div>
         `}
       </div>
 
