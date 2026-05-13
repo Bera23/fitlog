@@ -383,6 +383,10 @@
   .weight-chart-wrap { width: 100%; overflow: hidden; }
   .weight-chart-svg { width: 100%; overflow: visible; }
 
+  /* WEIGHT TAB REDESIGN — metric grid + card */
+  .wt-metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 16px 0; }
+  .wt-metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+
   /* NUTRITION SCORE & COLLAPSIBLE MEAL */
   .meal-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; cursor: pointer; user-select: none; }
   .meal-header:active { background: var(--s4); }
@@ -1458,7 +1462,7 @@ function historyDayDetailHTML(date) {
 
     return `
     <div class="hist-meal-item${isExp ? ' expanded' : ''}" data-hist-meal-id="${m.id}" style="border-top:1px solid var(--s3)">
-      <div onclick="toggleHistoryMeal('${m.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
+      <div onclick="toggleHistoryMeal(${m.id})" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
         <div>
           <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green)">${m.time}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
@@ -2307,65 +2311,128 @@ function zdravljeTabHTML() {
       </div>
     </div>`;
 
-  // Default: Težina subtab
+  // Default: Težina subtab — redesigned layout
   return subNav + `
+
     <div class="card">
-      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
-        <span>⚖️ Težina</span>
-        ${h ? `<span style="font-size:11px;color:var(--s9)">${h} cm <span onclick="startEditHeight()" style="color:var(--s10);cursor:pointer;text-decoration:underline">izmeni</span></span>` :
-          `<button class="weight-btn" onclick="startEditHeight()" style="font-size:11px">+ Visina</button>`}
+      <div class="card-label" style="margin-bottom:10px">Trenutna težina</div>
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+        <div style="font-size:52px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1;letter-spacing:-1px">${current ? current.weight : '—'}</div>
+        <div style="font-size:14px;color:var(--muted);align-self:flex-end;padding-bottom:6px">kg</div>
+        ${diffHTML ? `<div style="align-self:flex-end;padding-bottom:6px">${diffHTML}</div>` : ''}
       </div>
-      ${state.editHeight ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-        <span style="font-size:12px;color:var(--muted)">Visina:</span>
-        <input class="weight-input" id="hInput" type="number" value="${state.heightInput}" placeholder="cm" style="width:70px"/>
-        <button class="save-btn" onclick="saveHeight()">Sačuvaj</button>
-      </div>` : ''}
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
-        <div style="font-size:48px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1">${current ? current.weight : '—'}</div>
-        <div style="font-size:14px;color:var(--muted)">kg ${diffHTML}</div>
-        <button class="weight-btn" onclick="startEditWeight()" style="margin-left:auto;font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid var(--s3)">
+        <span style="font-size:12px;color:var(--muted)">
+          ${h
+            ? `${h} cm · BMI ${bmi.toFixed(1)} <span onclick="startEditHeight()" style="color:var(--s9);cursor:pointer;text-decoration:underline;margin-left:4px;font-size:11px">izmeni</span>`
+            : `<button class="weight-btn" onclick="startEditHeight()" style="font-size:11px">+ Dodaj visinu</button>`}
+        </span>
+        <button class="weight-btn" onclick="startEditWeight()" style="font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
       </div>
-      ${state.editWeight ? `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-        <span style="font-size:12px;color:var(--muted)">Nova težina:</span>
-        <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
-        <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
-      </div>` : ''}
-      <div style="background:var(--s1);border-radius:10px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:14px">
-          <div style="font-size:36px;font-weight:800;font-family:var(--mono);color:${cat.color}">${bmi.toFixed(1)}</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:${cat.color}">${cat.label}</div>
-            <div style="font-size:11px;color:var(--muted)">Idealna: ${idealMin}–${idealMax} kg</div>
-            ${toIdeal > 0 ? `<div style="font-size:11px;color:var(--orange)">Do idealne: -${toIdeal} kg</div>` : ''}
-          </div>
-          ${(() => {
-            const bf = estimateBodyFat(bmi, state.age, state.gender);
-            const bfColor = state.gender === 'male'
-              ? (bf < 6 ? 'var(--blue)' : bf < 14 ? 'var(--green)' : bf < 25 ? 'var(--orange)' : 'var(--red)')
-              : (bf < 14 ? 'var(--blue)' : bf < 21 ? 'var(--green)' : bf < 32 ? 'var(--orange)' : 'var(--red)');
-            return `<div style="margin-left:auto;text-align:center">
-              <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${bfColor}">${bf}%</div>
-              <div style="font-size:11px;color:var(--muted)">tel. mast</div>
+      ${state.editWeight ? `
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap">Nova težina:</span>
+          <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
+          <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
+          <button onclick="state.editWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+        </div>` : ''}
+      ${state.editHeight ? `
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap">Visina:</span>
+          <input class="weight-input" id="hInput" type="number" value="${state.heightInput}" placeholder="cm" style="width:70px"/>
+          <button class="save-btn" onclick="saveHeight()">Sačuvaj</button>
+          <button onclick="state.editHeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+        </div>` : ''}
+    </div>
+
+    <div class="wt-metrics-row">
+      <div class="wt-metric-card">
+        <div class="card-label" style="margin-bottom:6px">BMI indeks</div>
+        <div style="font-size:30px;font-weight:800;font-family:var(--mono);color:${cat.color};line-height:1">${bmi.toFixed(1)}</div>
+        <div style="font-size:12px;font-weight:700;color:${cat.color};margin-top:5px">${cat.label}</div>
+      </div>
+      ${(() => {
+        const bf = estimateBodyFat(bmi, state.age, state.gender);
+        const bfColor = state.gender === 'male'
+          ? (bf < 6 ? 'var(--blue)' : bf < 14 ? 'var(--green)' : bf < 25 ? 'var(--orange)' : 'var(--red)')
+          : (bf < 14 ? 'var(--blue)' : bf < 21 ? 'var(--green)' : bf < 32 ? 'var(--orange)' : 'var(--red)');
+        return `<div class="wt-metric-card">
+          <div class="card-label" style="margin-bottom:6px">Tel. mast</div>
+          <div style="font-size:30px;font-weight:800;font-family:var(--mono);color:${bfColor};line-height:1">${bf}%</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">procena (BMI)</div>
+        </div>`;
+      })()}
+    </div>
+
+    <div class="card" style="padding:12px 16px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Idealna: ${idealMin}–${idealMax} kg
+        ${toIdeal > 0
+          ? `· <span style="color:var(--orange)">do ideala još −${toIdeal} kg</span>`
+          : `· <span style="color:var(--green)">u idealnom opsegu ✓</span>`}
+      </div>
+      <div class="bmi-scale-wrap" style="margin:0">
+        <div class="bmi-scale-track"><div class="bmi-scale-marker" style="left:${bmiPct}%"></div></div>
+        <div class="bmi-scale-labels"><span>Pothr.</span><span>Normalno</span><span>Prekomerno</span><span>Gojaznost</span></div>
+      </div>
+    </div>
+
+    ${log.length >= 2 ? `
+    <div class="card">
+      <div class="card-label" style="margin-bottom:10px">Trend težine</div>
+      ${weightChartHTML(log)}
+    </div>` : ''}
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px 10px;border-bottom:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center">
+        <div class="card-label" style="margin:0">Istorija merenja</div>
+        <span style="font-size:11px;color:var(--s7)">${log.length} ${log.length === 1 ? 'unos' : 'unosa'}</span>
+      </div>
+      ${log.length === 0
+        ? `<div style="padding:24px 16px;text-align:center;color:var(--s7);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
+        : (() => {
+          const shown = log.slice(0, 10);
+          const maxW = Math.max(...shown.map(e => e.weight));
+          const minW = Math.min(...shown.map(e => e.weight));
+          const wRange = maxW - minW || 1;
+          return shown.map((e, i) => {
+            let diffBadge = '';
+            let dotColor = 'var(--s7)';
+            if (i < log.length - 1) {
+              const d = e.weight - log[i + 1].weight;
+              const c = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
+              const cAlpha = d < 0 ? 'rgba(143,212,46,0.13)' : d > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
+              diffBadge = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+              dotColor = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
+            }
+            const barPct = Math.max(10, Math.round(((e.weight - minW) / wRange) * 80) + 20);
+            const isLatest = i === 0;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--s3)${isLatest ? ';background:rgba(143,212,46,0.03)' : ''}">
+              <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
+              <span class="weight-log-date">${fmtDate(e.date)}</span>
+              <div style="flex:1;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;margin:0 4px">
+                <div style="height:100%;width:${barPct}%;background:${isLatest ? 'rgba(143,212,46,0.45)' : 'var(--s7)'};border-radius:2px"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                ${diffBadge}
+                <span class="weight-log-val">${e.weight} kg</span>
+                <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
+              </div>
             </div>`;
-          })()}
-        </div>
-        <div class="bmi-scale-wrap" style="margin-top:10px">
-          <div class="bmi-scale-track"><div class="bmi-scale-marker" style="left:${bmiPct}%"></div></div>
-          <div class="bmi-scale-labels"><span>Pothr.</span><span>Normalno</span><span>Prekomerno</span><span>Gojaznost</span></div>
-        </div>
-      </div>
-      ${log.length >= 2 ? `<div style="margin-bottom:10px">${weightChartHTML(log)}</div>` : ''}
-      <div><div class="card-label">Istorija</div>${logHTML}</div>
+          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--s7)">... i još ${log.length - 10} starijih merenja</div>` : '');
+        })()}
     </div>
 
     <div class="card">
-      <div class="card-label">🎯 Ciljna težina</div>
+      <div class="card-label" style="margin-bottom:10px">🎯 Ciljna težina</div>
       ${state.targetWeight ? `
-        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
-          <span style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--green)">${state.targetWeight}</span>
-          <span style="color:var(--muted)">kg</span>
-          <button onclick="clearTargetWeight()" style="margin-left:auto;background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s10);padding:4px 10px;font-size:11px;cursor:pointer">izmeni</button>
-        </div>${progHTML}` :
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex-shrink:0">
+            <div style="font-size:36px;font-weight:800;font-family:var(--mono);color:var(--green);line-height:1">${state.targetWeight}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">kg cilj</div>
+          </div>
+          <div style="flex:1;min-width:0">${progHTML}</div>
+          <button onclick="clearTargetWeight()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s10);padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;white-space:nowrap">izmeni</button>
+        </div>` :
         `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">Postavi ciljnu težinu da vidiš prognozu mršavljenja.</div>`}
       ${state.editTargetWeight ? `
         <div class="target-input-row">
@@ -2374,8 +2441,8 @@ function zdravljeTabHTML() {
           <button class="save-btn" onclick="saveTargetWeight()">Sačuvaj</button>
           <button onclick="state.editTargetWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button>
         </div>` : `
-        <button class="weight-btn" onclick="startEditTargetWeight()" style="font-size:12px;margin-top:4px">
-          ${state.targetWeight ? '' : '+ '}Postavi ciljnu težinu
+        <button class="weight-btn" onclick="startEditTargetWeight()" style="font-size:12px;margin-top:${state.targetWeight ? '12' : '4'}px">
+          ${state.targetWeight ? '✏ ' : '+ '}Postavi ciljnu težinu
         </button>`}
     </div>`;
 }
