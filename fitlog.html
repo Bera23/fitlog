@@ -20,7 +20,7 @@
     --border: #1e1e1e;
     --text: #f0f0f0;
     --text-secondary: #ccc;  /* renamed from --tc */
-    --muted: #555;
+    --muted: #999;
     --mono: 'Space Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     /* Surface scale */
@@ -1045,7 +1045,7 @@ function settingsDrawerHTML() {
             <span style="font-size:12px;color:var(--red)">${type}</span>
             <span class="drawer-row-val" style="color:var(--red)">${count}</span>
           </div>`).join('')}
-      </div>` : `<div style="font-size:12px;color:var(--s7);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
+      </div>` : `<div style="font-size:12px;color:var(--s11);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
       <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>
     </div>
 
@@ -1247,7 +1247,7 @@ function macroBar(label, value, min, max, color, unit) {
         <div style="display:flex;align-items:center;gap:4px">
           <span style="display:inline-block;width:12px;text-align:center;font-size:11px;color:${statusColor};font-weight:700">${statusIcon}</span>
           <span style="color:${statusColor};font-weight:700;min-width:36px;text-align:right">${Math.round(value)}${unit}</span>
-          <span style="color:var(--s8);font-size:11px">/ ${max}${unit}</span>
+          <span style="color:var(--s11);font-size:11px">/ ${max}${unit}</span>
           ${overageText}
         </div>
       </div>
@@ -1482,7 +1482,7 @@ function historyDayDetailHTML(date) {
       </div>
       <!-- Expanded view: item details — shown when .expanded -->
       <div class="hist-meal-expanded" style="padding-bottom:12px">
-        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s9)">· ${it.calories} kcal</span></div>`).join('') || ''}
+        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s11)">· ${it.calories} kcal</span></div>`).join('') || ''}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
           <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein||0)}g</span>
           <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
@@ -1492,7 +1492,7 @@ function historyDayDetailHTML(date) {
         ${msHTML}
       </div>
     </div>`;
-  }).join('') : `<div style="color:var(--s7);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
+  }).join('') : `<div style="color:var(--s11);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
 
   // Exercises (AI unos)
   const exHTML = day.exercises?.length ? `
@@ -2076,7 +2076,7 @@ function deleteWeightEntry(date) {
 }
 
 function weightChartHTML(log) {
-  if (log.length < 2) return `<div style="color:var(--s7);font-size:12px;padding:8px 0">Potrebno najmanje 2 merenja za grafikon.</div>`;
+  if (log.length < 2) return `<div style="color:var(--s11);font-size:12px;padding:8px 0">Potrebno najmanje 2 merenja za grafikon.</div>`;
   const entries = [...log].reverse();
   const weights = entries.map(e => e.weight);
   const minW = Math.min(...weights) - 1;
@@ -2125,7 +2125,7 @@ function weightChartHTML(log) {
         <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         ${dots}
       </svg>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s9);margin-top:2px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s11);margin-top:2px">
         <span>${fmtDate(entries[0].date)}</span>
         <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
         <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
@@ -2203,7 +2203,7 @@ function zdravljeTabHTML() {
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
         Dnevni cilj:
         <input class="goal-input" type="number" value="${waterGoal}" onchange="updateWaterGoal(this.value)" style="width:75px"/>
-        <span style="color:var(--s9)">ml</span>
+        <span style="color:var(--s11)">ml</span>
       </div>
     </div>`;
 
@@ -2287,7 +2287,7 @@ function zdravljeTabHTML() {
     <div class="card">
       <div class="card-label">🔥 Kalorije — preporuka</div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5);margin-bottom:12px">
-        <span style="font-size:12px;color:var(--s9);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
+        <span style="font-size:12px;color:var(--s11);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
         <button onclick="openDrawer()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s9);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)">⚙ Uredi profil</button>
       </div>
       <div class="zdravlje-stat">
@@ -2324,7 +2324,7 @@ function zdravljeTabHTML() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid var(--s3)">
         <span style="font-size:12px;color:var(--muted)">
           ${h
-            ? `${h} cm · BMI ${bmi.toFixed(1)} <span onclick="startEditHeight()" style="color:var(--s9);cursor:pointer;text-decoration:underline;margin-left:4px;font-size:11px">izmeni</span>`
+            ? `<span style="color:var(--green);font-weight:700">${h} cm</span> <span onclick="startEditHeight()" style="color:var(--green);cursor:pointer;margin-left:6px;font-size:11px;font-weight:700">izmeni</span>`
             : `<button class="weight-btn" onclick="startEditHeight()" style="font-size:11px">+ Dodaj visinu</button>`}
         </span>
         <button class="weight-btn" onclick="startEditWeight()" style="font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
@@ -2385,10 +2385,10 @@ function zdravljeTabHTML() {
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 16px 10px;border-bottom:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center">
         <div class="card-label" style="margin:0">Istorija merenja</div>
-        <span style="font-size:11px;color:var(--s7)">${log.length} ${log.length === 1 ? 'unos' : 'unosa'}</span>
+        <span style="font-size:11px;color:var(--s11)">${log.length} ${log.length === 1 ? 'unos' : 'unosa'}</span>
       </div>
       ${log.length === 0
-        ? `<div style="padding:24px 16px;text-align:center;color:var(--s7);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
+        ? `<div style="padding:24px 16px;text-align:center;color:var(--s11);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
         : (() => {
           const shown = log.slice(0, 10);
           const maxW = Math.max(...shown.map(e => e.weight));
@@ -2408,7 +2408,7 @@ function zdravljeTabHTML() {
             const isLatest = i === 0;
             return `<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--s3)${isLatest ? ';background:rgba(143,212,46,0.03)' : ''}">
               <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
-              <span class="weight-log-date">${fmtDate(e.date)}</span>
+              <span class="weight-log-date" style="color:${isLatest ? 'var(--green)' : 'var(--text-secondary)'}">${fmtDate(e.date)}</span>
               <div style="flex:1;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;margin:0 4px">
                 <div style="height:100%;width:${barPct}%;background:${isLatest ? 'rgba(143,212,46,0.45)' : 'var(--s7)'};border-radius:2px"></div>
               </div>
@@ -2418,7 +2418,7 @@ function zdravljeTabHTML() {
                 <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
               </div>
             </div>`;
-          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--s7)">... i još ${log.length - 10} starijih merenja</div>` : '');
+          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--s11)">... i još ${log.length - 10} starijih merenja</div>` : '');
         })()}
     </div>
 
@@ -2693,7 +2693,7 @@ function render() {
     <div class="empty">
       <span class="empty-icon">${emptyIcon}</span>
       <div class="empty-title">${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}</div>
-      <div style="font-size:12px;color:var(--s7);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
+      <div style="font-size:12px;color:var(--s11);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
     </div>` : '';
 
   const placeholder = state.mode === 'food'
