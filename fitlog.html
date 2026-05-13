@@ -252,7 +252,7 @@
   .log-note { margin-top: 6px; font-size: 11px; color: var(--muted); font-style: italic; }
 
   /* EMPTY */
-  .empty { text-align: center; padding: 48px 20px 36px; color: var(--s9); font-size: 13px; line-height: 1.6; }
+  .empty { text-align: center; padding: 48px 20px 36px; color: var(--muted); font-size: 13px; line-height: 1.6; }
   .empty-icon { font-size: 40px; margin-bottom: 14px; display: block; opacity: 0.6; }
   .empty-title { font-size: 15px; font-weight: 700; color: var(--s10); margin-bottom: 6px; }
 
@@ -289,7 +289,7 @@
   .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; transition: height 0.4s ease; }
   .chart-day { font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .chart-day.today { color: var(--green); }
-  .chart-kcal { font-size: 11px; color: var(--s9); font-family: var(--mono); }
+  .chart-kcal { font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .week-avg { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; }
   .week-avg-item { text-align: center; }
   .week-avg-val { font-family: var(--mono); font-weight: 700; font-size: 13px; }
@@ -482,7 +482,7 @@
   .drawer-input:focus { border-color: var(--s9); }
   .drawer-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
   .drawer-field { margin-bottom: 10px; }
-  .drawer-field-label { font-size: 11px; color: var(--s9); margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px; }
+  .drawer-field-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px; }
 </style>
 </head>
 <body>
@@ -950,7 +950,7 @@ function settingsDrawerHTML() {
       <div class="drawer-section-title">Gemini API</div>
       <div class="drawer-field">
         <div class="drawer-field-label">Aktivan ključ</div>
-        <div style="font-family:var(--mono);font-size:12px;color:var(--s9);padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5)">${maskedKey}</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5)">${maskedKey}</div>
       </div>
       <div class="drawer-field">
         <div class="drawer-field-label">Model</div>
@@ -1045,7 +1045,7 @@ function settingsDrawerHTML() {
             <span style="font-size:12px;color:var(--red)">${type}</span>
             <span class="drawer-row-val" style="color:var(--red)">${count}</span>
           </div>`).join('')}
-      </div>` : `<div style="font-size:12px;color:var(--s11);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
+      </div>` : `<div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
       <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>
     </div>
 
@@ -1247,7 +1247,7 @@ function macroBar(label, value, min, max, color, unit) {
         <div style="display:flex;align-items:center;gap:4px">
           <span style="display:inline-block;width:12px;text-align:center;font-size:11px;color:${statusColor};font-weight:700">${statusIcon}</span>
           <span style="color:${statusColor};font-weight:700;min-width:36px;text-align:right">${Math.round(value)}${unit}</span>
-          <span style="color:var(--s11);font-size:11px">/ ${max}${unit}</span>
+          <span style="color:var(--muted);font-size:11px">/ ${max}${unit}</span>
           ${overageText}
         </div>
       </div>
@@ -1482,7 +1482,7 @@ function historyDayDetailHTML(date) {
       </div>
       <!-- Expanded view: item details — shown when .expanded -->
       <div class="hist-meal-expanded" style="padding-bottom:12px">
-        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--s11)">· ${it.calories} kcal</span></div>`).join('') || ''}
+        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--muted)">· ${it.calories} kcal</span></div>`).join('') || ''}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
           <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein||0)}g</span>
           <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
@@ -1492,7 +1492,7 @@ function historyDayDetailHTML(date) {
         ${msHTML}
       </div>
     </div>`;
-  }).join('') : `<div style="color:var(--s11);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
+  }).join('') : `<div style="color:var(--muted);font-size:13px;padding:12px 0">Nema unetih obroka</div>`;
 
   // Exercises (AI unos)
   const exHTML = day.exercises?.length ? `
@@ -1715,7 +1715,7 @@ function historyTabHTML() {
   const subTabBar = `
     <div class="sub-tabs">
       <button class="sub-tab ${state.historySubTab === 'obroci' ? 'active' : 'inactive'}" onclick="setHistoryTab('obroci')">🍽 Obroci</button>
-      <button class="sub-tab ${state.historySubTab === 'proizvodi' ? 'active' : 'inactive'}" onclick="setHistoryTab('proizvodi')">🏷 Proizvodi</button>
+      <button class="sub-tab ${state.historySubTab === 'proizvodi' ? 'active' : 'inactive'}" onclick="setHistoryTab('proizvodi')">📦 Proizvodi</button>
     </div>`;
 
   if (state.historySubTab === 'proizvodi') {
@@ -2076,7 +2076,7 @@ function deleteWeightEntry(date) {
 }
 
 function weightChartHTML(log) {
-  if (log.length < 2) return `<div style="color:var(--s11);font-size:12px;padding:8px 0">Potrebno najmanje 2 merenja za grafikon.</div>`;
+  if (log.length < 2) return `<div style="color:var(--muted);font-size:12px;padding:8px 0">Potrebno najmanje 2 merenja za grafikon.</div>`;
   const entries = [...log].reverse();
   const weights = entries.map(e => e.weight);
   const minW = Math.min(...weights) - 1;
@@ -2125,7 +2125,7 @@ function weightChartHTML(log) {
         <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         ${dots}
       </svg>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--s11);margin-top:2px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
         <span>${fmtDate(entries[0].date)}</span>
         <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
         <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
@@ -2176,10 +2176,10 @@ function zdravljeTabHTML() {
         <div style="height:100%;width:${waterPct}%;background:var(--blue);border-radius:3px;transition:width 0.4s"></div>
       </div>
       <div class="water-btns">
-        <button class="water-btn" onclick="addWater(250)">+250 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">čaša</span></button>
-        <button class="water-btn" onclick="addWater(330)">+330 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">limenka</span></button>
-        <button class="water-btn" onclick="addWater(500)">+500 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">flaša</span></button>
-        <button class="water-btn" style="color:var(--red)" onclick="addWater(-250)">-250 ml<br><span style="font-size:10px;font-weight:400;color:var(--s11)">ispravka</span></button>
+        <button class="water-btn" onclick="addWater(250)">+250 ml<br><span style="font-size:10px;font-weight:400;color:var(--muted)">čaša</span></button>
+        <button class="water-btn" onclick="addWater(330)">+330 ml<br><span style="font-size:10px;font-weight:400;color:var(--muted)">limenka</span></button>
+        <button class="water-btn" onclick="addWater(500)">+500 ml<br><span style="font-size:10px;font-weight:400;color:var(--muted)">flaša</span></button>
+        <button class="water-btn" style="color:var(--red)" onclick="addWater(-250)">-250 ml<br><span style="font-size:10px;font-weight:400;color:var(--muted)">ispravka</span></button>
       </div>
       <div class="water-custom-row">
         <input class="water-custom-input" id="waterInput" type="number" placeholder="ml..." min="1" max="2000"/>
@@ -2196,14 +2196,14 @@ function zdravljeTabHTML() {
           return `<div class="water-hist-row">
             <span class="water-hist-date" style="${isToday ? 'color:var(--blue)' : ''}">${dayNames[dayObj.getDay()]}</span>
             <div class="water-hist-bar-wrap"><div class="water-hist-bar" style="width:${pct}%;background:${col}"></div></div>
-            <span class="water-hist-val" style="color:${e.ml >= waterGoal ? 'var(--blue)' : 'var(--s9)'}">${e.ml > 0 ? e.ml + 'ml' : '—'}</span>
+            <span class="water-hist-val" style="color:${e.ml >= waterGoal ? 'var(--blue)' : 'var(--muted)'}">${e.ml > 0 ? e.ml + 'ml' : '—'}</span>
           </div>`;
         }).join('')}
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
         Dnevni cilj:
         <input class="goal-input" type="number" value="${waterGoal}" onchange="updateWaterGoal(this.value)" style="width:75px"/>
-        <span style="color:var(--s11)">ml</span>
+        <span style="color:var(--muted)">ml</span>
       </div>
     </div>`;
 
@@ -2287,8 +2287,8 @@ function zdravljeTabHTML() {
     <div class="card">
       <div class="card-label">🔥 Kalorije — preporuka</div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5);margin-bottom:12px">
-        <span style="font-size:12px;color:var(--s11);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
-        <button onclick="openDrawer()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s9);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)">⚙ Uredi profil</button>
+        <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
+        <button onclick="openDrawer()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--muted);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)">⚙ Uredi profil</button>
       </div>
       <div class="zdravlje-stat">
         <span class="zdravlje-stat-label">Bazalni metabolizam (BMR)</span>
@@ -2306,7 +2306,7 @@ function zdravljeTabHTML() {
         <span class="zdravlje-stat-label">Tvoj trenutni cilj</span>
         <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">
           ${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}
-          <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:10px;cursor:pointer;text-decoration:underline;margin-left:4px;font-family:var(--sans)">uredi</button>
+          <button onclick="openDrawer()" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;text-decoration:underline;margin-left:4px;font-family:var(--sans)">uredi</button>
         </span>
       </div>
     </div>`;
@@ -2385,10 +2385,10 @@ function zdravljeTabHTML() {
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 16px 10px;border-bottom:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center">
         <div class="card-label" style="margin:0">Istorija merenja</div>
-        <span style="font-size:11px;color:var(--s11)">${log.length} ${log.length === 1 ? 'unos' : 'unosa'}</span>
+        <span style="font-size:11px;color:var(--muted)">${log.length} ${log.length === 1 ? 'unos' : 'unosa'}</span>
       </div>
       ${log.length === 0
-        ? `<div style="padding:24px 16px;text-align:center;color:var(--s11);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
+        ? `<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
         : (() => {
           const shown = log.slice(0, 10);
           const maxW = Math.max(...shown.map(e => e.weight));
@@ -2418,7 +2418,7 @@ function zdravljeTabHTML() {
                 <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
               </div>
             </div>`;
-          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--s11)">... i još ${log.length - 10} starijih merenja</div>` : '');
+          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--muted)">... i još ${log.length - 10} starijih merenja</div>` : '');
         })()}
     </div>
 
@@ -2531,7 +2531,7 @@ function render() {
         <div class="goal-row" style="justify-content:center;margin-bottom:12px">
           Cilj: <strong style="font-family:var(--mono);color:var(--green);margin:0 4px">${state.calorieGoal}</strong> kcal
           <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'TDEE−500'}</span>
-          <button onclick="openDrawer()" style="background:none;border:none;color:var(--s9);font-size:11px;cursor:pointer;text-decoration:underline;margin-left:6px;font-family:var(--sans)">⚙ uredi</button>
+          <button onclick="openDrawer()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;margin-left:6px;font-family:var(--sans)">⚙ uredi</button>
         </div>
         <div class="stats-chain">
           <!-- Uneseno -->
@@ -2539,7 +2539,7 @@ function render() {
             <div class="stat-label">Uneseno</div>
             <div class="stat-val" style="color:var(--green);font-size:18px">
               ${Math.round(t.consumed)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--muted);font-size:10px">kcal</span>
             </div>
           </div>
           <!-- Minus divider -->
@@ -2549,7 +2549,7 @@ function render() {
             <div class="stat-label">Sagoreno</div>
             <div class="stat-val" style="color:${t.burned > 0 ? 'var(--blue)' : 'var(--muted)'};font-size:18px">
               ${Math.round(t.burned)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--muted);font-size:10px">kcal</span>
             </div>
           </div>
           <!-- Equals divider -->
@@ -2559,7 +2559,7 @@ function render() {
             <div class="stat-label">Neto</div>
             <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'};font-size:18px">
               ${Math.round(t.net)}
-              <span style="color:var(--s11);font-size:10px">kcal</span>
+              <span style="color:var(--muted);font-size:10px">kcal</span>
             </div>
           </div>
         </div>
@@ -2568,7 +2568,7 @@ function render() {
           <div class="stat-label">Preostalo do cilja</div>
           <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)'}">
             ${t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net)}
-            <span style="color:var(--s11);font-size:10px">kcal</span>
+            <span style="color:var(--muted);font-size:10px">kcal</span>
           </div>
         </div>
       </div>
@@ -2693,7 +2693,7 @@ function render() {
     <div class="empty">
       <span class="empty-icon">${emptyIcon}</span>
       <div class="empty-title">${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}</div>
-      <div style="font-size:12px;color:var(--s11);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
     </div>` : '';
 
   const placeholder = state.mode === 'food'
