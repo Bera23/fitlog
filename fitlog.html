@@ -1290,9 +1290,11 @@ function autoCalorieGoal() {
 function macroLimits() {
   // Dynamic macro limits based on calorie goal
   const kcal = state.calorieGoal || 2000;
+  // Protein minimum: 1.6g per kg body weight (ISSN standard), fallback 80kg if not set
+  const protMin = Math.round((state.weight || 80) * 1.6);
   return {
-    protMin: 130,
-    protMax: Math.max(130, Math.round((kcal * 0.30) / 4)), // never below minimum
+    protMin,
+    protMax: Math.max(protMin, Math.round((kcal * 0.30) / 4)), // never below minimum
     carbMin: Math.round((kcal * 0.20) / 4),
     carbMax: Math.round((kcal * 0.40) / 4),
     fatMin: 50,
@@ -1876,12 +1878,10 @@ function historyTabHTML() {
     byMonth[month].push(e);
   });
 
-  const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
-
   let html = '';
   Object.keys(byMonth).sort().reverse().forEach(month => {
     const [yr, mo] = month.split('-');
-    const monthLabel = `${srMonths[parseInt(mo)]} ${yr}`;
+    const monthLabel = `${mo}.${yr}`;
     const monthEntries = byMonth[month];
     const monthAvg = Math.round(monthEntries.reduce((s, e) => s + e.net, 0) / monthEntries.length);
     const monthDeficit = monthEntries.filter(e => e.net < goal).length;
@@ -1922,8 +1922,6 @@ function historyTabHTML() {
 
 // Renders the products history sub-tab — grouped by month, collapsible cards per product
 function productsHistoryHTML() {
-  const srMonths = ['', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
-
   // Collect all dates with products from the last 90 days
   const byMonth = {};
   for (let i = 0; i < 90; i++) {
@@ -1944,7 +1942,7 @@ function productsHistoryHTML() {
 
   return months.map(month => {
     const [yr, mo] = month.split('-');
-    const monthLabel = `${srMonths[parseInt(mo)]} ${yr}`;
+    const monthLabel = `${mo}.${yr}`;
     const days = byMonth[month];
     const totalProducts = days.reduce((s, d) => s + d.products.length, 0);
 
@@ -2427,9 +2425,11 @@ function zdravljeTabHTML() {
   if (sub === 'kalorije') {
     const tw = state.targetWeight ? parseFloat(state.targetWeight) : null;
     // Macro targets based on suggested goal
+    // Protein minimum: 1.6g per kg body weight (ISSN standard), fallback 80kg if not set
+    const protMin = Math.round((state.weight || 80) * 1.6);
     const mt = {
-      protMax: Math.round((suggestedGoal * 0.30) / 4),
-      protMin: 130,
+      protMax: Math.max(protMin, Math.round((suggestedGoal * 0.30) / 4)), // never below minimum
+      protMin,
       carbMax: Math.round((suggestedGoal * 0.40) / 4),
       carbMin: Math.round((suggestedGoal * 0.20) / 4),
       fatMax:  Math.round((suggestedGoal * 0.30) / 9),
@@ -3453,9 +3453,10 @@ async function scoreNutrition() {
       m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
     ).join(' | ');
     const profile      = buildUserProfile();
+    const overVerb = state.gender === 'female' ? 'Prešla' : 'Prešao';
     const deficitStatus = t.consumed < state.calorieGoal
       ? `U kalorijskom deficitu ✓ (${state.calorieGoal - Math.round(t.consumed)} kcal ispod cilja).`
-      : `Prešao kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
+      : `${overVerb} kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
 
     const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
 ${profile}
