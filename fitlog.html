@@ -92,7 +92,7 @@
   .report-stat:last-child { border-bottom: none; }
   .report-stat-label { font-size: 13px; color: var(--muted); }
   .report-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; }
-  .report-day-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
+  .report-day-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
   .report-day-row:last-child { border-bottom: none; }
   .report-day-name { color: var(--muted); min-width: 28px; font-family: var(--mono); }
   .report-day-bar-wrap { flex: 1; height: 7px; background: var(--s4); border-radius: 99px; overflow: hidden; }
@@ -654,7 +654,11 @@ function loadDay(date) {
 }
 
 function saveDay(date, data) {
-  localStorage.setItem('fitlog_day_' + date, JSON.stringify(data));
+  // Snapshot the current calorie goal into the serialized data so historical
+  // weeks render correctly if the goal changes later. Uses spread to avoid
+  // mutating the live state.dayData object.
+  const payload = { ...data, goalSnapshot: state.calorieGoal };
+  localStorage.setItem('fitlog_day_' + date, JSON.stringify(payload));
 }
 
 // Load scanned products for a given date — returns array of product objects
@@ -1443,7 +1447,7 @@ function getWeekData(offset = 0) {
     d.setHours(0, 0, 0, 0);
     const dateStr = localDateStr(d);
     if (d > today) {
-      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, hasData: false, future: true });
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, goal: state.calorieGoal, hasData: false, future: true });
       continue;
     }
     const day = safeParseLS('fitlog_day_' + dateStr);
@@ -1457,9 +1461,11 @@ function getWeekData(offset = 0) {
       const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
       const carbs   = day.meals?.reduce((s, m) => s + (m.carbs   || 0), 0) || 0;
       const fat     = day.meals?.reduce((s, m) => s + (m.fat     || 0), 0) || 0;
-      result.push({ date: dateStr, consumed, burned, net: consumed - burned, protein, carbs, fat, hasData: consumed > 0, future: false });
+      // Use snapshotted goal from the day it was logged; fall back to current goal
+      const goal    = day.goalSnapshot || state.calorieGoal;
+      result.push({ date: dateStr, consumed, burned, net: consumed - burned, protein, carbs, fat, goal, hasData: consumed > 0, future: false });
     } else {
-      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, hasData: false, future: false });
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, goal: state.calorieGoal, hasData: false, future: false });
     }
   }
   return result;
@@ -2173,7 +2179,7 @@ function weeklyReportHTML(weekData) {
   const avgConsumed   = Math.round(totalConsumed / daysWithData.length);
   const avgBurned     = Math.round(totalBurned / daysWithData.length);
   const avgNet        = Math.round(totalNet / daysWithData.length);
-  const deficitDays   = daysWithData.filter(d => d.net < goal).length;
+  const deficitDays   = daysWithData.filter(d => d.net < (d.goal || goal)).length;
   const avgDeficit    = Math.round(goal - avgNet);
   const projectedLoss = ((avgDeficit * 7) / KCAL_PER_KG_FAT).toFixed(2);
 
@@ -2190,36 +2196,58 @@ function weeklyReportHTML(weekData) {
               : { emoji: '😔', label: 'Treba raditi', color: 'var(--red)' };
 
   const dayNames = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su'];
-  const maxNet = Math.max(...weekData.map(d => d.net), goal);
+  // maxNet accounts for per-day goals (via goalSnapshot) for correct bar scaling
+  const maxNet = Math.max(...weekData.map(d => Math.max(d.net, d.goal || goal)), 1);
 
   const dayRows = weekData.map(d => {
     const dayObj = new Date(d.date + 'T12:00:00');
     const name = dayNames[dayObj.getDay()];
-    if (d.future) return `<div class="report-day-row">
-      <span class="report-day-name">${name}</span>
-      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:0%;background:var(--s4)"></div></div>
-      <span class="report-day-val" style="color:var(--s6)">—</span>
-    </div>`;
-    if (!d.hasData) return `<div class="report-day-row">
-      <span class="report-day-name">${name}</span>
-      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:2%;background:var(--s4)"></div></div>
-      <span class="report-day-val" style="color:var(--s6)">0</span>
-    </div>`;
-    const pct = Math.min(100, (d.net / maxNet) * 100);
-    // Goal marker position inside bar-wrap (in % of maxNet)
-    const goalPct = Math.min(98, (goal / maxNet) * 100);
-    const color = d.net < goal ? 'var(--green)' : 'var(--red)';
-    // Only clickable for current week (history tab only has current week data)
+    // Use per-day snapshotted goal, fall back to current week goal
+    const dayGoal = d.goal || goal;
+
+    if (d.future) return `
+      <div class="report-day-row">
+        <span class="report-day-name" style="color:var(--s6)">${name}</span>
+        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
+          <div style="height:100%;width:0%;background:var(--s4);border-radius:4px"></div>
+        </div>
+        <span class="report-day-val" style="color:var(--s6);min-width:36px;text-align:right">—</span>
+        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--s6)"></span>
+      </div>`;
+
+    if (!d.hasData) return `
+      <div class="report-day-row">
+        <span class="report-day-name" style="color:var(--s7)">${name}</span>
+        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
+          <div style="height:100%;width:100%;background:var(--s3);border-radius:4px"></div>
+          <!-- Goal line marker -->
+          <div style="position:absolute;top:0;bottom:0;left:${Math.min(97, (dayGoal / maxNet) * 100)}%;width:2px;background:var(--s7);border-radius:1px"></div>
+        </div>
+        <span class="report-day-val" style="color:var(--s7);min-width:36px;text-align:right">—</span>
+        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--s7)"></span>
+      </div>`;
+
+    const pct     = Math.min(100, (d.net / maxNet) * 100);
+    const goalPct = Math.min(97, (dayGoal / maxNet) * 100);
+    const delta   = Math.round(d.net - dayGoal);
+    const inDef   = delta < 0;
+    const color   = inDef ? 'var(--green)' : 'var(--red)';
+    const deltaStr = inDef ? `−${Math.abs(delta)}` : `+${delta}`;
     const clickable = isCurrentWeek ? `onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer"` : '';
-    return `<div class="report-day-row" ${clickable}>
-      <span class="report-day-name" style="color:${d.net < goal ? 'var(--green)' : 'var(--muted)'}">${name}</span>
-      <div class="report-day-bar-wrap" style="position:relative;overflow:visible;border-radius:99px">
-        <div class="report-day-bar" style="width:${pct}%;background:${color}55"></div>
-        <!-- Vertical goal line marker — white semi-transparent for visibility on both dark track and colored bar -->
-        <div style="position:absolute;top:0;bottom:0;left:${goalPct}%;width:2px;background:rgba(255,255,255,0.55);pointer-events:none;border-radius:1px"></div>
-      </div>
-      <span class="report-day-val" style="color:${color}">${Math.round(d.net)}</span>
-    </div>`;
+
+    return `
+      <div class="report-day-row" ${clickable}>
+        <span class="report-day-name" style="color:${color}">${name}</span>
+        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
+          <!-- Bar fill -->
+          <div style="position:absolute;inset:0;background:var(--s3);border-radius:4px"></div>
+          <div style="position:absolute;top:0;bottom:0;left:0;width:${pct}%;background:${color}44;border-radius:4px;transition:width 0.4s ease"></div>
+          <!-- Goal line -->
+          <div style="position:absolute;top:0;bottom:0;left:${goalPct}%;width:2px;background:rgba(255,255,255,0.4);border-radius:1px"></div>
+        </div>
+        <span class="report-day-val" style="color:${color};min-width:36px;text-align:right">${Math.round(d.net)}</span>
+        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;font-weight:700;color:${color}">${deltaStr}</span>
+      </div>`;
   }).join('');
 
   // Stats object passed to AI summary (serialized as JSON in onclick)
@@ -2295,7 +2323,10 @@ function weeklyReportHTML(weekData) {
     </div>
 
     <div class="card">
-      <div class="card-label">Dani — neto kalorije</div>
+      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Dani — neto kalorije</span>
+        <span style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.3px;font-family:var(--mono)">${weekLabel}</span>
+      </div>
       ${dayRows}
       ${isCurrentWeek ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span></div>' : ''}
     </div>`;
@@ -2875,6 +2906,10 @@ function render() {
 
     statsContent = `
     <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:-8px">
+        <span class="card-label" style="margin:0">Kalorije</span>
+        <span style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px;text-transform:uppercase">Danas</span>
+      </div>
       ${ringHTML(t.consumed, t.burned, state.calorieGoal)}
       <div style="width:100%">
         <div class="goal-row" style="justify-content:center;margin-bottom:12px">
@@ -2922,26 +2957,15 @@ function render() {
       </div>
     </div>
     <div class="card">
-      <div class="card-label">Makronutrijenti</div>
+      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Makronutrijenti</span>
+        <span style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px;text-transform:uppercase">Danas</span>
+      </div>
       ${(() => { const ml = macroLimits(); return `
       ${macroBar('Proteini', t.protein, ml.protMin, ml.protMax, 'var(--green)')}
       ${macroBar('Ugljeni hidrati', t.carbs, ml.carbMin, ml.carbMax, 'var(--blue)')}
       ${macroBar('Masti', t.fat, ml.fatMin, ml.fatMax, 'var(--orange)')}
       ${macroBar('Šećer', t.sugar, 0, ml.sugarMax, 'var(--pink)')}`; })()}
-    </div>
-    <div class="card">
-      <div class="card-label">Nedeljni bilans</div>
-      ${weekChartHTML(weekData)}
-    </div>
-    <div class="card">
-      <div class="card-label">Streak — dani ispod cilja</div>
-      <div class="streak-wrap">
-        <div class="streak-num ${streak === 0 ? 'zero' : ''}">${streak}</div>
-        <div class="streak-info">
-          <div class="streak-title">${streakEmoji} ${streak === 0 ? 'Nema niza' : streak === 1 ? '1 dan' : streak + ' dana'}</div>
-          <div class="streak-sub">${streakMsg}</div>
-        </div>
-      </div>
     </div>
     ${weeklyReportHTML(weekData)}`;
   }
