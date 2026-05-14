@@ -107,6 +107,10 @@
     0% { background-position: -400px 0; }
     100% { background-position: 400px 0; }
   }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
   .skeleton { background: linear-gradient(90deg, var(--s4) 25%, #252525 50%, var(--s4) 75%); background-size: 800px 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }
   .skeleton-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 12px 16px 0; }
   .skeleton-time { height: 10px; width: 40px; margin-bottom: 10px; }
@@ -584,6 +588,9 @@ const state = {
   heightInput: '',
   editHeight: false,
   selectedHistoryDate: null,
+  weekOffset: 0,            // 0 = current week, -1 = last week, etc.
+  weeklySummary: null,      // cached AI summary text for current weekOffset
+  weeklySummaryLoading: false,
   imageBase64: null,
   imageMime: null,
   drawerOpen: false,
@@ -916,6 +923,34 @@ Unos korisnika: ${text}`;
   return parseGeminiJson(raw);
 }
 
+// Generate a short motivational weekly summary using Gemini.
+// Accepts aggregated weekly stats object and returns a plain text comment.
+async function generateWeeklySummary(stats) {
+  const profile = buildUserProfile();
+  const weekLabel = stats.weekLabel || 'ova nedelja';
+
+  const prompt = `Ti si motivišući nutricionistički trener. Analiziraj nedeljne statistike ishrane i daj kratak, konkretan komentar (2-4 rečenice, bez uvoda).
+${profile}
+Kalorijski cilj: ${state.calorieGoal} kcal/dan.
+Nedelja: ${weekLabel}
+
+Statistike:
+- Dana sa podacima: ${stats.daysWithData} od 7
+- Dana ispod cilja: ${stats.deficitDays} od ${stats.daysWithData}
+- Prosečan dnevni unos: ${stats.avgConsumed} kcal
+- Prosečno sagoreno: ${stats.avgBurned} kcal
+- Prosečan neto: ${stats.avgNet} kcal
+- Prosečan deficit: ${stats.avgDeficit} kcal
+- Prosečni proteini: ${stats.avgProtein}g
+- Prosečni ugljeni hidrati: ${stats.avgCarbs}g
+- Prosečne masti: ${stats.avgFat}g
+- Procenjen gubitak masti: ${stats.projectedLoss} kg
+
+Budi direktan, specifičan i motivišući. Pohvali ako je dobro, konstruktivno upozori ako nije. Odgovori na srpskom.`;
+
+  return await callGemini([{ text: prompt }], 0.5);
+}
+
 async function parseFoodFromImage(base64, mimeType, textContext) {
   const profile = buildUserProfile();
   const goal    = `Kalorijski cilj: ${state.calorieGoal} kcal.`;
@@ -1240,103 +1275,6 @@ function exportData() {
   showToast('Podaci izvezeni ✓');
 }
 
-// ─── CSV EXPORT ──────────────────────────────────────────────────────────────
-
-// Shared CSV download helper — prepends UTF-8 BOM so Excel opens Serbian chars correctly
-function downloadCSV(rows, filename) {
-  const escape = val => {
-    const s = String(val ?? '');
-    // Wrap in quotes if value contains comma, quote, or newline
-    return (s.includes(',') || s.includes('"') || s.includes('\n'))
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
-  };
-  const csv = rows.map(row => row.map(escape).join(',')).join('\n');
-  // BOM (\uFEFF) ensures Windows Excel correctly decodes UTF-8 (ć, č, š, ž, đ)
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 100);
-  showToast('CSV izvezen ✓');
-}
-
-// Export all meals + exercises for a given YYYY-MM month — one row per food item
-function exportMonthMealsCSV(month) {
-  const rows = [
-    ['Datum', 'Vreme', 'Namirnica', 'Kolicina', 'Kcal', 'Proteini (g)', 'UH (g)', 'Masti (g)', 'Secer (g)']
-  ];
-
-  const [yr, mo] = month.split('-');
-  const daysInMonth = new Date(parseInt(yr), parseInt(mo), 0).getDate();
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr    = `${yr}-${mo}-${String(d).padStart(2, '0')}`;
-    const displayDate = `${String(d).padStart(2, '0')}.${mo}.${yr}.`;
-    const day = safeParseLS('fitlog_day_' + dateStr);
-    if (!day?.meals?.length) continue;
-
-    day.meals.forEach(meal => {
-      meal.items.forEach(item => {
-        rows.push([
-          displayDate,
-          meal.time,
-          item.name,
-          item.amount,
-          Math.round(item.calories  || 0),
-          Math.round(item.protein   || 0),
-          Math.round(item.carbs     || 0),
-          Math.round(item.fat       || 0),
-          Math.round(item.sugar     || 0),
-        ]);
-      });
-    });
-  }
-
-  if (rows.length === 1) { showToast('Nema podataka za ovaj mesec', 'err'); return; }
-  downloadCSV(rows, `fitlog_obroci_${month}.csv`);
-}
-
-// Export all scanned products for a given YYYY-MM month — one row per product
-function exportMonthProductsCSV(month) {
-  const rows = [
-    ['Datum', 'Naziv', 'Brend', 'Porcija (g)', 'Kcal/100g', 'Proteini/100g (g)', 'UH/100g (g)',
-     'Masti/100g (g)', 'Secer/100g (g)', 'Vlakna/100g (g)', 'Ocena', 'Komentar']
-  ];
-
-  const [yr, mo] = month.split('-');
-  const daysInMonth = new Date(parseInt(yr), parseInt(mo), 0).getDate();
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr     = `${yr}-${mo}-${String(d).padStart(2, '0')}`;
-    const displayDate = `${String(d).padStart(2, '0')}.${mo}.${yr}.`;
-    const products    = loadProducts(dateStr);
-    if (!products.length) continue;
-
-    products.forEach(p => {
-      rows.push([
-        displayDate,
-        p.name              || '',
-        p.brand             || '',
-        p.serving_size_g    || '',
-        p.calories_per_100g || '',
-        p.protein_per_100g  || '',
-        p.carbs_per_100g    || '',
-        p.fat_per_100g      || '',
-        p.sugar_per_100g    || '',
-        p.fiber_per_100g    || '',
-        p.rating            || '',
-        p.rating_reason     || '',
-      ]);
-    });
-  }
-
-  if (rows.length === 1) { showToast('Nema proizvoda za ovaj mesec', 'err'); return; }
-  downloadCSV(rows, `fitlog_proizvodi_${month}.csv`);
-}
-
 // ─── TOAST ───────────────────────────────────────────────────────────────────
 
 let toastTimer = null;
@@ -1488,15 +1426,15 @@ function macroBar(label, value, min, max, color, unit) {
 // ─── WEEK DATA & STREAK ───────────────────────────────────────────────────────
 
 // Returns current week Mon–Sun (future days shown as empty)
-function getWeekData() {
+function getWeekData(offset = 0) {
   const result = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  // Always start from Monday of current week
+  // Start from Monday of the target week (offset=0 means current week)
   const dow = today.getDay(); // 0=Sun, 1=Mon...
   const mondayOffset = dow === 0 ? -6 : 1 - dow;
   const monday = new Date(today);
-  monday.setDate(today.getDate() + mondayOffset);
+  monday.setDate(today.getDate() + mondayOffset + offset * 7);
   monday.setHours(0, 0, 0, 0);
 
   for (let i = 0; i < 7; i++) {
@@ -1505,7 +1443,7 @@ function getWeekData() {
     d.setHours(0, 0, 0, 0);
     const dateStr = localDateStr(d);
     if (d > today) {
-      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: true });
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, hasData: false, future: true });
       continue;
     }
     const day = safeParseLS('fitlog_day_' + dateStr);
@@ -1515,9 +1453,13 @@ function getWeekData() {
       const workoutDay = cachedLoadWorkout(dateStr);
       const workoutBurned = workoutDay.reduce((s, e) => s + (e.calories || 0), 0);
       const burned = exBurned + workoutBurned;
-      result.push({ date: dateStr, consumed, burned, net: consumed - burned, hasData: consumed > 0, future: false });
+      // Aggregate macros from all meals of the day
+      const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
+      const carbs   = day.meals?.reduce((s, m) => s + (m.carbs   || 0), 0) || 0;
+      const fat     = day.meals?.reduce((s, m) => s + (m.fat     || 0), 0) || 0;
+      result.push({ date: dateStr, consumed, burned, net: consumed - burned, protein, carbs, fat, hasData: consumed > 0, future: false });
     } else {
-      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, hasData: false, future: false });
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, hasData: false, future: false });
     }
   }
   return result;
@@ -2008,10 +1950,7 @@ function historyTabHTML() {
     html += `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="color:${avgColor};font-size:12px;font-weight:600">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
-          <button onclick="exportMonthMealsCSV('${month}')" style="font-size:10px;background:rgba(143,212,46,0.1);border:1px solid rgba(143,212,46,0.3);color:var(--green);padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:700;font-family:var(--sans);white-space:nowrap">↓ CSV</button>
-        </div>
+        <span style="color:${avgColor};font-size:12px;font-weight:600">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
       </div>
       ${rows}
     </div>`;
@@ -2070,10 +2009,7 @@ function productsHistoryHTML() {
     return `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
-          <button onclick="exportMonthProductsCSV('${month}')" style="font-size:10px;background:rgba(143,212,46,0.1);border:1px solid rgba(143,212,46,0.3);color:var(--green);padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:700;font-family:var(--sans);white-space:nowrap">↓ CSV</button>
-        </div>
+        <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
       </div>
       ${dayBlocks}
     </div>`;
@@ -2206,21 +2142,45 @@ function trainingTabHTML() {
 
 function weeklyReportHTML(weekData) {
   // weekData passed from render to avoid double compute
-  weekData = weekData || getWeekData();
+  weekData = weekData || getWeekData(state.weekOffset);
   const goal = state.calorieGoal;
   const daysWithData = weekData.filter(d => d.hasData && !d.future);
 
+  // Build human-readable week label (e.g. "12.05. – 18.05.")
+  const weekStart = weekData[0].date;
+  const weekEnd   = weekData[6].date;
+  const weekLabel = `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`;
+
+  // Week navigation header — disable forward button when already on current week
+  const isCurrentWeek = state.weekOffset === 0;
+  const navHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="shiftWeek(-1)" style="background:var(--s4);border:none;border-radius:8px;color:var(--text);font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" aria-label="Prethodna nedelja">‹</button>
+      <div style="text-align:center">
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">${weekLabel}</div>
+        ${isCurrentWeek ? '<div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px">TEKUĆA NEDELJA</div>' : `<div style="font-size:10px;color:var(--muted)">${Math.abs(state.weekOffset)} ned. unazad</div>`}
+      </div>
+      <button onclick="shiftWeek(1)" ${isCurrentWeek ? 'disabled' : ''} style="background:var(--s4);border:none;border-radius:8px;color:${isCurrentWeek ? 'var(--s6)' : 'var(--text)'};font-size:18px;width:36px;height:36px;cursor:${isCurrentWeek ? 'default' : 'pointer'};display:flex;align-items:center;justify-content:center;flex-shrink:0" aria-label="Sledeća nedelja">›</button>
+    </div>`;
+
   if (daysWithData.length === 0) {
-    return `<div class="card"><div class="hist-empty">📭 Nema podataka za ovu nedelju.<br>Počni da unosiš obroke!</div></div>`;
+    return `<div class="card">${navHTML}<div class="hist-empty">📭 Nema podataka za ovu nedelju.<br>Počni da unosiš obroke!</div></div>`;
   }
 
   const totalConsumed = daysWithData.reduce((s, d) => s + d.consumed, 0);
   const totalBurned   = daysWithData.reduce((s, d) => s + d.burned, 0);
   const totalNet      = daysWithData.reduce((s, d) => s + d.net, 0);
+  const avgConsumed   = Math.round(totalConsumed / daysWithData.length);
+  const avgBurned     = Math.round(totalBurned / daysWithData.length);
   const avgNet        = Math.round(totalNet / daysWithData.length);
   const deficitDays   = daysWithData.filter(d => d.net < goal).length;
   const avgDeficit    = Math.round(goal - avgNet);
-  const projectedLoss = ((avgDeficit * 7) / KCAL_PER_KG_FAT).toFixed(2); // ~7700 kcal per kg fat
+  const projectedLoss = ((avgDeficit * 7) / KCAL_PER_KG_FAT).toFixed(2);
+
+  // Average macros across days with data
+  const avgProtein = Math.round(daysWithData.reduce((s, d) => s + (d.protein || 0), 0) / daysWithData.length);
+  const avgCarbs   = Math.round(daysWithData.reduce((s, d) => s + (d.carbs   || 0), 0) / daysWithData.length);
+  const avgFat     = Math.round(daysWithData.reduce((s, d) => s + (d.fat     || 0), 0) / daysWithData.length);
 
   // Grade
   const deficitRatio = deficitDays / daysWithData.length;
@@ -2246,31 +2206,55 @@ function weeklyReportHTML(weekData) {
       <span class="report-day-val" style="color:var(--s6)">0</span>
     </div>`;
     const pct = Math.min(100, (d.net / maxNet) * 100);
+    // Goal marker position inside bar-wrap (in % of maxNet)
+    const goalPct = Math.min(98, (goal / maxNet) * 100);
     const color = d.net < goal ? 'var(--green)' : 'var(--red)';
-    return `<div class="report-day-row" onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer">
+    // Only clickable for current week (history tab only has current week data)
+    const clickable = isCurrentWeek ? `onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer"` : '';
+    return `<div class="report-day-row" ${clickable}>
       <span class="report-day-name" style="color:${d.net < goal ? 'var(--green)' : 'var(--muted)'}">${name}</span>
-      <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:${pct}%;background:${color}55"></div></div>
+      <div class="report-day-bar-wrap" style="position:relative;overflow:visible;border-radius:99px">
+        <div class="report-day-bar" style="width:${pct}%;background:${color}55"></div>
+        <!-- Vertical goal line marker — white semi-transparent for visibility on both dark track and colored bar -->
+        <div style="position:absolute;top:0;bottom:0;left:${goalPct}%;width:2px;background:rgba(255,255,255,0.55);pointer-events:none;border-radius:1px"></div>
+      </div>
       <span class="report-day-val" style="color:${color}">${Math.round(d.net)}</span>
     </div>`;
   }).join('');
 
+  // Stats object passed to AI summary (serialized as JSON in onclick)
+  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss };
+  const statsJson = JSON.stringify(statsForAI).replace(/'/g, "\\'");
+
+  // AI summary section — shows button, loading state, or cached result
+  const aiSummaryHTML = state.weeklySummaryLoading
+    ? `<div style="margin-top:12px;padding:12px;background:var(--s3);border-radius:10px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px"><span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> Generišem komentar...</div>`
+    : state.weeklySummary
+      ? `<div style="margin-top:12px;padding:12px;background:var(--s3);border-radius:10px;border-left:3px solid var(--green)">
+           <div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">🤖 AI KOMENTAR</div>
+           <div style="font-size:13px;color:var(--text-secondary);line-height:1.65">${state.weeklySummary}</div>
+           <button onclick="state.weeklySummary=null;scheduleRender()" style="background:none;border:none;color:var(--s8);font-size:11px;cursor:pointer;margin-top:8px;padding:0">↺ Generiši ponovo</button>
+         </div>`
+      : `<button onclick="requestWeeklySummary(${statsJson.replace(/"/g, '&quot;')})" style="width:100%;margin-top:12px;padding:11px;background:var(--s3);border:1px solid var(--s5);border-radius:10px;color:var(--muted);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;text-align:center">🤖 Generiši AI komentar</button>`;
+
   return `
     <div class="card">
-      <div class="card-label">Nedeljni izveštaj</div>
+      ${navHTML}
       <div class="report-grade">${grade.emoji}</div>
       <div class="report-grade-label" style="color:${grade.color}">${grade.label}</div>
       <div class="report-grade-sub">${deficitDays} od ${daysWithData.length} dana ispod cilja</div>
+      ${aiSummaryHTML}
     </div>
 
     <div class="card">
       <div class="card-label">Statistike nedelje</div>
       <div class="report-stat">
         <span class="report-stat-label">Prosečan dnevni unos</span>
-        <span class="report-stat-val" style="color:var(--text)">${Math.round(totalConsumed / daysWithData.length)} kcal</span>
+        <span class="report-stat-val" style="color:var(--text)">${avgConsumed} kcal</span>
       </div>
       <div class="report-stat">
         <span class="report-stat-label">Prosečno sagoreno</span>
-        <span class="report-stat-val" style="color:var(--blue)">${Math.round(totalBurned / daysWithData.length)} kcal</span>
+        <span class="report-stat-val" style="color:var(--blue)">${avgBurned} kcal</span>
       </div>
       <div class="report-stat">
         <span class="report-stat-label">Prosečan neto</span>
@@ -2290,14 +2274,30 @@ function weeklyReportHTML(weekData) {
           ${avgDeficit > 0 ? '~' + projectedLoss + ' kg' : 'Nema deficita'}
         </span>
       </div>
+      <!-- Average weekly macros -->
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--s3)">
+        <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">Prosečni dnevni makroi</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
+            <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--green)">${avgProtein}g</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Proteini</div>
+          </div>
+          <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
+            <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--blue)">${avgCarbs}g</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Ugljeni h.</div>
+          </div>
+          <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
+            <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--orange)">${avgFat}g</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Masti</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
       <div class="card-label">Dani — neto kalorije</div>
       ${dayRows}
-      <div style="display:flex;justify-content:flex-end;margin-top:8px">
-        <span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span>
-      </div>
+      ${isCurrentWeek ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span></div>' : ''}
     </div>`;
 }
 
@@ -2866,7 +2866,7 @@ function render() {
   let statsContent = '';
   if (state.activeTab === 'stats') {
     const streak = calcStreak();
-    const weekData = getWeekData();
+    const weekData = getWeekData(state.weekOffset);
     const streakEmoji = streak >= 14 ? '🔥' : streak >= 7 ? '⚡' : streak >= 3 ? '💪' : streak >= 1 ? '✅' : '😴';
     const streakMsg = streak === 0
       ? 'Još nema niza. Počni danas!'
@@ -3877,6 +3877,34 @@ function resetGoalToAuto() {
   localStorage.removeItem('fitlog_goal_manual');
   autoCalorieGoal();
   scheduleRender();
+}
+
+// Navigate to previous or next week in the Pregled tab
+function shiftWeek(delta) {
+  // Prevent navigating into the future (offset 0 is current week)
+  if (state.weekOffset + delta > 0) return;
+  state.weekOffset += delta;
+  // Clear cached AI summary when switching weeks
+  state.weeklySummary = null;
+  state.weeklySummaryLoading = false;
+  scheduleRender();
+}
+
+// Trigger AI weekly summary generation — called from onclick in weeklyReportHTML
+async function requestWeeklySummary(stats) {
+  if (state.weeklySummaryLoading) return;
+  state.weeklySummaryLoading = true;
+  state.weeklySummary = null;
+  scheduleRender();
+  try {
+    const text = await generateWeeklySummary(stats);
+    state.weeklySummary = text.trim();
+  } catch (e) {
+    state.weeklySummary = '⚠️ Nije moguće generisati komentar — pokušaj ponovo.';
+  } finally {
+    state.weeklySummaryLoading = false;
+    scheduleRender();
+  }
 }
 
 function deleteMeal(id) {
