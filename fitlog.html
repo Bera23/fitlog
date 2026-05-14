@@ -562,6 +562,7 @@ const state = {
   dayData: { meals: [], exercises: [] },
   mode: 'food',
   activeTab: 'log',
+  mealInputDraft: '',   // persists food textarea content across renders
   zdravljeSubTab: 'tezina',
   nutritionScore: null,
   nutritionScoreLoading: false,
@@ -1698,7 +1699,9 @@ function deleteCurrentProduct(id) {
 }
 
 // Core product card renderer — shared by today log and history views
-function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
+// showDate controls whether the date badge is rendered in the card header.
+// Pass false when the card is inside a date-grouped list (history view) to avoid duplication.
+function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showDate = true) {
   const rating = p.rating || 'moderate';
   const badge  = rating === 'good'
     ? `<span class="product-rating-badge rating-good">✅ Dobro</span>`
@@ -1757,7 +1760,7 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr) {
     <div class="product-card${isExp ? ' expanded' : ''}" ${dataAttr}="${p.id}">
       <!-- Header: date | name (truncated) | badge | chevron — mirrors meal-header layout -->
       <div class="product-card-header" onclick="${toggleFn}(${p.id})">
-        ${dateStr ? `<span class="meal-time-badge">${dateStr}</span>` : ''}
+        ${(showDate && dateStr) ? `<span class="meal-time-badge">${dateStr}</span>` : ''}
         <span class="meal-summary">${p.name}</span>
         ${badge}
         <span class="meal-chevron${isExp ? ' open' : ''}">▾</span>
@@ -1910,7 +1913,8 @@ function productsHistoryHTML() {
         const isExp = state.expandedHistoryProductIds.has(p.id);
         // Inject date from storage key for products saved before date field was added
         const pWithDate = p.date ? p : { ...p, date };
-        return productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id');
+        // Pass showDate=false — date is already shown in the day group header
+        return productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false);
       }).join('');
 
       return `
@@ -2974,7 +2978,7 @@ function render() {
             <button class="send-btn" onclick="handleProductSubmit()" ${state.productLoading ? 'disabled' : ''} style="flex:1;margin-top:0">${state.productLoading ? 'Analiziram...' : '+ Analiziraj proizvod'}</button>
           </div>
         ` : `
-          <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}"></textarea>
+          <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}" oninput="state.mealInputDraft = this.value"></textarea>
           ${state.mode === 'food' && state.imageBase64 ? `
           <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
@@ -3083,6 +3087,11 @@ function render() {
     </div>`;
   // Sync drawer after every render — only rebuild if it's actually open
   if (state.drawerOpen) renderDrawer();
+  // Restore meal textarea draft after render — innerHTML wipe clears DOM values
+  if (state.mealInputDraft) {
+    const ta = document.getElementById('msgInput');
+    if (ta) ta.value = state.mealInputDraft;
+  }
 }
 
 function addWater(ml) {
@@ -3289,8 +3298,8 @@ function addProductToMeal(productId, productDate) {
   const macroTag = `[P:${p.protein_per_100g||0}g/100g UH:${p.carbs_per_100g||0}g/100g M:${p.fat_per_100g||0}g/100g ${p.calories_per_100g||0}kcal/100g]`;
   const line = `${p.name} - ${srv}g ${macroTag}`;
 
-  // Switch to log tab + food mode if currently elsewhere, then render so textarea exists in DOM
-  if (state.activeTab !== 'log') {
+  // Switch to log tab in food mode if needed — product mode has no msgInput in DOM
+  if (state.activeTab !== 'log' || state.mode !== 'food') {
     state.activeTab = 'log';
     state.mode = 'food';
     render();
@@ -3299,9 +3308,11 @@ function addProductToMeal(productId, productDate) {
   const ta = document.getElementById('msgInput');
   if (!ta) return;
 
-  // Append on new line if textarea already has content, otherwise start fresh
-  const current = ta.value.trim();
-  ta.value = current ? current + '\n' + line : line;
+  // Use state draft as base — ta.value would be empty if render() was just called above
+  const current = state.mealInputDraft.trim();
+  const newValue = current ? current + '\n' + line : line;
+  state.mealInputDraft = newValue;
+  ta.value = newValue;
   ta.focus();
   showToast('Dodato u unos ✓');
 }
@@ -3765,6 +3776,7 @@ async function handleSubmit() {
       };
       state.dayData.meals.push(meal);
       saveDay(state.date, state.dayData);
+      state.mealInputDraft = '';   // clear draft after successful submission
       showToast(`+${Math.round(meal.calories)} kcal dodato ✓`);
     } else {
       const result = await parseExercise(input);
