@@ -130,7 +130,7 @@
   .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
 
   /* PRODUCT CARDS */
-  .product-card { position: relative; border-bottom: 1px solid var(--s3); }
+  .product-card { position: relative; border-bottom: 1px solid var(--s5); }
   .product-card:last-child { border-bottom: none; }
   .product-card-header { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; cursor: pointer; gap: 8px; }
   .product-rating-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
@@ -1786,13 +1786,6 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
       <div class="product-collapsed">
         ${pillProtein}${pillSugar}${pillCal}
       </div>
-      <!-- "Add to meal" button — always visible, outside collapsed/expanded sections -->
-      <div style="padding-bottom:10px">
-        <button onclick="event.stopPropagation(); addProductToMeal(${p.id}, '${p.date}')"
-          style="background:rgba(143,212,46,0.12);border:1px solid rgba(143,212,46,0.3);border-radius:8px;color:var(--green);padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)">
-          + Ubaci u obrok
-        </button>
-      </div>
       <!-- Expanded full detail — shown when .expanded -->
       <div class="product-expanded">
         <!-- Full name + brand + serving size — visible only when expanded -->
@@ -1813,6 +1806,13 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
         ${p.summary ? `<div style="font-size:13px;color:var(--muted);line-height:1.6">${p.summary}</div>` : ''}
         ${deleteOnClick ? `
         <button onclick="${deleteOnClick}" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši proizvod</button>` : ''}
+        <!-- "Add to meal" shown only when card is expanded — reduces clutter in collapsed list -->
+        <div style="margin-top:10px">
+          <button onclick="event.stopPropagation(); addProductToMeal(${p.id}, '${p.date}')"
+            style="background:rgba(143,212,46,0.12);border:1px solid rgba(143,212,46,0.3);border-radius:8px;color:var(--green);padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);width:100%">
+            + Ubaci u obrok
+          </button>
+        </div>
       </div>
     </div>`;
 }
@@ -1936,7 +1936,7 @@ function productsHistoryHTML() {
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:11px;font-weight:700;color:var(--green);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3);letter-spacing:0.4px">
             ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
           </div>
           ${cards}
