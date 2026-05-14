@@ -3653,8 +3653,9 @@ function setMode(mode) {
   state.productImageBase64 = null;
   state.productImageMime   = null;
   render();
-  document.getElementById('msgInput')?.focus();
-  document.getElementById('productInput')?.focus();
+  // Note: intentionally no .focus() here — auto-focusing the textarea
+  // would trigger the mobile keyboard on every tab switch, which is unwanted.
+  // The user should tap the textarea explicitly to open the keyboard.
 }
 
 function updateTrainingInput(exId, field, value) {
