@@ -71,12 +71,12 @@
 
   /* ZDRAVLJE SUBTABS */
   .sub-tabs { display: flex; gap: 4px; margin: 12px 16px 0; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
-  .sub-tab { flex: 1; padding: 8px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; }
+  .sub-tab { flex: 1; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; min-height: 44px; }
   .sub-tab.active { background: var(--green); color: #0a0a0a; font-weight: 800; }
   .sub-tab.inactive { background: transparent; color: var(--s11); }
-  .weight-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--green); padding: 4px 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--sans); }
-  .weight-input { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 4px 8px; font-size: 13px; width: 65px; font-family: var(--mono); outline: none; }
-  .save-btn { background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .weight-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--green); padding: 10px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--sans); min-height: 44px; }
+  .weight-input { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 8px; font-size: 13px; width: 65px; font-family: var(--mono); outline: none; min-height: 44px; box-sizing: border-box; }
+  .save-btn { background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; min-height: 44px; }
 
   /* API KEY SCREEN */
   .api-screen { padding: 40px 20px; text-align: center; }
@@ -125,7 +125,7 @@
   .zdravlje-stat-label { font-size: 13px; color: var(--muted); }
   .zdravlje-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; }
   .target-input-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-  .target-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 7px 10px; font-size: 13px; font-family: var(--mono); width: 75px; outline: none; text-align: center; }
+  .target-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 10px; font-size: 13px; font-family: var(--mono); width: 75px; outline: none; text-align: center; min-height: 44px; box-sizing: border-box; }
   .prognoza-bar { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
   .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
 
@@ -160,9 +160,9 @@
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-    background: none; border: none; cursor: pointer; padding: 8px 4px;
+    background: none; border: none; cursor: pointer; padding: 13px 4px;
     transition: opacity 0.15s; position: relative; border-radius: 12px;
-    margin: 0 2px;
+    margin: 0 2px; min-height: 44px;
   }
   /* Active chip — pill background replaces the invisible 4px dot */
   .nav-btn.active {
@@ -184,7 +184,7 @@
 
   /* MODE TOGGLE */
   .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
-  .mode-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s var(--ease), color 0.15s var(--ease); }
+  .mode-btn { flex: 1; padding: 13px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s var(--ease), color 0.15s var(--ease); min-height: 44px; }
   .mode-btn.active { background: var(--green); color: var(--bg); }
   .mode-btn.inactive { background: var(--s4); color: var(--s11); }
 
@@ -230,7 +230,7 @@
   .stat-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
   .stat-val { font-family: var(--mono); font-weight: 700; }
   .goal-row { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-  .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 3px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; }
+  .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; min-height: 44px; box-sizing: border-box; }
 
   /* MACRO BAR */
   .macro-row { margin-bottom: 10px; }
@@ -329,7 +329,7 @@
   .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--s5); }
   .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 4px 0; }
   .ex-done-kcal { color: var(--blue); font-family: var(--mono); font-weight: 700; }
-  .ex-done-del { background: none; border: none; color: var(--s8); cursor: pointer; font-size: 16px; padding: 2px 4px; transition: color 0.12s; }
+  .ex-done-del { background: none; border: none; color: var(--s8); cursor: pointer; font-size: 16px; padding: 12px; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; transition: color 0.12s; }
   .ex-done-del:hover { color: var(--red); }
   /* Custom exercise — subtle dashed border with blue accent */
   .custom-ex-card { background: var(--s2); border: 1.5px dashed var(--s7); border-radius: 12px; padding: 16px; margin-bottom: 8px; }
@@ -366,7 +366,7 @@
   .water-drop.filled { background: rgba(71,200,255,0.12); border-color: rgba(71,200,255,0.4); }
   .water-drop.empty  { background: var(--s3); filter: grayscale(1); opacity: 0.4; }
   .water-btns { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  .water-btn { flex: 1; padding: 10px 8px; border: 1px solid var(--s6); border-radius: 8px; background: var(--s2); color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.15s, transform 0.1s; min-width: 70px; }
+  .water-btn { flex: 1; padding: 14px 8px; border: 1px solid var(--s6); border-radius: 8px; background: var(--s2); color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.15s, transform 0.1s; min-width: 70px; min-height: 44px; }
   .water-btn:active { background: rgba(71,200,255,0.1); transform: scale(0.97); }
   .water-custom-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .water-custom-input { flex: 1; background: var(--s1); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 10px 12px; font-size: 13px; font-family: var(--mono); outline: none; text-align: center; }
@@ -418,9 +418,9 @@
   .history-score-content { display: none; margin-top: 10px; }
 
   /* NUTRITION SCORE CARD */
-  .score-btn { width: 100%; padding: 13px; background: var(--s2); border: none; border-top: 1px solid var(--s6); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; }
+  .score-btn { width: 100%; padding: 13px; background: var(--s2); border: none; border-top: 1px solid var(--s6); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; min-height: 44px; }
   .score-btn:active { background: var(--s4); }
-  .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--s10); font-size: 11px; padding: 5px 12px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; }
+  .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--muted); font-size: 11px; padding: 12px 16px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; min-height: 44px; }
   .meal-score-btn:active { background: var(--s4); }
   .meal-score-inline { margin-top: 8px; padding: 10px 12px; background: var(--s3); border-radius: 10px; font-size: 13px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; }
   .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 20px; line-height: 1; flex-shrink: 0; }
@@ -483,6 +483,32 @@
   .drawer-select { width: 100%; background: var(--s2); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 13px; font-family: var(--sans); outline: none; box-sizing: border-box; }
   .drawer-field { margin-bottom: 10px; }
   .drawer-field-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px; }
+
+  /* ACCORDION SECTIONS */
+  .drawer-acc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; cursor: pointer; user-select: none;
+    border-bottom: 1px solid var(--s3);
+    transition: background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .drawer-acc-header:active { background: var(--s3); }
+  .drawer-acc-title {
+    font-size: 10px; color: var(--muted); font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+  }
+  .drawer-acc-chevron {
+    font-size: 10px; color: var(--s8);
+    transition: transform 0.22s var(--ease);
+  }
+  .drawer-acc-chevron.open { transform: rotate(180deg); color: var(--green); }
+  .drawer-acc-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s var(--ease);
+  }
+  .drawer-acc-body.open { max-height: 800px; }
+  .drawer-acc-inner { padding: 14px 16px 16px; }
 </style>
 </head>
 <body>
@@ -912,6 +938,16 @@ function closeDrawer() {
   renderDrawer();
 }
 
+// Toggle accordion section in settings drawer — pure DOM, no re-render
+function toggleDrawerSection(id) {
+  const body = document.getElementById('body-' + id);
+  const chev = document.getElementById('chev-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+
 // Persistent DOM element outside #app — survives render() calls
 function renderDrawer() {
   let wrap = document.getElementById('settings-drawer-wrap');
@@ -939,74 +975,86 @@ function settingsDrawerHTML() {
     ? Math.round(stats.tokensApprox / 1000) + 'k'
     : String(stats.tokensApprox || 0);
 
-  return `
-    <div class="drawer-header">
-      <span class="drawer-title">⚙ Podešavanja</span>
-      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  // Helper: renders a collapsible accordion section
+  const acc = (id, title, bodyHTML) => `
+    <div class="drawer-acc-header" onclick="toggleDrawerSection('${id}')">
+      <span class="drawer-acc-title">${title}</span>
+      <span class="drawer-acc-chevron" id="chev-${id}">▼</span>
     </div>
+    <div class="drawer-acc-body" id="body-${id}">
+      <div class="drawer-acc-inner">${bodyHTML}</div>
+    </div>`;
 
-    <!-- API KLJUČ -->
-    <div class="drawer-section">
-      <div class="drawer-section-title">Gemini API</div>
-      <div class="drawer-field">
-        <div class="drawer-field-label">Aktivan ključ</div>
-        <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5)">${maskedKey}</div>
+  const apiBody = `
+    <div class="drawer-field">
+      <div class="drawer-field-label">Aktivan ključ</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5)">${maskedKey}</div>
+    </div>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Model</div>
+      <select class="drawer-select" onchange="updateModel(this.value)">
+        <option value="gemini-2.0-flash-lite" ${state.geminiModel === 'gemini-2.0-flash-lite' ? 'selected' : ''}>gemini-2.0-flash-lite (preporučen)</option>
+        <option value="gemini-2.0-flash" ${state.geminiModel === 'gemini-2.0-flash' ? 'selected' : ''}>gemini-2.0-flash</option>
+        <option value="gemini-1.5-flash" ${state.geminiModel === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
+        <option value="gemini-3.1-flash-lite-preview" ${state.geminiModel === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview ⚠</option>
+      </select>
+    </div>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Promeni ključ</div>
+      <input class="drawer-input" id="drawerApiInput" type="password" placeholder="AIzaSy..." style="margin-bottom:6px"/>
+      <button onclick="saveDrawerApiKey()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj novi ključ</button>
+    </div>
+    <button onclick="clearApiKey()" class="drawer-btn danger">🗑 Obriši API ključ</button>`;
+
+  const profilBody = `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1">
+        <div class="drawer-field-label">Godine</div>
+        <input class="drawer-input" type="number" id="drawerAge" value="${state.age}" min="10" max="100"/>
       </div>
-      <div class="drawer-field">
-        <div class="drawer-field-label">Model</div>
-        <select class="drawer-select" onchange="updateModel(this.value)">
-          <option value="gemini-2.0-flash-lite" ${state.geminiModel === 'gemini-2.0-flash-lite' ? 'selected' : ''}>gemini-2.0-flash-lite (preporučen)</option>
-          <option value="gemini-2.0-flash" ${state.geminiModel === 'gemini-2.0-flash' ? 'selected' : ''}>gemini-2.0-flash</option>
-          <option value="gemini-1.5-flash" ${state.geminiModel === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
-          <option value="gemini-3.1-flash-lite-preview" ${state.geminiModel === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview ⚠</option>
+      <div style="flex:1">
+        <div class="drawer-field-label">Pol</div>
+        <select class="drawer-select" id="drawerGender">
+          <option value="male" ${state.gender === 'male' ? 'selected' : ''}>Muško</option>
+          <option value="female" ${state.gender === 'female' ? 'selected' : ''}>Žensko</option>
         </select>
       </div>
-      <div class="drawer-field">
-        <div class="drawer-field-label">Promeni ključ</div>
-        <input class="drawer-input" id="drawerApiInput" type="password" placeholder="AIzaSy..." style="margin-bottom:6px"/>
-        <button onclick="saveDrawerApiKey()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj novi ključ</button>
-      </div>
-      <button onclick="clearApiKey()" class="drawer-btn danger">🗑 Obriši API ključ</button>
     </div>
-
-    <!-- PROFIL -->
-    <div class="drawer-section">
-      <div class="drawer-section-title">Profil</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <div style="flex:1">
-          <div class="drawer-field-label">Godine</div>
-          <input class="drawer-input" type="number" id="drawerAge" value="${state.age}" min="10" max="100"/>
-        </div>
-        <div style="flex:1">
-          <div class="drawer-field-label">Pol</div>
-          <select class="drawer-select" id="drawerGender">
-            <option value="male" ${state.gender === 'male' ? 'selected' : ''}>Muško</option>
-            <option value="female" ${state.gender === 'female' ? 'selected' : ''}>Žensko</option>
-          </select>
-        </div>
-      </div>
-      <div class="drawer-field">
-        <div class="drawer-field-label">Nivo aktivnosti</div>
-        <select class="drawer-select" id="drawerActivity">
-          <option value="sedentary" ${state.activity === 'sedentary' ? 'selected' : ''}>Sedentarni</option>
-          <option value="light" ${state.activity === 'light' ? 'selected' : ''}>Lako aktivan (1-3x/ned)</option>
-          <option value="moderate" ${state.activity === 'moderate' ? 'selected' : ''}>Umeren (3-5x/ned)</option>
-          <option value="active" ${state.activity === 'active' ? 'selected' : ''}>Aktivan (6-7x/ned)</option>
-        </select>
-      </div>
-      <button onclick="saveDrawerProfile()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj profil</button>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Visina (cm)</div>
+      <input class="drawer-input" type="number" id="drawerHeight" value="${state.height || ''}" min="100" max="250" placeholder="npr. 182"/>
     </div>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Nivo aktivnosti</div>
+      <select class="drawer-select" id="drawerActivity">
+        <option value="sedentary" ${state.activity === 'sedentary' ? 'selected' : ''}>Sedentarni</option>
+        <option value="light" ${state.activity === 'light' ? 'selected' : ''}>Lako aktivan (1-3x/ned)</option>
+        <option value="moderate" ${state.activity === 'moderate' ? 'selected' : ''}>Umeren (3-5x/ned)</option>
+        <option value="active" ${state.activity === 'active' ? 'selected' : ''}>Aktivan (6-7x/ned)</option>
+      </select>
+    </div>
+    <button onclick="saveDrawerProfile()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj profil</button>`;
 
-    <!-- KALORIJSKI CILJ -->
-    <div class="drawer-section">
-      <div class="drawer-section-title">Kalorijski cilj</div>
+  const goalBody = (() => {
+    const rec = calcRecommendedGoal();
+    const isMatch = rec && state.calorieGoal === rec;
+    return `
+      ${rec ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(143,212,46,0.06);border:1px solid rgba(143,212,46,0.15);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <span class="drawer-row-label">BMI preporuka</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--green);font-weight:700;font-family:var(--mono);font-size:13px">${rec} kcal</span>
+          ${!isMatch
+            ? `<button onclick="applyRecommendedGoal(${rec})" style="background:var(--green);color:#0a0a0a;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Primeni</button>`
+            : `<span style="font-size:11px;color:var(--green)">✓ aktivan</span>`}
+        </span>
+      </div>` : ''}
       <div class="drawer-row">
-        <span class="drawer-row-label">Trenutni cilj</span>
-        <span class="drawer-row-val" style="color:var(--green)">${state.calorieGoal} kcal</span>
-      </div>
-      <div class="drawer-row">
-        <span class="drawer-row-label">Način</span>
-        <span style="font-size:12px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}">${state.calorieGoalManual ? 'Ručno' : 'Auto (TDEE−500)'}</span>
+        <span class="drawer-row-label">
+          Tvoj cilj
+          <span style="font-size:10px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'};margin-left:6px">${state.calorieGoalManual ? 'ručno' : 'auto'}</span>
+        </span>
+        <span class="drawer-row-val" style="color:${isMatch || !rec ? 'var(--green)' : 'var(--orange)'}">${state.calorieGoal} kcal</span>
       </div>
       <div class="drawer-field" style="margin-top:10px">
         <div class="drawer-field-label">Postavi ručno (kcal)</div>
@@ -1015,45 +1063,50 @@ function settingsDrawerHTML() {
           <button onclick="saveDrawerGoal()" style="background:var(--green);color:var(--bg);border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0">Sačuvaj</button>
         </div>
       </div>
-      ${state.calorieGoalManual ? `<button onclick="resetGoalToAuto()" class="drawer-btn" style="margin-top:4px">↺ Vrati na auto (TDEE−500)</button>` : ''}
-    </div>
+      ${state.calorieGoalManual ? `<button onclick="resetGoalToAuto()" class="drawer-btn" style="margin-top:4px">↺ Vrati na auto (BMI preporuka)</button>` : ''}`;
+  })();
 
-    <!-- API USAGE — sve počinje od 0 -->
-    <div class="drawer-section">
-      <div class="drawer-section-title">API Usage</div>
-      <div class="drawer-row">
-        <span class="drawer-row-label">Zahtevi danas</span>
-        <span class="drawer-row-val" style="color:var(--blue)">${stats.requests?.today || 0}</span>
-      </div>
-      <div class="drawer-row">
-        <span class="drawer-row-label">Zahtevi ukupno</span>
-        <span class="drawer-row-val">${stats.requests?.total || 0}</span>
-      </div>
-      <div class="drawer-row">
-        <span class="drawer-row-label">Prosečno vreme odgovora</span>
-        <span class="drawer-row-val" style="color:${avgTime > 3000 ? 'var(--red)' : avgTime > 1500 ? 'var(--orange)' : avgTime > 0 ? 'var(--green)' : 'var(--s7)'}">${avgTime > 0 ? avgTime + ' ms' : '0 ms'}</span>
-      </div>
-      <div class="drawer-row">
-        <span class="drawer-row-label">Tokeni (aproks.)</span>
-        <span class="drawer-row-val">${tokensDisplay}</span>
-      </div>
-      ${errorEntries.length ? `
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--s3)">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:700;letter-spacing:0.8px">GREŠKE</div>
-        ${errorEntries.map(([type, count]) => `
-          <div class="drawer-row">
-            <span style="font-size:12px;color:var(--red)">${type}</span>
-            <span class="drawer-row-val" style="color:var(--red)">${count}</span>
-          </div>`).join('')}
-      </div>` : `<div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
-      <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>
+  const usageBody = `
+    <div class="drawer-row">
+      <span class="drawer-row-label">Zahtevi danas</span>
+      <span class="drawer-row-val" style="color:var(--blue)">${stats.requests?.today || 0}</span>
     </div>
+    <div class="drawer-row">
+      <span class="drawer-row-label">Zahtevi ukupno</span>
+      <span class="drawer-row-val">${stats.requests?.total || 0}</span>
+    </div>
+    <div class="drawer-row">
+      <span class="drawer-row-label">Prosečno vreme odgovora</span>
+      <span class="drawer-row-val" style="color:${avgTime > 3000 ? 'var(--red)' : avgTime > 1500 ? 'var(--orange)' : avgTime > 0 ? 'var(--green)' : 'var(--s7)'}">${avgTime > 0 ? avgTime + ' ms' : '0 ms'}</span>
+    </div>
+    <div class="drawer-row">
+      <span class="drawer-row-label">Tokeni (aproks.)</span>
+      <span class="drawer-row-val">${tokensDisplay}</span>
+    </div>
+    ${errorEntries.length ? `
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--s3)">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:700;letter-spacing:0.8px">GREŠKE</div>
+      ${errorEntries.map(([type, count]) => `
+        <div class="drawer-row">
+          <span style="font-size:12px;color:var(--red)">${type}</span>
+          <span class="drawer-row-val" style="color:var(--red)">${count}</span>
+        </div>`).join('')}
+    </div>` : `<div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
+    <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>`;
 
-    <!-- EXPORT -->
-    <div class="drawer-section">
-      <div class="drawer-section-title">Podaci</div>
-      <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>
-    </div>`;
+  const podaciBody = `
+    <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>`;
+
+  return `
+    <div class="drawer-header">
+      <span class="drawer-title">⚙ Podešavanja</span>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    ${acc('api',    'Gemini API',       apiBody)}
+    ${acc('profil', 'Profil',           profilBody)}
+    ${acc('goal',   'Kalorijski cilj',  goalBody)}
+    ${acc('usage',  'API Usage',        usageBody)}
+    ${acc('data',   'Podaci',           podaciBody)}`;
 }
 
 function saveDrawerApiKey() {
@@ -1069,10 +1122,20 @@ function saveDrawerProfile() {
   const age = parseInt(document.getElementById('drawerAge')?.value);
   const gender = document.getElementById('drawerGender')?.value;
   const activity = document.getElementById('drawerActivity')?.value;
+  const height = parseFloat(document.getElementById('drawerHeight')?.value);
+
   if (!age || isNaN(age) || age < 10) { showToast('Unesi validne godine', 'err'); return; }
-  state.age = age; localStorage.setItem('fitlog_age', age);
+
+  state.age = age;      localStorage.setItem('fitlog_age', age);
   state.gender = gender; localStorage.setItem('fitlog_gender', gender);
   state.activity = activity; localStorage.setItem('fitlog_activity', activity);
+
+  // Save height if provided and valid — triggers BMI/TDEE recalculation
+  if (!isNaN(height) && height >= 100 && height <= 250) {
+    state.height = height;
+    localStorage.setItem('fitlog_height', height);
+  }
+
   autoCalorieGoal();
   showToast('Profil sačuvan ✓');
   render(); // updates zdravlje kalorije tab, header progress, ring
@@ -1087,6 +1150,16 @@ function saveDrawerGoal() {
   localStorage.setItem('fitlog_goal_manual', '1');
   showToast('Kalorijski cilj sačuvan ✓');
   render(); // updates ring, progress bar, stats tab
+}
+
+function applyRecommendedGoal(val) {
+  // Apply BMI-based recommended goal directly from Kalorije tab
+  state.calorieGoal = val;
+  state.calorieGoalManual = true;
+  localStorage.setItem('fitlog_goal', val);
+  localStorage.setItem('fitlog_goal_manual', '1');
+  showToast(`Cilj postavljen na ${val} kcal ✓`);
+  render();
 }
 
 function updateModel(val) {
@@ -1148,13 +1221,25 @@ function calcTDEE(w, h, age, gender, activity) {
   return Math.round(bmr * (actMults[activity] || 1.2));
 }
 
+function calcRecommendedGoal() {
+  // Shared BMI-based calorie goal recommendation — used by drawer, zdravlje tab, and autoCalorieGoal
+  const w = state.weight, h = state.height;
+  if (!w || !h) return null;
+  const tdee = calcTDEE(w, h, state.age, state.gender, state.activity);
+  if (!tdee) return null;
+  const bmiVal = w / Math.pow(h / 100, 2);
+  const deficit = bmiVal >= 35 ? 1000 : bmiVal >= 30 ? 750 : bmiVal >= 25 ? 500 : 250;
+  const floor   = state.gender === 'male' ? 1500 : 1200;
+  return Math.max(floor, Math.round(tdee - deficit));
+}
+
 function autoCalorieGoal() {
   // Only auto-set if user hasn't manually overridden
   if (state.calorieGoalManual) return;
-  const tdee = calcTDEE(state.weight, state.height, state.age, state.gender, state.activity);
-  if (tdee) {
-    state.calorieGoal = tdee - 500;
-    localStorage.setItem('fitlog_goal', state.calorieGoal);
+  const rec = calcRecommendedGoal();
+  if (rec) {
+    state.calorieGoal = rec;
+    localStorage.setItem('fitlog_goal', rec);
   }
 }
 
@@ -1163,11 +1248,11 @@ function macroLimits() {
   const kcal = state.calorieGoal || 2000;
   return {
     protMin: 130,
-    protMax: Math.round((kcal * 0.30) / 4),
+    protMax: Math.max(130, Math.round((kcal * 0.30) / 4)), // never below minimum
     carbMin: Math.round((kcal * 0.20) / 4),
     carbMax: Math.round((kcal * 0.40) / 4),
     fatMin: 50,
-    fatMax: Math.round((kcal * 0.30) / 9),
+    fatMax: Math.max(50, Math.round((kcal * 0.30) / 9)),   // never below minimum
     sugarMax: 50,
   };
 }
@@ -2140,6 +2225,17 @@ function zdravljeTabHTML() {
   const w = current ? current.weight : state.weight;
   const goal = state.calorieGoal;
 
+  // Starting weight — oldest log entry; shown only when 2+ measurements exist
+  const startEntry = log.length >= 2 ? log[log.length - 1] : null;
+  const weightDelta = startEntry && current ? +(current.weight - startEntry.weight).toFixed(1) : null;
+  const weightDeltaColor = weightDelta === null ? 'var(--muted)'
+    : weightDelta < 0 ? 'var(--green)'
+    : weightDelta > 0 ? 'var(--red)'
+    : 'var(--muted)';
+  const weightDeltaStr = weightDelta !== null
+    ? `${weightDelta > 0 ? '+' : ''}${weightDelta} kg`
+    : '';
+
   const activityMultipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
   const actMult = activityMultipliers[state.activity] || 1.2;
 
@@ -2222,7 +2318,16 @@ function zdravljeTabHTML() {
   const genderOffset = state.gender === 'male' ? 5 : -161;
   const bmr = Math.round(10 * w + 6.25 * h - 5 * state.age + genderOffset);
   const tdee = Math.round(bmr * actMult);
-  const suggestedGoal = Math.round(tdee - 500);
+  // BMI-based deficit via shared helper — consistent with drawer and autoCalorieGoal
+  const suggestedGoal   = calcRecommendedGoal() || Math.round(tdee - 500);
+  const deficitAmount   = bmi >= 35 ? 1000 : bmi >= 30 ? 750 : bmi >= 25 ? 500 : 250;
+  const minFloor        = state.gender === 'male' ? 1500 : 1200;
+  const suggestedGoalRaw = Math.round(tdee - deficitAmount);
+  const floorApplied    = suggestedGoalRaw < minFloor;
+  const deficitLabel    = bmi >= 35 ? '−1000 kcal · BMI 35+'
+    : bmi >= 30 ? '−750 kcal · BMI 30–35'
+    : bmi >= 25 ? '−500 kcal · BMI 25–30'
+    : '−250 kcal · blizu ideala';
   const bmiMin = 15, bmiMax = 45;
   const bmiPct = Math.min(98, Math.max(2, ((bmi - bmiMin) / (bmiMax - bmiMin)) * 100));
 
@@ -2283,12 +2388,80 @@ function zdravljeTabHTML() {
 
   if (sub === 'voda') return subNav + waterSection;
 
-  if (sub === 'kalorije') return subNav + `
+  if (sub === 'kalorije') {
+    const tw = state.targetWeight ? parseFloat(state.targetWeight) : null;
+    // Macro targets based on suggested goal
+    const mt = {
+      protMax: Math.round((suggestedGoal * 0.30) / 4),
+      protMin: 130,
+      carbMax: Math.round((suggestedGoal * 0.40) / 4),
+      carbMin: Math.round((suggestedGoal * 0.20) / 4),
+      fatMax:  Math.round((suggestedGoal * 0.30) / 9),
+      fatMin:  50,
+    };
+    // Target weight ETA calculation
+    const twCardHTML = (() => {
+      if (!tw || tw >= w) return '';
+      const dailyDeficit = tdee - goal;
+      if (dailyDeficit <= 0) return `
+        <div class="card">
+          <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--green)">${tw} kg</span>
+            <span style="font-size:13px;color:var(--muted)">· ostalo <strong style="color:var(--text)">${(w - tw).toFixed(1)} kg</strong></span>
+          </div>
+          <div style="font-size:12px;color:var(--orange);background:rgba(255,179,71,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid var(--orange)">
+            ⚠ Tvoj cilj (${goal} kcal) je jednak ili viši od TDEE. Nema deficita — mršavljenje neće biti moguće.
+          </div>
+        </div>`;
+      const weeklyLoss   = (dailyDeficit * 7) / KCAL_PER_KG_FAT;
+      const weeksNeeded  = Math.ceil((w - tw) / weeklyLoss);
+      const eta          = new Date();
+      eta.setDate(eta.getDate() + weeksNeeded * 7);
+      const etaStr = eta.toLocaleDateString('sr-RS', { day: 'numeric', month: 'long', year: 'numeric' });
+      // startWeight: oldest log entry or current weight if only one measurement
+      const startWeight  = log.length > 1 ? log[log.length - 1].weight : w;
+      const progressPct  = startWeight > tw
+        ? Math.min(100, Math.round(((startWeight - w) / (startWeight - tw)) * 100))
+        : 0;
+      return `
+        <div class="card">
+          <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+            <div>
+              <div style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--green);line-height:1">${tw}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">kg cilj</div>
+            </div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px">
+                <span>${w} kg</span><span style="color:var(--green)">${tw} kg</span>
+              </div>
+              <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${progressPct}%;background:var(--green);border-radius:3px"></div>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:5px">ostalo: <span style="color:var(--text);font-weight:700">${(w - tw).toFixed(1)} kg</span></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Dnevni deficit</div>
+              <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--green)">−${Math.round(dailyDeficit)} kcal</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">−${weeklyLoss.toFixed(2)} kg/ned</div>
+            </div>
+            <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Procena cilja</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3">${etaStr}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">~${weeksNeeded} nedelja</div>
+            </div>
+          </div>
+        </div>`;
+    })();
+
+    return subNav + `
     <div class="card">
       <div class="card-label">🔥 Kalorije — preporuka</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5);margin-bottom:12px">
+      <div style="padding:8px 10px;background:var(--s2);border-radius:8px;border:1px solid var(--s5);margin-bottom:12px">
         <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
-        <button onclick="openDrawer()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--muted);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)">⚙ Uredi profil</button>
       </div>
       <div class="zdravlje-stat">
         <span class="zdravlje-stat-label">Bazalni metabolizam (BMR)</span>
@@ -2298,18 +2471,58 @@ function zdravljeTabHTML() {
         <span class="zdravlje-stat-label">Dnevna potrošnja (TDEE)</span>
         <span class="zdravlje-stat-val" style="color:var(--blue)">${tdee} kcal</span>
       </div>
-      <div class="zdravlje-stat">
-        <span class="zdravlje-stat-label">Preporučeni cilj (-500 kcal)</span>
+      <div class="zdravlje-stat" style="padding-bottom:10px">
+        <span class="zdravlje-stat-label">Preporučeni cilj <span style="font-size:10px;color:var(--green);font-weight:700">${deficitLabel}</span></span>
         <span class="zdravlje-stat-val" style="color:var(--green)">${suggestedGoal} kcal</span>
       </div>
-      <div class="zdravlje-stat">
-        <span class="zdravlje-stat-label">Tvoj trenutni cilj</span>
-        <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">
-          ${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}
-          <button onclick="openDrawer()" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;text-decoration:underline;margin-left:4px;font-family:var(--sans)">uredi</button>
+      ${floorApplied ? `
+      <div style="font-size:11px;color:var(--orange);background:rgba(255,179,71,0.08);padding:8px 10px;border-radius:8px;border-left:3px solid var(--orange);margin-bottom:10px">
+        ⚠ Minimalni dnevni unos (${minFloor} kcal) primenjen zbog zaštite od pothranjenosti.
+      </div>` : ''}
+      <div class="zdravlje-stat" style="padding-top:10px;border-top:1px solid var(--s3);flex-wrap:wrap;gap:6px">
+        <span class="zdravlje-stat-label">
+          Tvoj podešeni cilj
+          <span style="font-size:10px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'};margin-left:6px">${state.calorieGoalManual ? 'ručno' : 'auto'}</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">
+            ${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}
+          </span>
+          ${goal > suggestedGoal + 100 ? `
+          <button onclick="applyRecommendedGoal(${suggestedGoal})" style="background:var(--green);border:none;border-radius:7px;color:#0a0a0a;font-size:11px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:var(--sans);white-space:nowrap">
+            Primeni preporuku
+          </button>` : ''}
         </span>
       </div>
+    </div>
+
+    ${twCardHTML}
+
+    <div class="card">
+      <div class="card-label" style="margin-bottom:12px">🥗 Preporučeni makroi</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Na osnovu preporučenog cilja od <span style="color:var(--green);font-weight:700">${suggestedGoal} kcal/dan</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="background:var(--s2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--green);line-height:1">${Math.max(mt.protMin, mt.protMax)}g</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:5px">Proteini</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${mt.protMax < mt.protMin ? `cilj ${mt.protMin}g` : `min ${mt.protMin}g`}</div>
+        </div>
+        <div style="background:var(--s2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--blue);line-height:1">${mt.carbMax}g</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:5px">Ugljeni h.</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${mt.carbMin}–${mt.carbMax}g</div>
+        </div>
+        <div style="background:var(--s2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--orange);line-height:1">${Math.max(mt.fatMin, mt.fatMax)}g</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:5px">Masti</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${mt.fatMax < mt.fatMin ? `cilj ${mt.fatMin}g` : `min ${mt.fatMin}g`}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);padding-top:10px;border-top:1px solid var(--s3)">
+        Preporuka: 30% proteini · 40% ugljeni hidrati · 30% masti
+      </div>
     </div>`;
+  }
 
   // Default: Težina subtab — redesigned layout
   return subNav + `
@@ -2322,11 +2535,15 @@ function zdravljeTabHTML() {
         ${diffHTML ? `<div style="align-self:flex-end;padding-bottom:6px">${diffHTML}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid var(--s3)">
-        <span style="font-size:12px;color:var(--muted)">
-          ${h
-            ? `<span style="color:var(--green);font-weight:700">${h} cm</span> <span onclick="startEditHeight()" style="color:var(--green);cursor:pointer;margin-left:6px;font-size:11px;font-weight:700">izmeni</span>`
-            : `<button class="weight-btn" onclick="startEditHeight()" style="font-size:11px">+ Dodaj visinu</button>`}
-        </span>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span style="font-size:12px;color:var(--muted)">
+            ${h
+              ? `Visina: <span style="color:var(--green);font-weight:700">${h} cm</span>`
+              : `<span style="color:var(--s8)">Visina nije uneta</span>`}
+          </span>
+          ${startEntry ? `
+          <span style="font-size:12px;color:var(--muted)">Početna: <span style="font-weight:700;color:var(--text-secondary)">${startEntry.weight} kg</span> <span style="color:${weightDeltaColor};font-weight:700;font-size:11px">${weightDeltaStr}</span></span>` : ''}
+        </div>
         <button class="weight-btn" onclick="startEditWeight()" style="font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
       </div>
       ${state.editWeight ? `
@@ -2335,13 +2552,6 @@ function zdravljeTabHTML() {
           <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
           <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
           <button onclick="state.editWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
-        </div>` : ''}
-      ${state.editHeight ? `
-        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
-          <span style="font-size:12px;color:var(--muted);white-space:nowrap">Visina:</span>
-          <input class="weight-input" id="hInput" type="number" value="${state.heightInput}" placeholder="cm" style="width:70px"/>
-          <button class="save-btn" onclick="saveHeight()">Sačuvaj</button>
-          <button onclick="state.editHeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
         </div>` : ''}
     </div>
 
@@ -2530,8 +2740,7 @@ function render() {
       <div style="width:100%">
         <div class="goal-row" style="justify-content:center;margin-bottom:12px">
           Cilj: <strong style="font-family:var(--mono);color:var(--green);margin:0 4px">${state.calorieGoal}</strong> kcal
-          <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'TDEE−500'}</span>
-          <button onclick="openDrawer()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;margin-left:6px;font-family:var(--sans)">⚙ uredi</button>
+          <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'BMI preporuka'}</span>
         </div>
         <div class="stats-chain">
           <!-- Uneseno -->
@@ -3142,6 +3351,8 @@ function saveHeight() {
   if (!isNaN(v) && v > 0) {
     state.height = v;
     localStorage.setItem('fitlog_height', v);
+    // Recalculate calorie goal since BMI changes with height
+    autoCalorieGoal();
   }
   state.editHeight = false;
   render();
