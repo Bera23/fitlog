@@ -832,6 +832,19 @@ function scheduleRender() {
 let _renderCache = {};
 function clearRenderCache() { _renderCache = {}; }
 
+// ─── PROMPT HELPERS ──────────────────────────────────────────────────────────
+
+// Returns a consistent user profile string injected into every AI prompt.
+// Single source of truth — avoids per-function duplication and drift.
+function buildUserProfile() {
+  const gender = state.gender === 'male' ? 'muškarac' : 'žena';
+  const age    = state.age    || 30;
+  const weight = state.weight || 75;
+  const height = state.height ? `, ${state.height}cm` : '';
+  const act    = ACT_LABELS[state.activity] || 'sedentarni';
+  return `Korisnik: ${gender}, ${age} god, ${weight}kg${height}, nivo aktivnosti: ${act}.`;
+}
+
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
 
 // Low-level Gemini call — accepts a `parts` array so callers can pass text-only
@@ -869,10 +882,14 @@ async function callGemini(parts, temperature = 0.1) {
 }
 
 async function parseFood(text) {
-  const w = state.weight || 75;
-  const prompt = `Ti si nutricionistički asistent. Korisnik opisuje šta je jeo.
-Korisnikova telesna masa je ${w} kg.
+  const profile = buildUserProfile();
+  const goal    = `Kalorijski cilj: ${state.calorieGoal} kcal.`;
+
+  const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
+${profile} ${goal}
 Iz opisa izvuci namirnice i proceni kalorije, makronutrijente i šećer.
+Ako količina nije navedena, proceni tipičnu porciju za odraslu osobu i naznači je u "amount".
+Poznate namirnice poput pljeskavice, ćevapa, bureka, ajvara, kajmaka, sarme tretiraj prema standardnim domaćim receptima.
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_FOOD_SCHEMA}
 Napomena: sugar je dodati i prirodni šećer u gramima.
@@ -884,10 +901,12 @@ Unos korisnika: ${text}`;
 }
 
 async function parseExercise(text) {
-  const w = state.weight || 75;
+  const profile = buildUserProfile();
+
   const prompt = `Ti si fitness asistent. Korisnik opisuje fizičke aktivnosti.
-Korisnikova telesna masa je ${w} kg.
-Iz opisa izvuci aktivnosti i proceni potrošnju kalorija.
+${profile}
+Iz opisa izvuci aktivnosti i proceni potrošnju kalorija koristeći MET vrednosti prilagođene profilu korisnika.
+Ako trajanje nije navedeno, pretpostavi tipično trajanje za tu aktivnost i naznači pretpostavku u polju "note".
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_EXERCISE_SCHEMA}
 
@@ -898,12 +917,17 @@ Unos korisnika: ${text}`;
 }
 
 async function parseFoodFromImage(base64, mimeType, textContext) {
-  const w = state.weight || 75;
+  const profile = buildUserProfile();
+  const goal    = `Kalorijski cilj: ${state.calorieGoal} kcal.`;
   // Append optional user text as extra context for the model
   const contextNote = textContext ? `\nDodatni opis od korisnika: "${textContext}"` : '';
+
   const prompt = `Ti si nutricionistički asistent. Analiziraj ovu sliku hrane.
-Korisnikova telesna masa je ${w} kg.
+${profile} ${goal}
+Ako vidiš kuvanu hranu na tanjiru: proceni porciju vizualno (poredi sa standardnim tanjirom ~26cm).
+Ako vidiš ambalažu ili deklaraciju: koristi nutritivne vrednosti sa etikete.
 Proceni namirnice, porcije, kalorije, makronutrijente i šećer koje vidiš na slici.${contextNote}
+Ako nisi siguran u neku namirnicu ili porciju, naznači to u polju "note".
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_FOOD_SCHEMA}`;
 
@@ -927,8 +951,10 @@ async function analyzeProduct(text, base64, mimeType) {
 ${imageNote}${contextNote}
 
 Iz deklaracije izvuci nutritivne vrednosti na 100g i oceni da li je ovaj proizvod zdrav.
+Ako etiketa nije potpuno čitljiva, oceni na osnovu vidljivog dela i naznači to u polju "summary".
 Za serving_size_g: ako vidiš na etiketi standardnu porciju (npr. "1 kesica 30g"), koristi tu vrednost. Ako vidiš ukupnu masu pakovanja (npr. "220g"), koristi to. Ako nema podatka, proceni tipičnu porciju.
 Crvene zastavice su: visok sadržaj šećera (>15g/100g), palmino ulje, šećerni alkoholi (sorbitol, maltitol itd), trans masti, HFCS, aditivi E-102, E-104, E-110, E-122, E-124, E-129, E-211, E-621.
+Ako postoji zdravija alternativa ovom proizvodu, pomeni je kratko na kraju polja "summary".
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PRODUCT_SCHEMA}`;
 
@@ -1936,7 +1962,7 @@ function productsHistoryHTML() {
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:10px;font-weight:600;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3);letter-spacing:0.4px">
+          <div style="font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
             ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
           </div>
           ${cards}
@@ -3426,10 +3452,17 @@ async function scoreNutrition() {
     const mealsSummary = d.meals.map(m =>
       m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
     ).join(' | ');
+    const profile      = buildUserProfile();
+    const deficitStatus = t.consumed < state.calorieGoal
+      ? `U kalorijskom deficitu ✓ (${state.calorieGoal - Math.round(t.consumed)} kcal ispod cilja).`
+      : `Prešao kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
+
     const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
+${profile}
+Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski minimum: ${ml.protMin}g.
+Status danas: ${deficitStatus}
 Obroci: ${mealsSummary}
 Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
-Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski cilj: ${ml.protMin}g.
 
 Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
 
@@ -3535,14 +3568,22 @@ async function scoreMeal(mealId) {
 
   try {
     const items = meal.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ');
+
+    // Infer meal context from logged time (affects scoring expectations)
+    const mealHour   = parseInt(meal.time?.split(':')[0]) || 12;
+    const mealContext = mealHour < 10 ? 'doručak' : mealHour < 14 ? 'ručak' : mealHour < 18 ? 'užina' : 'večera';
+
     // Build goal context from actual user state instead of hardcoding weight loss
     const goalContext = state.calorieGoalManual
       ? `kalorijski cilj ${state.calorieGoal} kcal (ručno postavljeno)`
       : `cilj mršavljenje, kalorijski cilj ${state.calorieGoal} kcal`;
-    const prompt = `Oceni ovaj obrok u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
+
+    const profile = buildUserProfile();
+
+    const prompt = `Oceni ovaj obrok (${mealContext}) u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
 Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
-Korisnik: ${state.weight || 80}kg, ${goalContext}.
+${profile} ${goalContext}.
 Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const raw = await callGemini([{ text: prompt }], 0.2);
     const result = parseGeminiJson(raw);
