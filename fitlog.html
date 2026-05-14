@@ -587,7 +587,7 @@ const state = {
   imageBase64: null,
   imageMime: null,
   drawerOpen: false,
-  geminiModel: localStorage.getItem('fitlog_model') || 'gemini-2.0-flash-lite',
+  geminiModel: localStorage.getItem('fitlog_model') || 'gemini-3.1-flash-lite-preview',
   targetWeight: parseFloat(localStorage.getItem('fitlog_target_weight')) || null,
   targetWeightInput: '',
   editTargetWeight: false,
@@ -1007,10 +1007,14 @@ function settingsDrawerHTML() {
     <div class="drawer-field">
       <div class="drawer-field-label">Model</div>
       <select class="drawer-select" onchange="updateModel(this.value)">
-        <option value="gemini-2.0-flash-lite" ${state.geminiModel === 'gemini-2.0-flash-lite' ? 'selected' : ''}>gemini-2.0-flash-lite (preporučen)</option>
-        <option value="gemini-2.0-flash" ${state.geminiModel === 'gemini-2.0-flash' ? 'selected' : ''}>gemini-2.0-flash</option>
-        <option value="gemini-1.5-flash" ${state.geminiModel === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
-        <option value="gemini-3.1-flash-lite-preview" ${state.geminiModel === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview ⚠</option>
+        <!-- Best free-tier option: 15 RPM, 500 RPD, 250K TPM -->
+        <option value="gemini-3.1-flash-lite-preview" ${state.geminiModel === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite · 15rpm / 500rpd ⭐</option>
+        <!-- 10 RPM, 20 RPD, 250K TPM -->
+        <option value="gemini-2.5-flash-lite" ${state.geminiModel === 'gemini-2.5-flash-lite' ? 'selected' : ''}>gemini-2.5-flash-lite · 10rpm / 20rpd</option>
+        <!-- 5 RPM, 20 RPD, 250K TPM -->
+        <option value="gemini-2.5-flash" ${state.geminiModel === 'gemini-2.5-flash' ? 'selected' : ''}>gemini-2.5-flash · 5rpm / 20rpd</option>
+        <!-- 5 RPM, 20 RPD, 250K TPM -->
+        <option value="gemini-3-flash-preview" ${state.geminiModel === 'gemini-3-flash-preview' ? 'selected' : ''}>gemini-3-flash-preview · 5rpm / 20rpd</option>
       </select>
     </div>
     <div class="drawer-field">
