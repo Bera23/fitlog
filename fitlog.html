@@ -667,7 +667,7 @@ function saveProducts(date, products) {
 function deleteProductEntry(date, id) {
   const products = loadProducts(date).filter(p => p.id !== id);
   saveProducts(date, products);
-  render();
+  scheduleRender();
 }
 
 // Weight log: [{date, weight}] sorted by date desc
@@ -813,6 +813,19 @@ function debounce(fn, ms) {
 
 // Debounced render for training inputs — avoids re-render on every keystroke
 const debounceRender = debounce(render, DEBOUNCE_MS);
+
+// Coalesces multiple synchronous render() calls into a single RAF render.
+// Multiple calls within the same synchronous block collapse to one paint frame.
+// Keep render() only where the new DOM is needed immediately (e.g. focus() after).
+let _renderScheduled = false;
+function scheduleRender() {
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  requestAnimationFrame(() => {
+    _renderScheduled = false;
+    render();
+  });
+}
 
 // Per-render memoization cache — cleared at the start of each render() call.
 // Avoids repeated localStorage reads for the same key within one render cycle.
@@ -1139,7 +1152,7 @@ function saveDrawerProfile() {
 
   autoCalorieGoal();
   showToast('Profil sačuvan ✓');
-  render(); // updates zdravlje kalorije tab, header progress, ring
+  scheduleRender(); // updates zdravlje kalorije tab, header progress, ring
 }
 
 function saveDrawerGoal() {
@@ -1150,7 +1163,7 @@ function saveDrawerGoal() {
   localStorage.setItem('fitlog_goal', val);
   localStorage.setItem('fitlog_goal_manual', '1');
   showToast('Kalorijski cilj sačuvan ✓');
-  render(); // updates ring, progress bar, stats tab
+  scheduleRender(); // updates ring, progress bar, stats tab
 }
 
 function applyRecommendedGoal(val) {
@@ -1160,7 +1173,7 @@ function applyRecommendedGoal(val) {
   localStorage.setItem('fitlog_goal', val);
   localStorage.setItem('fitlog_goal_manual', '1');
   showToast(`Cilj postavljen na ${val} kcal ✓`);
-  render();
+  scheduleRender();
 }
 
 function updateModel(val) {
@@ -2103,7 +2116,7 @@ function weeklyReportHTML(weekData) {
     </div>`;
     const pct = Math.min(100, (d.net / maxNet) * 100);
     const color = d.net < goal ? 'var(--green)' : 'var(--red)';
-    return `<div class="report-day-row" onclick="setTab('history');state.selectedHistoryDate='${d.date}';render()" style="cursor:pointer">
+    return `<div class="report-day-row" onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer">
       <span class="report-day-name" style="color:${d.net < goal ? 'var(--green)' : 'var(--muted)'}">${name}</span>
       <div class="report-day-bar-wrap"><div class="report-day-bar" style="width:${pct}%;background:${color}55"></div></div>
       <span class="report-day-val" style="color:${color}">${Math.round(d.net)}</span>
@@ -2168,7 +2181,7 @@ function deleteWeightEntry(date) {
     state.weight = null;
     localStorage.removeItem('fitlog_weight');
   }
-  render();
+  scheduleRender();
 }
 
 function weightChartHTML(log) {
@@ -2371,24 +2384,6 @@ function zdravljeTabHTML() {
     diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>`;
   }
 
-  const logHTML = log.slice(0, 8).map((e, i) => {
-    let entryDiff = '';
-    if (i < log.length - 1) {
-      const d = e.weight - log[i+1].weight;
-      const c = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
-      const cAlpha = d < 0 ? 'rgba(143,212,46,0.13)' : d > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
-      entryDiff = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d>0?'+':''}${d.toFixed(1)}</span>`;
-    }
-    return `<div class="weight-log-item">
-      <span class="weight-log-date">${fmtDate(e.date)}</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        ${entryDiff}
-        <span class="weight-log-val">${e.weight} kg</span>
-        <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
-      </div>
-    </div>`;
-  }).join('');
-
   const sub = state.zdravljeSubTab || 'tezina';
   const subNav = `
     <div class="sub-tabs">
@@ -2562,7 +2557,7 @@ function zdravljeTabHTML() {
           <span style="font-size:12px;color:var(--muted);white-space:nowrap">Nova težina:</span>
           <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
           <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
-          <button onclick="state.editWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
+          <button onclick="state.editWeight=false;scheduleRender()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">✕</button>
         </div>` : ''}
     </div>
 
@@ -2660,7 +2655,7 @@ function zdravljeTabHTML() {
           <span style="font-size:12px;color:var(--muted)">Cilj:</span>
           <input class="target-input" id="twInput" type="number" placeholder="kg" value="${state.targetWeightInput}"/>
           <button class="save-btn" onclick="saveTargetWeight()">Sačuvaj</button>
-          <button onclick="state.editTargetWeight=false;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button>
+          <button onclick="state.editTargetWeight=false;scheduleRender()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button>
         </div>` : `
         <button class="weight-btn" onclick="startEditTargetWeight()" style="font-size:12px;margin-top:${state.targetWeight ? '12' : '4'}px">
           ${state.targetWeight ? '✏ ' : '+ '}Postavi ciljnu težinu
@@ -2966,7 +2961,7 @@ function render() {
           <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.productImageMime||'image/jpeg'};base64,${state.productImageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Etiketa priložena — analiziraće se</span>
-            <button onclick="state.productImageBase64=null;state.productImageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+            <button onclick="state.productImageBase64=null;state.productImageMime=null;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
           </div>` : ''}
           <!-- Photo + Send in one row: secondary | primary -->
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -2983,7 +2978,7 @@ function render() {
           <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
-            <button onclick="state.imageBase64=null;state.imageMime=null;render()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+            <button onclick="state.imageBase64=null;state.imageMime=null;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
           </div>` : ''}
           <!-- Photo + Send in one row: secondary | primary -->
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -3099,7 +3094,7 @@ function addWater(ml) {
   const updated = Math.max(0, current + ml);
   saveWater(state.date, updated);
   if (ml > 0) showToast(`+${ml}ml dodato 💧`);
-  render();
+  scheduleRender();
 }
 
 function addWaterCustom() {
@@ -3109,7 +3104,7 @@ function addWaterCustom() {
   const current = loadWater(state.date);
   saveWater(state.date, current + ml);
   showToast(`+${ml}ml dodato 💧`);
-  render();
+  scheduleRender();
 }
 
 function updateWaterGoal(val) {
@@ -3118,6 +3113,7 @@ function updateWaterGoal(val) {
     state.waterGoal = v;
     localStorage.setItem('fitlog_water_goal', v);
     localStorage.setItem('fitlog_water_goal_manual', '1');
+    scheduleRender(); // refresh progress bar and drop indicators
   }
 }
 
@@ -3135,7 +3131,7 @@ function saveTargetWeight() {
     localStorage.setItem('fitlog_target_weight', v);
   }
   state.editTargetWeight = false;
-  render();
+  scheduleRender();
 }
 
 function clearTargetWeight() {
@@ -3192,13 +3188,13 @@ function estimateBodyFat(bmi, age, gender) {
 
 function openHistoryDetail(date) {
   state.selectedHistoryDate = date;
-  render();
+  scheduleRender();
   window.scrollTo(0, 0);
 }
 
 function closeHistoryDetail() {
   state.selectedHistoryDate = null;
-  render();
+  scheduleRender();
 }
 
 // Handle image selection specifically for product scanner tab
@@ -3214,7 +3210,7 @@ function handleProductImageSelect(input) {
   reader.onload = (e) => {
     state.productImageBase64 = e.target.result.split(',')[1];
     state.productImageMime   = file.type || 'image/jpeg';
-    render();
+    scheduleRender();
   };
   reader.readAsDataURL(file);
 }
@@ -3262,7 +3258,7 @@ async function handleProductSubmit() {
     showToast(msg, 'err');
   } finally {
     state.productLoading = false;
-    render();
+    scheduleRender();
   }
 }
 
@@ -3321,7 +3317,7 @@ function addProductToMeal(productId, productDate) {
 function setHistoryTab(tab) {
   state.historySubTab     = tab;
   state.selectedHistoryDate = null; // clear any open day detail on sub-tab switch
-  render();
+  scheduleRender();
 }
 
 function handleImageSelect(input) {
@@ -3338,7 +3334,7 @@ function handleImageSelect(input) {
     const b64 = e.target.result.split(',')[1];
     state.imageBase64 = b64;
     state.imageMime = file.type || 'image/jpeg';
-    render();
+    scheduleRender();
   };
   reader.readAsDataURL(file);
 }
@@ -3356,11 +3352,10 @@ function saveApiKey() {
 
 function clearApiKey() {
   if (confirm('Obriši API ključ?')) {
-    state.drawerOpen = false; // close drawer before transitioning to API key screen
+    state.drawerOpen = false;
     state.apiKey = '';
     localStorage.removeItem('fitlog_apikey');
-    renderDrawer(); // visually close drawer first
-    render(); // then show API key screen
+    scheduleRender(); // drawer close + API key screen in one frame
   }
 }
 
@@ -3386,7 +3381,7 @@ function saveWeight() {
     autoCalorieGoal();
   }
   state.editWeight = false;
-  render();
+  scheduleRender();
 }
 
 function startEditHeight() {
@@ -3405,7 +3400,7 @@ function saveHeight() {
     autoCalorieGoal();
   }
   state.editHeight = false;
-  render();
+  scheduleRender();
 }
 
 async function scoreNutrition() {
@@ -3497,7 +3492,7 @@ function saveOnboarding() {
   autoCalorieGoal();
 
   showToast('Profil sačuvan! 🎉');
-  render();
+  scheduleRender();
 }
 
 function toggleMeal(id) {
@@ -3536,10 +3531,14 @@ async function scoreMeal(mealId) {
 
   try {
     const items = meal.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ');
+    // Build goal context from actual user state instead of hardcoding weight loss
+    const goalContext = state.calorieGoalManual
+      ? `kalorijski cilj ${state.calorieGoal} kcal (ručno postavljeno)`
+      : `cilj mršavljenje, kalorijski cilj ${state.calorieGoal} kcal`;
     const prompt = `Oceni ovaj obrok u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
 Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
-Korisnik: ${state.weight}kg, cilj mršavljenje.
+Korisnik: ${state.weight || 80}kg, ${goalContext}.
 Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const raw = await callGemini([{ text: prompt }], 0.2);
     const result = parseGeminiJson(raw);
@@ -3623,7 +3622,7 @@ function toggleHistoryScore(date) {
 
 function setZdravljeTab(sub) {
   state.zdravljeSubTab = sub;
-  render();
+  scheduleRender();
 }
 
 function setTab(tab) {
@@ -3639,7 +3638,7 @@ function setTab(tab) {
     state.nutritionScore = loadNutritionScore(state.date);
     state.mealScores = loadMealScores(state.date);
   }
-  render();
+  scheduleRender();
 }
 
 function setMode(mode) {
@@ -3686,7 +3685,7 @@ function addWorkoutEntry(exId) {
   workout.push(entry);
   saveWorkout(state.date, workout);
   showToast(`${ex.name} dodato · -${calories} kcal`);
-  render();
+  scheduleRender();
 }
 
 function addCustomWorkoutEntry() {
@@ -3714,32 +3713,32 @@ function addCustomWorkoutEntry() {
   saveWorkout(state.date, workout);
   state.trainingInputs.custom.name = ''; // reset after adding
   showToast(`${entry.name} dodato · ~-${calories} kcal`);
-  render();
+  scheduleRender();
 }
 
 function deleteWorkoutEntry(uid) {
   const workout = loadWorkout(state.date).filter(e => e.uid !== uid);
   saveWorkout(state.date, workout);
-  render();
+  scheduleRender();
 }
 
 function resetGoalToAuto() {
   state.calorieGoalManual = false;
   localStorage.removeItem('fitlog_goal_manual');
   autoCalorieGoal();
-  render();
+  scheduleRender();
 }
 
 function deleteMeal(id) {
   state.dayData.meals = state.dayData.meals.filter(m => m.id !== id);
   saveDay(state.date, state.dayData);
-  render();
+  scheduleRender();
 }
 
 function deleteEx(id) {
   state.dayData.exercises = state.dayData.exercises.filter(e => e.id !== id);
   saveDay(state.date, state.dayData);
-  render();
+  scheduleRender();
 }
 
 async function handleSubmit() {
@@ -3801,7 +3800,7 @@ async function handleSubmit() {
     showToast(msg, 'err');
   } finally {
     state.loading = false;
-    render();
+    scheduleRender();
   }
 }
 
