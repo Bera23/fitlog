@@ -1240,6 +1240,103 @@ function exportData() {
   showToast('Podaci izvezeni ✓');
 }
 
+// ─── CSV EXPORT ──────────────────────────────────────────────────────────────
+
+// Shared CSV download helper — prepends UTF-8 BOM so Excel opens Serbian chars correctly
+function downloadCSV(rows, filename) {
+  const escape = val => {
+    const s = String(val ?? '');
+    // Wrap in quotes if value contains comma, quote, or newline
+    return (s.includes(',') || s.includes('"') || s.includes('\n'))
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  const csv = rows.map(row => row.map(escape).join(',')).join('\n');
+  // BOM (\uFEFF) ensures Windows Excel correctly decodes UTF-8 (ć, č, š, ž, đ)
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+  showToast('CSV izvezen ✓');
+}
+
+// Export all meals + exercises for a given YYYY-MM month — one row per food item
+function exportMonthMealsCSV(month) {
+  const rows = [
+    ['Datum', 'Vreme', 'Namirnica', 'Kolicina', 'Kcal', 'Proteini (g)', 'UH (g)', 'Masti (g)', 'Secer (g)']
+  ];
+
+  const [yr, mo] = month.split('-');
+  const daysInMonth = new Date(parseInt(yr), parseInt(mo), 0).getDate();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr    = `${yr}-${mo}-${String(d).padStart(2, '0')}`;
+    const displayDate = `${String(d).padStart(2, '0')}.${mo}.${yr}.`;
+    const day = safeParseLS('fitlog_day_' + dateStr);
+    if (!day?.meals?.length) continue;
+
+    day.meals.forEach(meal => {
+      meal.items.forEach(item => {
+        rows.push([
+          displayDate,
+          meal.time,
+          item.name,
+          item.amount,
+          Math.round(item.calories  || 0),
+          Math.round(item.protein   || 0),
+          Math.round(item.carbs     || 0),
+          Math.round(item.fat       || 0),
+          Math.round(item.sugar     || 0),
+        ]);
+      });
+    });
+  }
+
+  if (rows.length === 1) { showToast('Nema podataka za ovaj mesec', 'err'); return; }
+  downloadCSV(rows, `fitlog_obroci_${month}.csv`);
+}
+
+// Export all scanned products for a given YYYY-MM month — one row per product
+function exportMonthProductsCSV(month) {
+  const rows = [
+    ['Datum', 'Naziv', 'Brend', 'Porcija (g)', 'Kcal/100g', 'Proteini/100g (g)', 'UH/100g (g)',
+     'Masti/100g (g)', 'Secer/100g (g)', 'Vlakna/100g (g)', 'Ocena', 'Komentar']
+  ];
+
+  const [yr, mo] = month.split('-');
+  const daysInMonth = new Date(parseInt(yr), parseInt(mo), 0).getDate();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr     = `${yr}-${mo}-${String(d).padStart(2, '0')}`;
+    const displayDate = `${String(d).padStart(2, '0')}.${mo}.${yr}.`;
+    const products    = loadProducts(dateStr);
+    if (!products.length) continue;
+
+    products.forEach(p => {
+      rows.push([
+        displayDate,
+        p.name              || '',
+        p.brand             || '',
+        p.serving_size_g    || '',
+        p.calories_per_100g || '',
+        p.protein_per_100g  || '',
+        p.carbs_per_100g    || '',
+        p.fat_per_100g      || '',
+        p.sugar_per_100g    || '',
+        p.fiber_per_100g    || '',
+        p.rating            || '',
+        p.rating_reason     || '',
+      ]);
+    });
+  }
+
+  if (rows.length === 1) { showToast('Nema proizvoda za ovaj mesec', 'err'); return; }
+  downloadCSV(rows, `fitlog_proizvodi_${month}.csv`);
+}
+
 // ─── TOAST ───────────────────────────────────────────────────────────────────
 
 let toastTimer = null;
@@ -1911,7 +2008,10 @@ function historyTabHTML() {
     html += `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <span style="color:${avgColor};font-size:12px;font-weight:600">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:${avgColor};font-size:12px;font-weight:600">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
+          <button onclick="exportMonthMealsCSV('${month}')" style="font-size:10px;background:rgba(143,212,46,0.1);border:1px solid rgba(143,212,46,0.3);color:var(--green);padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:700;font-family:var(--sans);white-space:nowrap">↓ CSV</button>
+        </div>
       </div>
       ${rows}
     </div>`;
@@ -1970,7 +2070,10 @@ function productsHistoryHTML() {
     return `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
+          <button onclick="exportMonthProductsCSV('${month}')" style="font-size:10px;background:rgba(143,212,46,0.1);border:1px solid rgba(143,212,46,0.3);color:var(--green);padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:700;font-family:var(--sans);white-space:nowrap">↓ CSV</button>
+        </div>
       </div>
       ${dayBlocks}
     </div>`;
