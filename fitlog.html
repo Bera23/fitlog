@@ -140,6 +140,10 @@
   /* PRODUCT CARDS */
   .product-card { position: relative; border-bottom: 1px solid var(--s5); }
   .product-card:last-child { border-bottom: none; }
+  /* Inside swipe wrappers each .product-card is :last-child of .hist-swipe-inner,
+     so the rule above strips all borders. Restore them and only remove on last wrapper. */
+  .hist-swipe-inner .product-card { border-bottom: 1px solid var(--s5); }
+  .hist-swipe-wrap:last-child .product-card { border-bottom: none; }
   .product-card-header { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; cursor: pointer; gap: 8px; }
   .product-rating-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
   .rating-good  { background: rgba(143,212,46,0.15);  color: var(--green); }
@@ -277,6 +281,14 @@
   .toast.ok  { background: var(--green); color: var(--bg); }
   .toast.err { background: var(--red); color: var(--white); }
   .toast.hide { opacity: 0; transform: translate(-50%, -4px) scale(0.97); }
+  /* Undo toast — neutral bg with action button */
+  .toast.undo { background: var(--s4); color: var(--text); border: 1px solid var(--s6); display: flex; align-items: center; gap: 10px; }
+  .toast-undo-btn { background: var(--orange); color: var(--bg); border: none; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--sans); flex-shrink: 0; }
+  /* Dimmed style for duplicate products in history */
+  .product-card-duplicate { opacity: 0.4; }
+  /* Swipe wrapper for history product cards */
+  .hist-swipe-wrap { position: relative; overflow: hidden; }
+  .hist-swipe-inner { transition: transform 0.25s var(--ease); will-change: transform; background: var(--card); }
 
   /* STREAK */
   .streak-wrap { display: flex; align-items: center; gap: 16px; }
@@ -1797,7 +1809,7 @@ function deleteCurrentProduct(id) {
 // Core product card renderer — shared by today log and history views
 // showDate controls whether the date badge is rendered in the card header.
 // Pass false when the card is inside a date-grouped list (history view) to avoid duplication.
-function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showDate = true) {
+function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showDate = true, isDuplicate = false) {
   const rating = p.rating || 'moderate';
   const badge  = rating === 'good'
     ? `<span class="product-rating-badge rating-good">✅ Dobro</span>`
@@ -1853,7 +1865,7 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
     </div>`;
 
   return `
-    <div class="product-card${isExp ? ' expanded' : ''}" ${dataAttr}="${p.id}">
+    <div class="product-card${isExp ? ' expanded' : ''}${isDuplicate ? ' product-card-duplicate' : ''}" ${dataAttr}="${p.id}">
       <!-- Header: date | name (truncated) | badge | chevron — mirrors meal-header layout -->
       <div class="product-card-header" onclick="${toggleFn}(${p.id})">
         ${(showDate && dateStr) ? `<span class="meal-time-badge">${dateStr}</span>` : ''}
@@ -1982,6 +1994,7 @@ function historyTabHTML() {
 function productsHistoryHTML() {
   // Collect all dates with products from the last 90 days
   const byMonth = {};
+  const allProducts = [];
   for (let i = 0; i < 90; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -1991,7 +2004,18 @@ function productsHistoryHTML() {
     const month = dateStr.slice(0, 7);
     if (!byMonth[month]) byMonth[month] = [];
     byMonth[month].push({ date: dateStr, products });
+    products.forEach(p => allProducts.push(p));
   }
+
+  // Build a set of normalized names that appear more than once across all history
+  const nameCounts = {};
+  allProducts.forEach(p => {
+    const key = p.name?.trim().toLowerCase();
+    if (key) nameCounts[key] = (nameCounts[key] || 0) + 1;
+  });
+  const duplicateNames = new Set(
+    Object.entries(nameCounts).filter(([, count]) => count > 1).map(([name]) => name)
+  );
 
   const months = Object.keys(byMonth).sort().reverse();
   if (!months.length) {
@@ -2009,11 +2033,17 @@ function productsHistoryHTML() {
       const dayLabel = `${dayNum}.${date.slice(5,7)}.`;
 
       const cards = products.map(p => {
-        const isExp = state.expandedHistoryProductIds.has(p.id);
-        // Inject date from storage key for products saved before date field was added
+        const isExp    = state.expandedHistoryProductIds.has(p.id);
         const pWithDate = p.date ? p : { ...p, date };
-        // Pass showDate=false — date is already shown in the day group header
-        return productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false);
+        const isDup    = duplicateNames.has(p.name?.trim().toLowerCase());
+        // Pass isDup flag so the card gets dimmed visually
+        const cardHTML = productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false, isDup);
+        // Wrap in swipe-to-delete container — passes date so delete knows which key to update
+        return `
+          <div class="hist-swipe-wrap" ontouchstart="swipeStart(event,${p.id},'hist-product','${date}')" ontouchmove="swipeMove(event,${p.id})" ontouchend="swipeEnd(event,${p.id},'hist-product')" ontouchcancel="swipeCancel(${p.id})">
+            <div class="swipe-delete-bg">🗑</div>
+            <div class="hist-swipe-inner" id="swipe-hist-${p.id}">${cardHTML}</div>
+          </div>`;
       }).join('');
 
       return `
@@ -3350,20 +3380,26 @@ function clearTargetWeight() {
 const _swipe = {};
 function swipeCancel(id) {
   if (!_swipe[id]) return;
-  const el = document.getElementById('swipe-meal-' + id);
+  const el = _swipeEl(id);
   const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
   if (el) el.style.transform = 'translateX(0)';
   if (bg) bg.style.opacity = '0';
   delete _swipe[id];
 }
-function swipeStart(e, id, type) {
-  _swipe[id] = { startX: e.touches[0].clientX, type };
+// Resolve the inner sliding element based on swipe type
+function _swipeEl(id) {
+  const type = _swipe[id]?.type;
+  return document.getElementById(type === 'hist-product' ? 'swipe-hist-' + id : 'swipe-meal-' + id);
+}
+function swipeStart(e, id, type, date) {
+  // Store type and optional date (needed for hist-product delete)
+  _swipe[id] = { startX: e.touches[0].clientX, type, date: date || null };
 }
 function swipeMove(e, id) {
   if (!_swipe[id]) return;
   const dx = e.touches[0].clientX - _swipe[id].startX;
   if (dx >= 0) return;
-  const el = document.getElementById('swipe-meal-' + id);
+  const el = _swipeEl(id);
   const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
   if (el) el.style.transform = `translateX(${Math.max(-80, dx)}px)`;
   if (bg) bg.style.opacity = String(Math.min(1, Math.abs(dx) / 60));
@@ -3371,17 +3407,89 @@ function swipeMove(e, id) {
 function swipeEnd(e, id, type) {
   if (!_swipe[id]) return;
   const dx = e.changedTouches[0].clientX - _swipe[id].startX;
-  const el = document.getElementById('swipe-meal-' + id);
+  const meta = { ..._swipe[id] }; // capture before delete
+  const el = _swipeEl(id);
   const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
   if (dx < -60) {
     if (el) el.style.transform = 'translateX(-100%)';
     if (bg) bg.style.opacity = '0';
-    setTimeout(() => { if (type === 'meal') deleteMeal(id); }, 200);
+    setTimeout(() => {
+      if (meta.type === 'meal') deleteMeal(id);
+      else if (meta.type === 'hist-product') deleteHistoryProductWithUndo(meta.date, id);
+    }, 200);
   } else {
     if (el) el.style.transform = 'translateX(0)';
     if (bg) bg.style.opacity = '0';
   }
   delete _swipe[id];
+}
+
+// ─── HISTORY PRODUCT HELPERS ──────────────────────────────────────────────────
+
+// Returns all products from the last 90 days as a flat array
+function getAllHistoryProducts() {
+  const all = [];
+  for (let i = 0; i < 90; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    loadProducts(localDateStr(d)).forEach(p => all.push(p));
+  }
+  return all;
+}
+
+// Returns the first history product matching name (case-insensitive, trimmed)
+function findDuplicateInHistory(name) {
+  const normalized = name.trim().toLowerCase();
+  return getAllHistoryProducts().find(p => p.name?.trim().toLowerCase() === normalized) || null;
+}
+
+// Pending undo state for swipe-deleted history products
+let _histUndoPending = null;
+let _histUndoTimer   = null;
+
+// Delete a product from history storage only (diary entries untouched), with undo support
+function deleteHistoryProductWithUndo(date, id) {
+  const products = loadProducts(date);
+  const product  = products.find(p => String(p.id) === String(id));
+  if (!product) return;
+
+  // Save undo state before removing
+  _histUndoPending = { date, product };
+
+  saveProducts(date, products.filter(p => String(p.id) !== String(id)));
+  scheduleRender();
+
+  showUndoToast(`"${product.name}" obrisano`);
+  clearTimeout(_histUndoTimer);
+  // Auto-expire undo state after toast fades
+  _histUndoTimer = setTimeout(() => { _histUndoPending = null; }, 4500);
+}
+
+// Restore the last swipe-deleted history product
+function undoDeleteHistoryProduct() {
+  if (!_histUndoPending) return;
+  const { date, product } = _histUndoPending;
+  clearTimeout(_histUndoTimer);
+  _histUndoPending = null;
+
+  const products = loadProducts(date);
+  products.unshift(product);
+  saveProducts(date, products);
+  scheduleRender();
+  showToast('Vraćeno ✓');
+}
+
+// Undo toast — neutral style with orange action button
+function showUndoToast(msg) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<span>${msg}</span><button class="toast-undo-btn" onclick="undoDeleteHistoryProduct()">Poništi</button>`;
+  el.className = 'toast undo';
+  el.style.display = 'flex';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.add('hide');
+    setTimeout(() => { el.style.display = 'none'; el.classList.remove('hide'); el.innerHTML = ''; }, 300);
+  }, 4000);
 }
 
 // ─── BODY FAT ESTIMATE ────────────────────────────────────────────────────────
@@ -3443,6 +3551,10 @@ async function handleProductSubmit() {
       ...result,
     };
 
+    // Check for duplicate BEFORE saving — after save the product is in storage
+    // and findDuplicateInHistory would always find it (self-match)
+    const isDuplicate = !!findDuplicateInHistory(result.name);
+
     const products = loadProducts(state.date);
     products.unshift(product); // newest first
     saveProducts(state.date, products);
@@ -3454,7 +3566,12 @@ async function handleProductSubmit() {
     const ta = document.getElementById('productInput');
     if (ta) ta.value = '';
 
-    showToast(`${result.name} analiziran ✓`);
+    // Warn if a product with this name already existed in history before this scan
+    if (isDuplicate) {
+      showToast(`⚠️ "${result.name}" već postoji u istoriji`, 'err');
+    } else {
+      showToast(`${result.name} analiziran ✓`);
+    }
   } catch (e) {
     const msg = e.message?.includes('API_KEY') ? '❌ Neispravan API ključ' :
                 e.message?.includes('RESOURCE_EXHAUSTED') ? '⏳ API limit — sačekaj minut' :
