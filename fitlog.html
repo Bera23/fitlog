@@ -319,31 +319,6 @@
   .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
   .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
 
-  /* TRAINING TAB */
-  .ex-card { background: var(--s2); border: 1px solid var(--s5); border-radius: 12px; padding: 16px; margin-bottom: 8px; transition: border-color 0.15s; }
-  .ex-card:focus-within { border-color: var(--s8); }
-  .ex-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .ex-icon { font-size: 22px; }
-  .ex-name { font-size: 15px; font-weight: 700; }
-  .ex-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .ex-input-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .ex-input-label { font-size: 10px; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; font-weight: 600; }
-  .ex-input { width: 62px; background: var(--s4); border: 1px solid var(--s6); border-radius: 8px; color: var(--text); padding: 8px 6px; font-size: 15px; font-family: var(--mono); font-weight: 700; text-align: center; outline: none; transition: border-color 0.15s; }
-  .ex-input:focus { border-color: var(--s9); }
-  .ex-sep { font-size: 18px; color: var(--s7); margin-top: 14px; }
-  .ex-add-btn { margin-left: auto; background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: var(--mono); white-space: nowrap; transition: opacity 0.15s, transform 0.1s; }
-  .ex-add-btn:active { opacity: 0.85; transform: scale(0.97); }
-  .ex-done-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--s5); }
-  .ex-done-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 4px 0; }
-  .ex-done-kcal { color: var(--blue); font-family: var(--mono); font-weight: 700; }
-  .ex-done-del { background: none; border: none; color: var(--s8); cursor: pointer; font-size: 16px; padding: 12px; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; transition: color 0.12s; }
-  .ex-done-del:hover { color: var(--red); }
-  /* Custom exercise — subtle dashed border with blue accent */
-  .custom-ex-card { background: var(--s2); border: 1.5px dashed var(--s7); border-radius: 12px; padding: 16px; margin-bottom: 8px; }
-  .workout-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 4px; }
-  .workout-total-label { font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-  .workout-total-val { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--blue); }
-
   /* HISTORY DETAIL */
   .hist-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
   .hist-back-btn { background: var(--s4); border: none; border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: var(--sans); transition: background 0.12s; }
@@ -534,8 +509,6 @@ const LS_VERSION = 1;
 const KCAL_PER_KG_FAT      = 7700;   // approximate kcal needed to burn 1 kg of body fat
 const WATER_ML_PER_KG      = 30;     // recommended daily water intake in ml per kg bodyweight
 const DEFAULT_WATER_GOAL_ML = 2000;  // fallback water goal when weight is unknown
-const CUSTOM_EX_KCAL_COEFF  = 0.002; // rough kcal per rep per kg for unknown exercises
-const DEBOUNCE_MS           = 120;   // ms delay before re-render after training input changes
 
 // ─── GEMINI PROMPT SCHEMAS ───────────────────────────────────────────────────
 // JSON output format strings shared across prompt functions — single source of truth
@@ -607,25 +580,7 @@ const state = {
   // Fitness goal: 'lose' | 'maintain' | 'gain'
   fitnessGoal: localStorage.getItem('fitlog_fitness_goal') || 'lose',
   waterGoal: initWaterGoal(),
-  // Training inputs state per exercise
-  trainingInputs: {
-    cucnjevi:  { sets: 3, reps: 10 },
-    sklekovi:  { sets: 3, reps: 8  },
-    plank:     { sets: 3, secs: 15 },
-    iskoraci:  { sets: 3, reps: 8  },
-    podizanje: { sets: 3, reps: 8  },
-    custom:    { name: '', sets: 3, reps: 10 },
-  },
 };
-
-// Predefined exercises: kcal/rep/kg or kcal/sec/kg
-const EXERCISES = [
-  { id: 'cucnjevi',  name: 'Čučnjevi',          icon: '🦵', type: 'reps', kcalPerRepPerKg: 0.0033 },
-  { id: 'sklekovi',  name: 'Sklekovi od zida',   icon: '🤲', type: 'reps', kcalPerRepPerKg: 0.0020 },
-  { id: 'plank',     name: 'Plank',              icon: '🧱', type: 'secs', kcalPerSecPerKg: 0.00083 },
-  { id: 'iskoraci',  name: 'Bočni iskoraci',     icon: '⚡', type: 'reps', kcalPerRepPerKg: 0.0028 },
-  { id: 'podizanje', name: 'Podizanje nogu',     icon: '🦶', type: 'reps', kcalPerRepPerKg: 0.0018 },
-];
 
 // Human-readable activity labels used across tabs and drawer
 const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
@@ -751,13 +706,6 @@ function cachedLoadWorkout(date) {
   return result;
 }
 
-function calcExerciseKcal(ex, sets, reps, secs) {
-  const w = state.weight || 80;
-  if (ex.type === 'reps') return Math.round(sets * reps * ex.kcalPerRepPerKg * w);
-  if (ex.type === 'secs') return Math.round(sets * secs * ex.kcalPerSecPerKg * w);
-  return 0;
-}
-
 // Safe JSON parse for localStorage — never crashes
 function safeParseLS(key) {
   try {
@@ -826,9 +774,6 @@ function debounce(fn, ms) {
     timer = setTimeout(() => fn.apply(this, args), ms);
   };
 }
-
-// Debounced render for training inputs — avoids re-render on every keystroke
-const debounceRender = debounce(render, DEBOUNCE_MS);
 
 // Coalesces multiple synchronous render() calls into a single RAF render.
 // Multiple calls within the same synchronous block collapse to one paint frame.
@@ -1435,7 +1380,7 @@ function totals() {
   const d = state.dayData;
   const consumed    = d.meals.reduce((s, m) => s + (m.calories || 0), 0);
   const exBurned    = d.exercises.reduce((s, e) => s + (e.burned || 0), 0);
-  // Include training tab workout calories in burned total
+  // Include legacy workout entries (fitlog_workout_*) in burned total for history correctness
   const workout     = cachedLoadWorkout(state.date);
   const workoutBurned = workout.reduce((s, e) => s + (e.calories || 0), 0);
   const burned      = exBurned + workoutBurned;
@@ -2074,7 +2019,7 @@ function productsHistoryHTML() {
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
             ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
           </div>
           ${cards}
@@ -2084,135 +2029,11 @@ function productsHistoryHTML() {
     return `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <span style="color:var(--muted);font-size:10px">${totalProducts} skenirano</span>
+        <span style="color:var(--muted);font-size:12px;font-weight:600">${totalProducts} skenirano</span>
       </div>
       ${dayBlocks}
     </div>`;
   }).join('');
-}
-
-function trainingTabHTML() {
-  const workout = cachedLoadWorkout(state.date);
-  const totalKcal = workout.reduce((s, e) => s + (e.calories || 0), 0);
-
-  // Group done entries by exercise id
-  const doneByEx = {};
-  workout.forEach(e => {
-    if (!doneByEx[e.exId]) doneByEx[e.exId] = [];
-    doneByEx[e.exId].push(e);
-  });
-
-  // Predefined exercise cards
-  const exCards = EXERCISES.map(ex => {
-    const inp = state.trainingInputs[ex.id];
-    const done = doneByEx[ex.id] || [];
-    const preview = ex.type === 'reps'
-      ? calcExerciseKcal(ex, inp.sets, inp.reps, 0)
-      : calcExerciseKcal(ex, inp.sets, 0, inp.secs);
-
-    const doneHTML = done.length ? `
-      <div class="ex-done-list">
-        ${done.map(e => `
-          <div class="ex-done-item">
-            <span>${e.sets}×${e.reps || e.secs + 's'}</span>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="ex-done-kcal">-${e.calories} kcal</span>
-              <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
-            </div>
-          </div>`).join('')}
-      </div>` : '';
-
-    const inputsHTML = ex.type === 'reps' ? `
-      <div class="ex-input-group">
-        <div class="ex-input-label">Serije</div>
-        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
-          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
-      </div>
-      <div class="ex-sep">×</div>
-      <div class="ex-input-group">
-        <div class="ex-input-label">Ponavljanja</div>
-        <input class="ex-input" type="number" min="1" max="200" value="${inp.reps}"
-          oninput="updateTrainingInput('${ex.id}','reps',this.value)" />
-      </div>` : `
-      <div class="ex-input-group">
-        <div class="ex-input-label">Serije</div>
-        <input class="ex-input" type="number" min="1" max="20" value="${inp.sets}"
-          oninput="updateTrainingInput('${ex.id}','sets',this.value)" />
-      </div>
-      <div class="ex-sep">×</div>
-      <div class="ex-input-group">
-        <div class="ex-input-label">Sekunde</div>
-        <input class="ex-input" type="number" min="5" max="600" value="${inp.secs}"
-          oninput="updateTrainingInput('${ex.id}','secs',this.value)" />
-      </div>`;
-
-    return `<div class="ex-card">
-      <div class="ex-header">
-        <span class="ex-icon">${ex.icon}</span>
-        <span class="ex-name">${ex.name}</span>
-      </div>
-      <div class="ex-inputs">
-        ${inputsHTML}
-        <button class="ex-add-btn" onclick="addWorkoutEntry('${ex.id}')">
-          +${preview} kcal
-        </button>
-      </div>
-      ${doneHTML}
-    </div>`;
-  }).join('');
-
-  // Custom exercise
-  const ci = state.trainingInputs.custom;
-  const customCard = `
-    <div class="custom-ex-card">
-      <div class="ex-header">
-        <span class="ex-icon">✏️</span>
-        <span class="ex-name" style="color:var(--muted)">Custom vežba</span>
-      </div>
-      <input id="customNameInput" style="width:100%;background:var(--s4);border:1px solid var(--s6);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;font-family:var(--sans);outline:none;margin-bottom:10px"
-        type="text" placeholder="Naziv vežbe..." value="${ci.name}" />
-      <div class="ex-inputs">
-        <div class="ex-input-group">
-          <div class="ex-input-label">Serije</div>
-          <input class="ex-input" type="number" min="1" max="20" value="${ci.sets}"
-            oninput="updateTrainingInput('custom','sets',this.value)" />
-        </div>
-        <div class="ex-sep">×</div>
-        <div class="ex-input-group">
-          <div class="ex-input-label">Ponavljanja</div>
-          <input class="ex-input" type="number" min="1" max="200" value="${ci.reps}"
-            oninput="updateTrainingInput('custom','reps',this.value)" />
-        </div>
-        <button class="ex-add-btn" style="background:var(--blue)" onclick="addCustomWorkoutEntry()">Dodaj</button>
-      </div>
-      ${(doneByEx['custom'] || []).length ? `
-        <div class="ex-done-list">
-          ${(doneByEx['custom'] || []).map(e => `
-            <div class="ex-done-item">
-              <span>${e.name} · ${e.sets}×${e.reps}</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="ex-done-kcal" style="color:var(--blue)">~${e.calories} kcal</span>
-                <button class="ex-done-del" onclick="deleteWorkoutEntry('${e.uid}')">×</button>
-              </div>
-            </div>`).join('')}
-        </div>` : ''}
-    </div>`;
-
-  const totalHTML = totalKcal > 0 ? `
-    <div class="card">
-      <div class="workout-total">
-        <span class="workout-total-label">Ukupno sagoreno</span>
-        <span class="workout-total-val">-${totalKcal} kcal</span>
-      </div>
-    </div>` : '';
-
-  return `
-    ${totalHTML}
-    <div class="card">
-      <div class="card-label">Trening — ${state.date === todayStr() ? 'danas' : state.date}</div>
-      ${exCards}
-      ${customCard}
-    </div>`;
 }
 
 function weeklyReportHTML(weekData) {
@@ -3322,7 +3143,6 @@ function render() {
     <div class="tab-content">
     ${state.activeTab === 'stats' ? statsContent : ''}
     ${state.activeTab === 'history' ? historyTabHTML() : ''}
-    ${state.activeTab === 'training' ? trainingTabHTML() : ''}
     ${state.activeTab === 'zdravlje' ? zdravljeTabHTML() : ''}
 
     ${state.activeTab === 'log' ? `
@@ -3440,10 +3260,6 @@ function render() {
       <button class="nav-btn ${state.activeTab === 'log' ? 'active' : 'inactive'}" onclick="setTab('log')">
         <span class="nav-icon">📋</span>
         <span class="nav-label">Dnevnik</span>
-      </button>
-      <button class="nav-btn ${state.activeTab === 'training' ? 'active' : 'inactive'}" onclick="setTab('training')">
-        <span class="nav-icon">🏋️</span>
-        <span class="nav-label">Trening</span>
       </button>
       <button class="nav-btn ${state.activeTab === 'stats' ? 'active' : 'inactive'}" onclick="setTab('stats')">
         <span class="nav-icon">📊</span>
@@ -4057,75 +3873,6 @@ function setMode(mode) {
   // Note: intentionally no .focus() here — auto-focusing the textarea
   // would trigger the mobile keyboard on every tab switch, which is unwanted.
   // The user should tap the textarea explicitly to open the keyboard.
-}
-
-function updateTrainingInput(exId, field, value) {
-  if (field === 'name') state.trainingInputs[exId][field] = value;
-  else state.trainingInputs[exId][field] = parseInt(value) || 0;
-  debounceRender(); // debounced to avoid lag on fast typing
-}
-
-function addWorkoutEntry(exId) {
-  const ex = EXERCISES.find(e => e.id === exId);
-  if (!ex) return;
-  const inp = state.trainingInputs[exId];
-  // Guard against zero values
-  if (ex.type === 'reps' && (!inp.sets || !inp.reps)) {
-    showToast('Unesi serije i ponavljanja', 'err'); return;
-  }
-  if (ex.type === 'secs' && (!inp.sets || !inp.secs)) {
-    showToast('Unesi serije i sekunde', 'err'); return;
-  }
-  const calories = calcExerciseKcal(ex, inp.sets, inp.reps || 0, inp.secs || 0);
-  const entry = {
-    uid: crypto.randomUUID(),
-    exId,
-    name: ex.name,
-    sets: inp.sets,
-    reps: ex.type === 'reps' ? inp.reps : null,
-    secs: ex.type === 'secs' ? inp.secs : null,
-    calories,
-    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
-  };
-  const workout = loadWorkout(state.date);
-  workout.push(entry);
-  saveWorkout(state.date, workout);
-  showToast(`${ex.name} dodato · -${calories} kcal`);
-  scheduleRender();
-}
-
-function addCustomWorkoutEntry() {
-  // Read name directly from DOM to avoid re-render on every keystroke
-  const nameEl = document.getElementById('customNameInput');
-  const name = nameEl ? nameEl.value.trim() : state.trainingInputs.custom.name.trim();
-  if (!name) { showToast('Unesi naziv vežbe', 'err'); return; }
-  // Sync name to state for persistence
-  state.trainingInputs.custom.name = name;
-  const ci = state.trainingInputs.custom;
-  const w = state.weight || 80;
-  const calories = Math.round(ci.sets * ci.reps * CUSTOM_EX_KCAL_COEFF * w);
-  const entry = {
-    uid: crypto.randomUUID(),
-    exId: 'custom',
-    name,
-    sets: ci.sets,
-    reps: ci.reps,
-    secs: null,
-    calories,
-    time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
-  };
-  const workout = loadWorkout(state.date);
-  workout.push(entry);
-  saveWorkout(state.date, workout);
-  state.trainingInputs.custom.name = ''; // reset after adding
-  showToast(`${entry.name} dodato · ~-${calories} kcal`);
-  scheduleRender();
-}
-
-function deleteWorkoutEntry(uid) {
-  const workout = loadWorkout(state.date).filter(e => e.uid !== uid);
-  saveWorkout(state.date, workout);
-  scheduleRender();
 }
 
 function resetGoalToAuto() {
