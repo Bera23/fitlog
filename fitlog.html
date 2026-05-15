@@ -555,6 +555,7 @@ const state = {
   exerciseInputDraft: '', // persists exercise textarea content across renders
   zdravljeSubTab: 'tezina',
   nutritionScore: null,
+  nutritionScoreCollapsed: false,
   nutritionScoreLoading: false,
   expandedScoreDate: null,
   mealScores: {},
@@ -3078,7 +3079,6 @@ function render() {
                 <div class="meal-score-area">
                 ${scoreHTML}
                 </div>
-                <button onclick="deleteMeal('${m.id}')" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši obrok</button>
               </div>
             </div>
           </div>`;
@@ -3095,8 +3095,9 @@ function render() {
         const isOpen = state.expandedExIds.has(e.id);
         const mainName = e.items[0]?.name || 'Aktivnost';
         return `
-          <div class="log-item${isOpen ? ' expanded' : ''}" data-ex-id="${e.id}">
-            <div class="log-item-inner" style="background:var(--card)">
+          <div class="log-item${isOpen ? ' expanded' : ''}" data-ex-id="${e.id}" ontouchstart="swipeStart(event,'${e.id}','exercise')" ontouchmove="swipeMove(event,'${e.id}')" ontouchend="swipeEnd(event,'${e.id}','exercise')" ontouchcancel="swipeCancel('${e.id}')">
+            <div class="swipe-delete-bg">🗑</div>
+            <div class="log-item-inner" id="swipe-ex-${e.id}" style="background:var(--card)">
               <div class="meal-header" onclick="toggleEx('${e.id}')">
                 <span class="meal-time-badge" style="color:var(--blue)">${e.time}</span>
                 <span class="meal-summary">${mainName}</span>
@@ -3108,7 +3109,6 @@ function render() {
                 ${e.items.map(it => `
                   <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.detail}</div>`).join('')}
                 ${e.note ? `<div class="log-note" style="margin-top:6px">${e.note}</div>` : ''}
-                <button onclick="deleteEx('${e.id}')" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši aktivnost</button>
               </div>
             </div>
           </div>`;
@@ -3276,16 +3276,21 @@ function render() {
               </div>` :
             state.nutritionScore ? `
               <div style="padding:16px">
-                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:${state.nutritionScoreCollapsed ? '0' : '12px'}">
                   <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
                   <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                  <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+                  <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+                    <button onclick="scoreNutrition()" title="Oceni ponovo" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">↺</button>
+                    <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
+                  </div>
                 </div>
+                ${state.nutritionScoreCollapsed ? '' : `
                 <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
                 <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
                 <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
                 <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
                 <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
+                `}
               </div>` : `
               <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
           </div>` : ''}
@@ -3389,7 +3394,9 @@ function swipeCancel(id) {
 // Resolve the inner sliding element based on swipe type
 function _swipeEl(id) {
   const type = _swipe[id]?.type;
-  return document.getElementById(type === 'hist-product' ? 'swipe-hist-' + id : 'swipe-meal-' + id);
+  if (type === 'hist-product') return document.getElementById('swipe-hist-' + id);
+  if (type === 'exercise')     return document.getElementById('swipe-ex-' + id);
+  return document.getElementById('swipe-meal-' + id);
 }
 function swipeStart(e, id, type, date) {
   // Store type and optional date (needed for hist-product delete)
@@ -3415,6 +3422,7 @@ function swipeEnd(e, id, type) {
     if (bg) bg.style.opacity = '0';
     setTimeout(() => {
       if (meta.type === 'meal') deleteMeal(id);
+      else if (meta.type === 'exercise') deleteEx(id);
       else if (meta.type === 'hist-product') deleteHistoryProductWithUndo(meta.date, id);
     }, 200);
   } else {
@@ -3737,6 +3745,7 @@ async function scoreNutrition() {
   }
   state.nutritionScoreLoading = true;
   state.nutritionScore = null;
+  state.nutritionScoreCollapsed = false; // always expand to show fresh results
 
   try {
     const t = totals();
@@ -3780,7 +3789,10 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
             <div class="score-num" style="color:${scoreColor}">${score.score}</div>
             <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-            <button onclick="clearNutritionScore()" style="margin-left:auto;background:none;border:none;color:var(--s7);cursor:pointer;font-size:20px;line-height:1">×</button>
+            <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+              <button onclick="scoreNutrition()" title="Oceni ponovo" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">↺</button>
+              <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">▾</button>
+            </div>
           </div>
           <div class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
