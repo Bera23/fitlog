@@ -86,7 +86,7 @@
   .api-screen p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
   .api-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 16px; font-size: 13px; font-family: var(--mono); outline: none; margin-bottom: 10px; }
   .api-save-btn { width: 100%; background: var(--green); color: var(--bg); border: none; border-radius: 12px; padding: 16px; font-size: 15px; font-weight: 800; cursor: pointer; font-family: var(--mono); letter-spacing: 1px; }
-  .api-hint { font-size: 11px; color: var(--s7); margin-top: 8px; }
+  .api-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
   .api-hint a { color: var(--muted); }
 
   /* WEEKLY REPORT */
@@ -182,7 +182,7 @@
   .nav-btn.active .nav-icon { transform: scale(1.12); }
   .nav-label { font-size: 11px; font-weight: 600; font-family: var(--sans); letter-spacing: 0.3px; }
   .nav-btn.active .nav-label { color: var(--green); }
-  .nav-btn.inactive .nav-label { color: var(--s8); }
+  .nav-btn.inactive .nav-label { color: var(--s11); }
   .nav-btn.active .nav-icon { filter: none; }
   .nav-btn.inactive .nav-icon { opacity: 0.35; }
 
@@ -199,7 +199,7 @@
   /* INPUT */
   .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: var(--sans); resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
   .msg-input:focus { border-color: var(--s8); }
-  .hint { font-size: 11px; color: var(--s6); text-align: right; margin: 4px 0 6px; }
+  .hint { font-size: 11px; color: var(--muted); text-align: right; margin: 4px 0 6px; }
 
   /* SEND BUTTON */
   .send-btn { width: 100%; padding: 14px 20px; background: var(--green); color: var(--bg); border: none; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: var(--sans); letter-spacing: 0.3px; transition: opacity 0.2s, transform 0.1s; }
@@ -258,7 +258,7 @@
   /* EMPTY */
   .empty { text-align: center; padding: 48px 20px 36px; color: var(--muted); font-size: 13px; line-height: 1.6; }
   .empty-icon { font-size: 40px; margin-bottom: 14px; display: block; opacity: 0.6; }
-  .empty-title { font-size: 15px; font-weight: 700; color: var(--s10); margin-bottom: 6px; }
+  .empty-title { font-size: 15px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
 
   /* TOAST — above bottom nav */
   @keyframes toastIn {
@@ -281,7 +281,7 @@
   /* STREAK */
   .streak-wrap { display: flex; align-items: center; gap: 16px; }
   .streak-num { font-family: var(--mono); font-size: 48px; font-weight: 700; line-height: 1; color: var(--green); }
-  .streak-num.zero { color: var(--s7); }
+  .streak-num.zero { color: var(--muted); }
   .streak-info { flex: 1; }
   .streak-title { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
   .streak-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
@@ -314,7 +314,7 @@
   .hist-date { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 90px; }
   .hist-date.today { color: var(--green); }
   .hist-net { font-family: var(--mono); font-size: 13px; font-weight: 700; }
-  .hist-empty { text-align: center; padding: 40px 20px; color: var(--s6); font-size: 13px; }
+  .hist-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
 
   /* HISTORY DETAIL */
   .hist-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -372,7 +372,7 @@
   .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
   .meal-summary { flex: 1; font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
-  .meal-chevron { font-size: 11px; color: var(--s8); margin-left: 4px; transition: transform 0.2s var(--ease), color 0.15s; }
+  .meal-chevron { font-size: 11px; color: var(--s11); margin-left: 4px; transition: transform 0.2s var(--ease), color 0.15s; }
   .meal-chevron.open { transform: rotate(180deg); color: var(--green); }
   /* Pills row — shown when collapsed, hidden when expanded */
   .meal-pills-row { padding: 0 16px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
@@ -412,7 +412,7 @@
   .onboard-title { font-family: var(--mono); color: var(--green); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
   .onboard-sub { color: var(--muted); font-size: 13px; line-height: 1.65; margin-bottom: 28px; }
   .onboard-field { margin-bottom: 18px; }
-  .onboard-label { font-size: 11px; color: var(--s10); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 7px; }
+  .onboard-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 7px; }
   .onboard-input {
     width: 100%; background: var(--s2); border: 1px solid var(--s6);
     border-radius: 10px; color: var(--text); padding: 13px 14px;
@@ -477,7 +477,7 @@
     letter-spacing: 1.2px; text-transform: uppercase;
   }
   .drawer-acc-chevron {
-    font-size: 10px; color: var(--s8);
+    font-size: 10px; color: var(--s11);
     transition: transform 0.22s var(--ease);
   }
   .drawer-acc-chevron.open { transform: rotate(180deg); color: var(--green); }
@@ -1841,14 +1841,14 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
     <div class="product-macro-cell">
       <div class="product-macro-val" style="color:${color}">${totalVal !== null ? totalVal + 'g' : '–'}</div>
       <div class="product-macro-lbl">${label}</div>
-      ${per100Val !== null ? `<div style="font-size:9px;color:var(--s6);margin-top:1px">${per100Val}g/100g</div>` : ''}
+      ${per100Val !== null ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${per100Val}g/100g</div>` : ''}
     </div>`;
 
   const calCell = `
     <div class="product-macro-cell">
       <div class="product-macro-val" style="color:var(--text)">${tot ? tot.cal : p.calories_per_100g||0}</div>
       <div class="product-macro-lbl">kcal${tot ? '' : '/100g'}</div>
-      ${tot ? `<div style="font-size:9px;color:var(--s6);margin-top:1px">${p.calories_per_100g||0}/100g</div>` : ''}
+      ${tot ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${p.calories_per_100g||0}/100g</div>` : ''}
     </div>`;
 
   return `
@@ -1960,7 +1960,7 @@ function historyTabHTML() {
         <div style="display:flex;align-items:center;gap:6px">
           ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
           <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
-          <span style="font-size:16px;color:var(--s8);font-weight:300">›</span>
+          <span style="font-size:16px;color:var(--s11);font-weight:300">›</span>
         </div>
       </div>`;
     }).join('');
@@ -2100,23 +2100,23 @@ function weeklyReportHTML(weekData) {
 
     if (d.future) return `
       <div class="report-day-row">
-        <span class="report-day-name" style="color:var(--s6)">${name}</span>
+        <span class="report-day-name" style="color:var(--muted)">${name}</span>
         <div class="report-day-bar-wrap">
           <div style="position:absolute;inset:0;background:var(--s4);border-radius:99px"></div>
         </div>
-        <span class="rdr-consumed" style="color:var(--s6)">—</span>
+        <span class="rdr-consumed" style="color:var(--muted)">—</span>
         <span class="rdr-burned"></span>
         <span class="rdr-delta"></span>
       </div>`;
 
     if (!d.hasData) return `
       <div class="report-day-row">
-        <span class="report-day-name" style="color:var(--s7)">${name}</span>
+        <span class="report-day-name" style="color:var(--muted)">${name}</span>
         <div class="report-day-bar-wrap">
           <div style="position:absolute;inset:0;background:var(--s3);border-radius:99px"></div>
           <div style="position:absolute;top:-3px;bottom:-3px;left:${Math.min(97,(dayGoal/maxConsumed)*100)}%;width:1.5px;background:rgba(255,255,255,0.15);border-radius:1px"></div>
         </div>
-        <span class="rdr-consumed" style="color:var(--s7)">—</span>
+        <span class="rdr-consumed" style="color:var(--muted)">—</span>
         <span class="rdr-burned"></span>
         <span class="rdr-delta"></span>
       </div>`;
@@ -2249,7 +2249,7 @@ function weeklyReportHTML(weekData) {
         <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;min-width:36px;text-align:right">Delta</span>
       </div>
       ${dayRows}
-      ${isCurrentWeek ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span></div>' : ''}
+      ${isCurrentWeek ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><span style="font-size:10px;color:var(--muted)">Tapni dan za detalje</span></div>' : ''}
     </div>`;
 }
 
@@ -2729,7 +2729,7 @@ function zdravljeTabHTML() {
           <span style="font-size:12px;color:var(--muted)">
             ${h
               ? `Visina: <span style="color:var(--green);font-weight:700">${h} cm</span>`
-              : `<span style="color:var(--s8)">Visina nije uneta</span>`}
+              : `<span style="color:var(--muted)">Visina nije uneta</span>`}
           </span>
           ${startEntry ? `
           <span style="font-size:12px;color:var(--muted)">Početna: <span style="font-weight:700;color:var(--text-secondary)">${startEntry.weight} kg</span> <span style="color:${weightDeltaColor};font-weight:700;font-size:11px">${weightDeltaStr}</span></span>` : ''}
