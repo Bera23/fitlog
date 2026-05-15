@@ -539,7 +539,8 @@ const state = {
   dayData: { meals: [], exercises: [] },
   mode: 'food',
   activeTab: 'log',
-  mealInputDraft: '',   // persists food textarea content across renders
+  mealInputDraft: '',     // persists food textarea content across renders
+  exerciseInputDraft: '', // persists exercise textarea content across renders
   zdravljeSubTab: 'tezina',
   nutritionScore: null,
   nutritionScoreLoading: false,
@@ -1643,7 +1644,7 @@ function historyDayDetailHTML(date) {
 
     return `
     <div class="hist-meal-item${isExp ? ' expanded' : ''}" data-hist-meal-id="${m.id}" style="border-top:1px solid var(--s3)">
-      <div onclick="toggleHistoryMeal(${m.id})" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
+      <div onclick="toggleHistoryMeal('${m.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
         <div>
           <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green)">${m.time}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
@@ -3156,9 +3157,9 @@ function render() {
     ${state.activeTab === 'log' ? `
       <div class="card">
         <div class="mode-toggle">
-          <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')">🍽 Obrok</button>
-          <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')">💪 Vežba</button>
-          <button class="mode-btn ${state.mode === 'product' ? 'active' : 'inactive'}" onclick="setMode('product')">📦 Proizvod</button>
+          <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')" ${state.loading || state.productLoading ? 'disabled' : ''}>🍽 Obrok</button>
+          <button class="mode-btn ${state.mode === 'exercise' ? 'active' : 'inactive'}" onclick="setMode('exercise')" ${state.loading || state.productLoading ? 'disabled' : ''}>💪 Vežba</button>
+          <button class="mode-btn ${state.mode === 'product' ? 'active' : 'inactive'}" onclick="setMode('product')" ${state.loading || state.productLoading ? 'disabled' : ''}>📦 Proizvod</button>
         </div>
 
         ${state.mode === 'product' ? `
@@ -3179,7 +3180,7 @@ function render() {
             <button class="send-btn" onclick="handleProductSubmit()" ${state.productLoading ? 'disabled' : ''} style="flex:1;margin-top:0">${state.productLoading ? 'Analiziram...' : '+ Analiziraj proizvod'}</button>
           </div>
         ` : `
-          <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}" oninput="state.mealInputDraft = this.value"></textarea>
+          <textarea class="msg-input" id="msgInput" rows="4" placeholder="${placeholder}" oninput="state.mode === 'food' ? state.mealInputDraft = this.value : state.exerciseInputDraft = this.value"></textarea>
           ${state.mode === 'food' && state.imageBase64 ? `
           <div class="img-strip" style="margin-top:8px">
             <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
@@ -3237,7 +3238,7 @@ function render() {
         ${state.mode === 'food' ? mealsHTML : ''}
         ${state.mode === 'exercise' ? exHTML : ''}
         ${emptyHTML}
-        ${d.meals.length ? `
+        ${state.mode === 'food' && d.meals.length ? `
           <div id="nutrition-score-card" class="card" style="padding:0;overflow:hidden">
             ${state.nutritionScoreLoading ? `
               <div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
@@ -3284,10 +3285,12 @@ function render() {
     </div>`;
   // Sync drawer after every render — only rebuild if it's actually open
   if (state.drawerOpen) renderDrawer();
-  // Restore meal textarea draft after render — innerHTML wipe clears DOM values
-  if (state.mealInputDraft) {
+  // Restore textarea draft after render — innerHTML wipe clears DOM values.
+  // Each mode has its own draft so they don't bleed into each other.
+  const draftValue = state.mode === 'food' ? state.mealInputDraft : state.exerciseInputDraft;
+  if (draftValue) {
     const ta = document.getElementById('msgInput');
-    if (ta) ta.value = state.mealInputDraft;
+    if (ta) ta.value = draftValue;
   }
 }
 
@@ -3934,13 +3937,16 @@ async function handleSubmit() {
   const input = document.getElementById('msgInput')?.value.trim();
   // Require text OR image (image only valid in food mode)
   if (!input && !(state.imageBase64 && state.mode === 'food')) return;
+  // Snapshot mode at submit time — mode buttons are disabled during loading
+  // but this guards against any future race conditions
+  const modeAtSubmit = state.mode;
   state.loading = true;
   render();
 
   try {
     const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
 
-    if (state.mode === 'food') {
+    if (modeAtSubmit === 'food') {
       let result;
       if (state.imageBase64) {
         // Image path — optional text becomes context for the model
@@ -3978,6 +3984,7 @@ async function handleSubmit() {
       };
       state.dayData.exercises.push(ex);
       saveDay(state.date, state.dayData);
+      state.exerciseInputDraft = ''; // clear draft after successful submission
       showToast(`-${Math.round(ex.burned)} kcal sagoreno ✓`);
     }
   } catch (e) {
