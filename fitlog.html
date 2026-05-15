@@ -604,6 +604,8 @@ const state = {
   age: parseInt(localStorage.getItem('fitlog_age')) || 30,
   gender: localStorage.getItem('fitlog_gender') || 'male',
   activity: localStorage.getItem('fitlog_activity') || 'sedentary',
+  // Fitness goal: 'lose' | 'maintain' | 'gain'
+  fitnessGoal: localStorage.getItem('fitlog_fitness_goal') || 'lose',
   waterGoal: initWaterGoal(),
   // Training inputs state per exercise
   trainingInputs: {
@@ -938,20 +940,20 @@ async function generateWeeklySummary(stats) {
 
   const prompt = `Ti si motivišući nutricionistički trener. Analiziraj nedeljne statistike ishrane i daj kratak, konkretan komentar (2-4 rečenice, bez uvoda).
 ${profile}
-Kalorijski cilj: ${state.calorieGoal} kcal/dan.
+Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj korisnika: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
 Nedelja: ${weekLabel}
 
 Statistike:
 - Dana sa podacima: ${stats.daysWithData} od 7
-- Dana ispod cilja: ${stats.deficitDays} od ${stats.daysWithData}
+- Dana ${state.fitnessGoal === 'gain' ? 'u suficitu' : 'ispod cilja'}: ${stats.deficitDays} od ${stats.daysWithData}
 - Prosečan dnevni unos: ${stats.avgConsumed} kcal
 - Prosečno sagoreno: ${stats.avgBurned} kcal
 - Prosečan neto: ${stats.avgNet} kcal
-- Prosečan deficit: ${stats.avgDeficit} kcal
+- Prosečan ${state.fitnessGoal === 'gain' ? 'suficit' : 'deficit'}: ${stats.avgDeficit} kcal
 - Prosečni proteini: ${stats.avgProtein}g
 - Prosečni ugljeni hidrati: ${stats.avgCarbs}g
 - Prosečne masti: ${stats.avgFat}g
-- Procenjen gubitak masti: ${stats.projectedLoss} kg
+- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak mase' : 'gubitak masti'}: ${stats.projectedLoss} kg
 
 Budi direktan, specifičan i motivišući. Pohvali ako je dobro, konstruktivno upozori ako nije. Odgovori na srpskom.`;
 
@@ -1119,6 +1121,13 @@ function settingsDrawerHTML() {
         <option value="active" ${state.activity === 'active' ? 'selected' : ''}>Aktivan (6-7x/ned)</option>
       </select>
     </div>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Cilj</div>
+      <select class="drawer-select" id="drawerFitnessGoal">
+        <option value="lose"     ${state.fitnessGoal === 'lose'     ? 'selected' : ''}>🔥 Mršavljenje</option>
+        <option value="gain"     ${state.fitnessGoal === 'gain'     ? 'selected' : ''}>💪 Gojenje</option>
+      </select>
+    </div>
     <button onclick="saveDrawerProfile()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj profil</button>`;
 
   const goalBody = (() => {
@@ -1127,7 +1136,7 @@ function settingsDrawerHTML() {
     return `
       ${rec ? `
       <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(143,212,46,0.06);border:1px solid rgba(143,212,46,0.15);border-radius:8px;padding:8px 10px;margin-bottom:8px">
-        <span class="drawer-row-label">BMI preporuka</span>
+        <span class="drawer-row-label">${state.fitnessGoal === 'gain' ? 'Preporuka (gojenje)' : 'BMI preporuka'}</span>
         <span style="display:flex;align-items:center;gap:8px">
           <span style="color:var(--green);font-weight:700;font-family:var(--mono);font-size:13px">${rec} kcal</span>
           ${!isMatch
@@ -1149,7 +1158,7 @@ function settingsDrawerHTML() {
           <button onclick="saveDrawerGoal()" style="background:var(--green);color:var(--bg);border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0">Sačuvaj</button>
         </div>
       </div>
-      ${state.calorieGoalManual ? `<button onclick="resetGoalToAuto()" class="drawer-btn" style="margin-top:4px">↺ Vrati na auto (BMI preporuka)</button>` : ''}`;
+      ${state.calorieGoalManual ? `<button onclick="resetGoalToAuto()" class="drawer-btn" style="margin-top:4px">↺ Vrati na auto (${state.fitnessGoal === 'gain' ? 'gojenje preporuka' : 'BMI preporuka'})</button>` : ''}`;
   })();
 
   const usageBody = `
@@ -1209,17 +1218,40 @@ function saveDrawerProfile() {
   const gender = document.getElementById('drawerGender')?.value;
   const activity = document.getElementById('drawerActivity')?.value;
   const height = parseFloat(document.getElementById('drawerHeight')?.value);
+  const fitnessGoal = document.getElementById('drawerFitnessGoal')?.value || 'lose';
 
   if (!age || isNaN(age) || age < 10) { showToast('Unesi validne godine', 'err'); return; }
+
+  // Detect if the fitness goal direction changed
+  const goalChanged = fitnessGoal !== state.fitnessGoal;
 
   state.age = age;      localStorage.setItem('fitlog_age', age);
   state.gender = gender; localStorage.setItem('fitlog_gender', gender);
   state.activity = activity; localStorage.setItem('fitlog_activity', activity);
+  state.fitnessGoal = fitnessGoal; localStorage.setItem('fitlog_fitness_goal', fitnessGoal);
 
   // Save height if provided and valid — triggers BMI/TDEE recalculation
   if (!isNaN(height) && height >= 100 && height <= 250) {
     state.height = height;
     localStorage.setItem('fitlog_height', height);
+  }
+
+  if (goalChanged) {
+    // Reset target weight — old target is in the wrong direction for the new mode
+    state.targetWeight = null;
+    state.targetWeightInput = '';
+    localStorage.removeItem('fitlog_target_weight');
+
+    // Reset manual calorie goal — old goal was optimized for the previous mode
+    state.calorieGoalManual = false;
+    localStorage.removeItem('fitlog_goal_manual');
+
+    // Clear stale AI weekly summary — it was generated for the previous mode
+    state.weeklySummary = null;
+
+    // Clear today's nutrition score — it was graded against the previous mode's logic
+    state.nutritionScore = null;
+    localStorage.removeItem(SCORE_KEY + state.date);
   }
 
   autoCalorieGoal();
@@ -1308,11 +1340,18 @@ function calcTDEE(w, h, age, gender, activity) {
 }
 
 function calcRecommendedGoal() {
-  // Shared BMI-based calorie goal recommendation — used by drawer, zdravlje tab, and autoCalorieGoal
+  // Shared calorie goal recommendation — branches by fitnessGoal mode
   const w = state.weight, h = state.height;
   if (!w || !h) return null;
   const tdee = calcTDEE(w, h, state.age, state.gender, state.activity);
   if (!tdee) return null;
+
+  if (state.fitnessGoal === 'gain') {
+    // Moderate lean-gain surplus: +300 kcal above TDEE
+    return Math.round(tdee + 300);
+  }
+
+  // Default: 'lose' — BMI-based calorie deficit
   const bmiVal = w / Math.pow(h / 100, 2);
   const deficit = bmiVal >= 35 ? 1000 : bmiVal >= 30 ? 750 : bmiVal >= 25 ? 500 : 250;
   const floor   = state.gender === 'male' ? 1500 : 1200;
@@ -1371,7 +1410,11 @@ function ringHTML(consumed, burned, goal) {
   const r = 68, cx = 80, cy = 80;
   const circ = 2 * Math.PI * r;
   const dash = circ * pct;
-  const color = net > goal ? 'var(--red)' : 'var(--green)';
+  // For gain mode: being above goal (surplus) is good — green; for lose: it's bad — red
+  const overGoal = net > goal;
+  const color = overGoal
+    ? (state.fitnessGoal === 'gain' ? 'var(--green)' : 'var(--red)')
+    : 'var(--green)';
   return `
     <div class="ring-wrap" style="width:160px;height:160px">
       <svg width="160" height="160" style="transform:rotate(-90deg)">
@@ -1489,17 +1532,20 @@ function calcStreak() {
     return consumed - exBurned - workoutBurned;
   }
 
-  // Check if today counts
+  // Check if today counts — condition differs by fitnessGoal mode
   const todayNet = getDayNet(todayStr());
-  const todayInDeficit = todayNet !== null && todayNet < state.calorieGoal;
+  const todayOnTarget = state.fitnessGoal === 'gain'
+    ? todayNet !== null && todayNet >= state.calorieGoal   // gain: surplus = on target
+    : todayNet !== null && todayNet < state.calorieGoal;   // lose/maintain: deficit = on target
 
-  for (let i = todayInDeficit ? 0 : 1; i < 365; i++) {
+  for (let i = todayOnTarget ? 0 : 1; i < 365; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = localDateStr(d);
     const net = getDayNet(dateStr);
     if (net === null) break;
-    if (net < state.calorieGoal) streak++;
+    const onTarget = state.fitnessGoal === 'gain' ? net >= state.calorieGoal : net < state.calorieGoal;
+    if (onTarget) streak++;
     else break;
   }
   return streak;
@@ -1518,8 +1564,9 @@ function weekChartHTML(weekData) {
     const heightPct = d.hasData ? Math.max(4, (d.net / maxNet) * 100) : 4;
     // Today: full opacity; past with data: 0.85; past no data: 0.3; future: 0.12
     const opacity = isToday ? 1 : d.future ? 0.12 : d.hasData ? 0.85 : 0.3;
-    // Future bars use s3, past no-data s5, today/past with data use green/red
-    const color = d.future ? 'var(--s5)' : !d.hasData ? 'var(--s6)' : d.net < goal ? 'var(--green)' : 'var(--red)';
+    // Future bars use s3, past no-data s5, today/past with data use green/red based on goal mode
+    const onTarget = state.fitnessGoal === 'gain' ? d.net >= goal : d.net < goal;
+    const color = d.future ? 'var(--s5)' : !d.hasData ? 'var(--s6)' : onTarget ? 'var(--green)' : 'var(--red)';
     // Today gets a subtle top border highlight
     const todayStyle = isToday ? 'outline:1.5px solid var(--green);outline-offset:-1px;border-radius:4px 4px 0 0;' : '';
     const kcalLabel = d.hasData ? (d.net >= 1000 ? Math.round(d.net/100)/10 + 'k' : Math.round(d.net)) : '';
@@ -1538,7 +1585,13 @@ function weekChartHTML(weekData) {
   const daysWithData = weekData.filter(d => d.hasData && !d.future);
   const avgNet = daysWithData.length ? Math.round(daysWithData.reduce((s, d) => s + d.net, 0) / daysWithData.length) : 0;
   const deficitDays = daysWithData.filter(d => d.net < goal).length;
-  const avgColor = avgNet < goal ? 'var(--green)' : 'var(--red)';
+  const surplusDays = daysWithData.length - deficitDays;
+  const isGainMode  = state.fitnessGoal === 'gain';
+  const onTargetDays = isGainMode ? surplusDays : deficitDays;
+  // avgNet color: for gain green = above goal; for lose green = below goal
+  const avgColor = isGainMode
+    ? (avgNet >= goal ? 'var(--green)' : 'var(--red)')
+    : (avgNet < goal ? 'var(--green)' : 'var(--red)');
 
   return `
     <div class="week-chart">
@@ -1554,12 +1607,16 @@ function weekChartHTML(weekData) {
           <div class="week-avg-label">prosek kcal</div>
         </div>
         <div class="week-avg-item">
-          <div class="week-avg-val" style="color:var(--green)">${deficitDays}/${daysWithData.length}</div>
-          <div class="week-avg-label">dana u deficitu</div>
+          <div class="week-avg-val" style="color:var(--green)">${onTargetDays}/${daysWithData.length}</div>
+          <div class="week-avg-label">${isGainMode ? 'dana u suficitu' : 'dana u deficitu'}</div>
         </div>
         <div class="week-avg-item">
-          <div class="week-avg-val" style="color:${avgNet < goal ? 'var(--green)' : 'var(--red)'}">
-            ${avgNet > 0 ? (avgNet < goal ? '✓ deficit' : '✗ višak') : '-'}
+          <div class="week-avg-val" style="color:${avgColor}">
+            ${avgNet > 0
+              ? (isGainMode
+                  ? (avgNet >= goal ? '✓ suficit' : '✗ deficit')
+                  : (avgNet < goal ? '✓ deficit' : '✗ višak'))
+              : '-'}
           </div>
           <div class="week-avg-label">nedeljni status</div>
         </div>
@@ -1615,7 +1672,9 @@ function historyDayDetailHTML(date) {
   const inDeficit = net < goal;
   const deficit = goal - net;
   const pct = Math.min(100, (net / goal) * 100);
-  const barColor = inDeficit ? 'var(--green)' : 'var(--red)';
+  // For gain mode: being above goal (surplus, not in deficit) is good — green
+  const onTarget = state.fitnessGoal === 'gain' ? !inDeficit : inDeficit;
+  const barColor = onTarget ? 'var(--green)' : 'var(--red)';
 
   const dObj = new Date(date + 'T12:00:00');
   const dayNum = dObj.getDate();
@@ -1712,7 +1771,7 @@ function historyDayDetailHTML(date) {
     <div class="hist-progress-labels">
       <span>Uneseno: <strong style="color:var(--text)">${Math.round(consumed)}</strong></span>
       <span>Sagoreno: <strong style="color:var(--blue)">${Math.round(totalBurned)}</strong></span>
-      <span style="color:${inDeficit?'var(--green)':'var(--red)'}">
+      <span style="color:${onTarget?'var(--green)':'var(--red)'}">
         ${inDeficit ? '↓ ' + Math.abs(Math.round(deficit)) : '↑ +' + Math.abs(Math.round(deficit))} kcal
       </span>
     </div>
@@ -1933,13 +1992,20 @@ function historyTabHTML() {
     const monthEntries = byMonth[month];
     const monthAvg = Math.round(monthEntries.reduce((s, e) => s + e.net, 0) / monthEntries.length);
     const monthDeficit = monthEntries.filter(e => e.net < goal).length;
-    const avgColor = monthAvg < goal ? 'var(--green)' : 'var(--red)';
+    const monthSurplus = monthEntries.length - monthDeficit;
+    // For gain mode: green = above goal (surplus); for lose: green = below goal (deficit)
+    const avgColor = state.fitnessGoal === 'gain'
+      ? (monthAvg >= goal ? 'var(--green)' : 'var(--red)')
+      : (monthAvg < goal ? 'var(--green)' : 'var(--red)');
+    const onTargetCount = state.fitnessGoal === 'gain' ? monthSurplus : monthDeficit;
 
     const rows = monthEntries.map(e => {
       const isToday = e.date === todayDate;
       const inDeficit = e.net < goal;
-      const dotColor = inDeficit ? 'var(--green)' : 'var(--red)';
-      const netColor = inDeficit ? 'var(--green)' : 'var(--red)';
+      // For gain: being above goal (surplus) = good = green; for lose: deficit = good = green
+      const onTarget = state.fitnessGoal === 'gain' ? !inDeficit : inDeficit;
+      const dotColor = onTarget ? 'var(--green)' : 'var(--red)';
+      const netColor = onTarget ? 'var(--green)' : 'var(--red)';
       const dayNum = e.date.slice(8).replace(/^0/, '');
       const dayLabel = `${dayNum}.${e.date.slice(5,7)}.`;
       const score = loadNutritionScore(e.date);
@@ -1959,7 +2025,7 @@ function historyTabHTML() {
     html += `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
         <span>${monthLabel}</span>
-        <span style="color:${avgColor};font-size:12px;font-weight:600">${monthDeficit}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
+        <span style="color:${avgColor};font-size:12px;font-weight:600">${onTargetCount}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
       </div>
       ${rows}
     </div>`;
@@ -2182,7 +2248,12 @@ function weeklyReportHTML(weekData) {
   const avgConsumed   = Math.round(totalConsumed / daysWithData.length);
   const avgBurned     = Math.round(totalBurned / daysWithData.length);
   const avgNet        = Math.round(totalNet / daysWithData.length);
+  // For gain mode, "good" days are when net >= goal (surplus achieved)
+  const isGainMode = state.fitnessGoal === 'gain';
   const deficitDays   = daysWithData.filter(d => d.net < (d.goal || goal)).length;
+  const surplusDays   = daysWithData.length - deficitDays;
+  // Grade is based on days on-target: deficit days for lose/maintain, surplus days for gain
+  const onTargetDays  = isGainMode ? surplusDays : deficitDays;
   const avgDeficit    = Math.round(goal - avgNet);
   const projectedLoss = ((avgDeficit * 7) / KCAL_PER_KG_FAT).toFixed(2);
 
@@ -2192,7 +2263,7 @@ function weeklyReportHTML(weekData) {
   const avgFat     = Math.round(daysWithData.reduce((s, d) => s + (d.fat     || 0), 0) / daysWithData.length);
 
   // Grade
-  const deficitRatio = deficitDays / daysWithData.length;
+  const deficitRatio = onTargetDays / daysWithData.length;
   const grade = deficitRatio >= 0.86 ? { emoji: '🏆', label: 'Odlično!', color: 'var(--green)' }
               : deficitRatio >= 0.57 ? { emoji: '💪', label: 'Dobro', color: 'var(--green)' }
               : deficitRatio >= 0.29 ? { emoji: '😐', label: 'Može bolje', color: 'var(--orange)' }
@@ -2234,7 +2305,8 @@ function weeklyReportHTML(weekData) {
     const goalPct = Math.min(97, (dayGoal / maxNet) * 100);
     const delta   = Math.round(d.net - dayGoal);
     const inDef   = delta < 0;
-    const color   = inDef ? 'var(--green)' : 'var(--red)';
+    // For gain mode: being above goal (surplus, delta > 0) is good = green
+    const color   = isGainMode ? (!inDef ? 'var(--green)' : 'var(--red)') : (inDef ? 'var(--green)' : 'var(--red)');
     const deltaStr = inDef ? `−${Math.abs(delta)}` : `+${delta}`;
     const clickable = isCurrentWeek ? `onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer"` : '';
 
@@ -2253,8 +2325,8 @@ function weeklyReportHTML(weekData) {
       </div>`;
   }).join('');
 
-  // Stats object passed to AI summary (serialized as JSON in onclick)
-  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss };
+  // Stats object passed to AI summary — deficitDays reinterpreted as on-target days per mode
+  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays: onTargetDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss };
   const statsJson = JSON.stringify(statsForAI).replace(/'/g, "\\'");
 
   // AI summary section — shows button, loading state, or cached result
@@ -2273,7 +2345,9 @@ function weeklyReportHTML(weekData) {
       ${navHTML}
       <div class="report-grade">${grade.emoji}</div>
       <div class="report-grade-label" style="color:${grade.color}">${grade.label}</div>
-      <div class="report-grade-sub">${deficitDays} od ${daysWithData.length} dana ispod cilja</div>
+      <div class="report-grade-sub">${isGainMode
+        ? `${surplusDays} od ${daysWithData.length} dana u suficitu`
+        : `${deficitDays} od ${daysWithData.length} dana ispod cilja`}</div>
       ${aiSummaryHTML}
     </div>
 
@@ -2289,20 +2363,34 @@ function weeklyReportHTML(weekData) {
       </div>
       <div class="report-stat">
         <span class="report-stat-label">Prosečan neto</span>
-        <span class="report-stat-val" style="color:${avgNet < goal ? 'var(--green)' : 'var(--red)'}">${avgNet} kcal</span>
+        <span class="report-stat-val" style="color:${
+          isGainMode
+            ? (avgNet >= goal ? 'var(--green)' : 'var(--red)')
+            : (avgNet < goal ? 'var(--green)' : 'var(--red)')
+        }">${avgNet} kcal</span>
       </div>
       <div class="report-stat">
-        <span class="report-stat-label">Prosečan deficit</span>
-        <span class="report-stat-val" style="color:${avgDeficit > 0 ? 'var(--green)' : 'var(--red)'}">${avgDeficit > 0 ? '-' : '+'}${Math.abs(avgDeficit)} kcal</span>
+        <span class="report-stat-label">${isGainMode ? 'Prosečan suficit/deficit' : 'Prosečan deficit'}</span>
+        <span class="report-stat-val" style="color:${
+          isGainMode
+            ? (avgDeficit < 0 ? 'var(--green)' : 'var(--orange)')   // gain: surplus=green, deficit=orange
+            : (avgDeficit > 0 ? 'var(--green)' : 'var(--red)')       // lose: deficit=green, surplus=red
+        }">
+          ${avgDeficit > 0 ? '-' : '+'}${Math.abs(avgDeficit)} kcal
+        </span>
       </div>
       <div class="report-stat">
         <span class="report-stat-label">Ukupno uneseno</span>
         <span class="report-stat-val" style="color:var(--muted)">${Math.round(totalConsumed)} kcal</span>
       </div>
       <div class="report-stat">
-        <span class="report-stat-label">Procenjen gubitak masti</span>
-        <span class="report-stat-val" style="color:${avgDeficit > 0 ? 'var(--green)' : 'var(--red)'}">
-          ${avgDeficit > 0 ? '~' + projectedLoss + ' kg' : 'Nema deficita'}
+        <span class="report-stat-label">${isGainMode ? 'Procenjen dobitak mase' : 'Procenjen gubitak masti'}</span>
+        <span class="report-stat-val" style="color:${isGainMode
+          ? (avgDeficit < 0 ? 'var(--green)' : 'var(--orange)')     // gain: surplus achieved=green
+          : (avgDeficit > 0 ? 'var(--green)' : 'var(--red)')}">     // lose: deficit achieved=green
+          ${isGainMode
+            ? (avgDeficit < 0 ? `~${Math.abs(parseFloat(projectedLoss))} kg` : 'Nema suficita')
+            : (avgDeficit > 0 ? `~${projectedLoss} kg` : 'Nema deficita')}
         </span>
       </div>
       <!-- Average weekly macros -->
@@ -2377,11 +2465,17 @@ function weightChartHTML(log) {
   const intercept = (sumY - slope * sumX) / n;
   const trendY0 = H - ((intercept - minW) / (maxW - minW)) * H;
   const trendY1 = H - ((intercept + slope * (n - 1) - minW) / (maxW - minW)) * H;
-  const trendColor = slope < -0.01 ? 'var(--green)' : slope > 0.01 ? 'var(--red)' : 'var(--muted)';
+  // For gain mode: rising slope is good (green); for lose: falling is good (green)
+  const trendColor = state.fitnessGoal === 'gain'
+    ? (slope > 0.01 ? 'var(--green)' : slope < -0.01 ? 'var(--red)' : 'var(--muted)')
+    : (slope < -0.01 ? 'var(--green)' : slope > 0.01 ? 'var(--red)' : 'var(--muted)');
   const trendLabel = slope < -0.01 ? '↘ trend pada' : slope > 0.01 ? '↗ trend raste' : '→ stabilan';
 
   const diff = entries[entries.length-1].weight - entries[0].weight;
-  const diffColor = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
+  // For gain mode: weight increase is positive (green); for lose: decrease is positive (green)
+  const diffColor = state.fitnessGoal === 'gain'
+    ? (diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--muted)')
+    : (diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)');
   return `
     <div class="weight-chart-wrap">
       <svg class="weight-chart-svg" viewBox="-10 -10 ${W+20} ${H+20}" height="90">
@@ -2417,10 +2511,11 @@ function zdravljeTabHTML() {
   // Starting weight — oldest log entry; shown only when 2+ measurements exist
   const startEntry = log.length >= 2 ? log[log.length - 1] : null;
   const weightDelta = startEntry && current ? +(current.weight - startEntry.weight).toFixed(1) : null;
+  // For gain mode: weight increase is good (green); for lose: decrease is good (green)
   const weightDeltaColor = weightDelta === null ? 'var(--muted)'
-    : weightDelta < 0 ? 'var(--green)'
-    : weightDelta > 0 ? 'var(--red)'
-    : 'var(--muted)';
+    : state.fitnessGoal === 'gain'
+      ? (weightDelta > 0 ? 'var(--green)' : weightDelta < 0 ? 'var(--red)' : 'var(--muted)')
+      : (weightDelta < 0 ? 'var(--green)' : weightDelta > 0 ? 'var(--red)' : 'var(--muted)');
   const weightDeltaStr = weightDelta !== null
     ? `${weightDelta > 0 ? '+' : ''}${weightDelta} kg`
     : '';
@@ -2495,7 +2590,7 @@ function zdravljeTabHTML() {
   if (!w || !h) {
     return `<div class="card" style="text-align:center;padding:32px 20px">
       <div style="font-size:36px;margin-bottom:12px">⚖️</div>
-      <div style="color:var(--muted);font-size:13px">Unesi težinu i visinu u Pregled tabu da vidiš zdravstvene podatke.</div>
+      <div style="color:var(--muted);font-size:13px">Unesi težinu ispod i visinu u ⚙ Podešavanjima da vidiš zdravstvene podatke.</div>
     </div>${waterSection}`;
   }
 
@@ -2512,8 +2607,10 @@ function zdravljeTabHTML() {
   const deficitAmount   = bmi >= 35 ? 1000 : bmi >= 30 ? 750 : bmi >= 25 ? 500 : 250;
   const minFloor        = state.gender === 'male' ? 1500 : 1200;
   const suggestedGoalRaw = Math.round(tdee - deficitAmount);
-  const floorApplied    = suggestedGoalRaw < minFloor;
-  const deficitLabel    = bmi >= 35 ? '−1000 kcal · BMI 35+'
+  const floorApplied    = state.fitnessGoal === 'lose' && suggestedGoalRaw < minFloor;
+  // Label for recommended goal — differs by fitnessGoal mode
+  const deficitLabel    = state.fitnessGoal === 'gain' ? '+300 kcal · gojenje'
+    : bmi >= 35 ? '−1000 kcal · BMI 35+'
     : bmi >= 30 ? '−750 kcal · BMI 30–35'
     : bmi >= 25 ? '−500 kcal · BMI 25–30'
     : '−250 kcal · blizu ideala';
@@ -2523,6 +2620,7 @@ function zdravljeTabHTML() {
   const tw = state.targetWeight;
   let progHTML = '';
   if (tw && tw < w) {
+    // Loss: target is below current weight
     const toTarget = w - tw;
     const weeklyDeficit = goal < tdee ? (tdee - goal) * 7 / KCAL_PER_KG_FAT : 0;
     const weeksNeeded = weeklyDeficit > 0 ? Math.ceil(toTarget / weeklyDeficit) : null;
@@ -2538,6 +2636,23 @@ function zdravljeTabHTML() {
         Procena: <strong style="color:var(--text)">~${weeksNeeded} nedelja</strong>
         (~${weeklyDeficit.toFixed(1)} kg/ned)</div>` :
         `<div style="margin-top:6px;font-size:12px;color:var(--orange)">Postavi kalorijski deficit za prognozu.</div>`}`;
+  } else if (tw && tw > w) {
+    // Gain: target is above current weight
+    const toTarget = tw - w;
+    const weeklySurplus = goal > tdee ? (goal - tdee) * 7 / KCAL_PER_KG_FAT : 0;
+    const weeksNeeded = weeklySurplus > 0 ? Math.ceil(toTarget / weeklySurplus) : null;
+    const startWeight = log.length > 1 ? log[log.length-1].weight : w;
+    const progressPct = startWeight < tw ? Math.min(100, Math.max(0, ((w - startWeight) / (tw - startWeight)) * 100)) : 0;
+    progHTML = `
+      <div class="prognoza-bar"><div class="prognoza-fill" style="width:${progressPct}%;background:var(--blue)"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px">
+        <span>Start: ${startWeight} kg</span>
+        <span style="color:var(--blue);font-weight:700">Cilj: ${tw} kg (još +${Math.round(tw - w)} kg)</span>
+      </div>
+      ${weeksNeeded ? `<div style="margin-top:8px;font-size:12px;color:var(--muted)">
+        Procena: <strong style="color:var(--text)">~${weeksNeeded} nedelja</strong>
+        (~${weeklySurplus.toFixed(1)} kg/ned)</div>` :
+        `<div style="margin-top:6px;font-size:12px;color:var(--orange)">Postavi kalorijski suficit za prognozu.</div>`}`;
   }
 
   const prev = log[1] || null;
@@ -2572,62 +2687,123 @@ function zdravljeTabHTML() {
       fatMax:  Math.round((suggestedGoal * 0.30) / 9),
       fatMin:  50,
     };
-    // Target weight ETA calculation
+    // Target weight ETA calculation — supports both loss (tw < w) and gain (tw > w)
     const twCardHTML = (() => {
-      if (!tw || tw >= w) return '';
-      const dailyDeficit = tdee - goal;
-      if (dailyDeficit <= 0) return `
-        <div class="card">
-          <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <span style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--green)">${tw} kg</span>
-            <span style="font-size:13px;color:var(--muted)">· ostalo <strong style="color:var(--text)">${(w - tw).toFixed(1)} kg</strong></span>
-          </div>
-          <div style="font-size:12px;color:var(--orange);background:rgba(255,179,71,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid var(--orange)">
-            ⚠ Tvoj cilj (${goal} kcal) je jednak ili viši od TDEE. Nema deficita — mršavljenje neće biti moguće.
-          </div>
-        </div>`;
-      const weeklyLoss   = (dailyDeficit * 7) / KCAL_PER_KG_FAT;
-      const weeksNeeded  = Math.ceil((w - tw) / weeklyLoss);
-      const eta          = new Date();
-      eta.setDate(eta.getDate() + weeksNeeded * 7);
-      const etaStr = eta.toLocaleDateString('sr-RS', { day: 'numeric', month: 'long', year: 'numeric' });
-      // startWeight: oldest log entry or current weight if only one measurement
-      const startWeight  = log.length > 1 ? log[log.length - 1].weight : w;
-      const progressPct  = startWeight > tw
-        ? Math.min(100, Math.round(((startWeight - w) / (startWeight - tw)) * 100))
-        : 0;
-      return `
-        <div class="card">
-          <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-            <div>
-              <div style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--green);line-height:1">${tw}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">kg cilj</div>
+      if (!tw) return '';
+
+      // Loss scenario
+      if (tw < w) {
+        const dailyDeficit = tdee - goal;
+        if (dailyDeficit <= 0) return `
+          <div class="card">
+            <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--green)">${tw} kg</span>
+              <span style="font-size:13px;color:var(--muted)">· ostalo <strong style="color:var(--text)">${(w - tw).toFixed(1)} kg</strong></span>
             </div>
-            <div style="flex:1">
-              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px">
-                <span>${w} kg</span><span style="color:var(--green)">${tw} kg</span>
+            <div style="font-size:12px;color:var(--orange);background:rgba(255,179,71,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid var(--orange)">
+              ⚠ Tvoj cilj (${goal} kcal) je jednak ili viši od TDEE. Nema deficita — mršavljenje neće biti moguće.
+            </div>
+          </div>`;
+        const weeklyLoss   = (dailyDeficit * 7) / KCAL_PER_KG_FAT;
+        const weeksNeeded  = Math.ceil((w - tw) / weeklyLoss);
+        const eta          = new Date();
+        eta.setDate(eta.getDate() + weeksNeeded * 7);
+        const etaStr = eta.toLocaleDateString('sr-RS', { day: 'numeric', month: 'long', year: 'numeric' });
+        const startWeight  = log.length > 1 ? log[log.length - 1].weight : w;
+        const progressPct  = startWeight > tw
+          ? Math.min(100, Math.max(0, Math.round(((startWeight - w) / (startWeight - tw)) * 100)))
+          : 0;
+        return `
+          <div class="card">
+            <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+              <div>
+                <div style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--green);line-height:1">${tw}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">kg cilj</div>
               </div>
-              <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden">
-                <div style="height:100%;width:${progressPct}%;background:var(--green);border-radius:3px"></div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px">
+                  <span>${w} kg</span><span style="color:var(--green)">${tw} kg</span>
+                </div>
+                <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${progressPct}%;background:var(--green);border-radius:3px"></div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:5px">ostalo: <span style="color:var(--text);font-weight:700">${(w - tw).toFixed(1)} kg</span></div>
               </div>
-              <div style="font-size:11px;color:var(--muted);margin-top:5px">ostalo: <span style="color:var(--text);font-weight:700">${(w - tw).toFixed(1)} kg</span></div>
             </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
-              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Dnevni deficit</div>
-              <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--green)">−${Math.round(dailyDeficit)} kcal</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">−${weeklyLoss.toFixed(2)} kg/ned</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Dnevni deficit</div>
+                <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--green)">−${Math.round(dailyDeficit)} kcal</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">−${weeklyLoss.toFixed(2)} kg/ned</div>
+              </div>
+              <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Procena cilja</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3">${etaStr}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">~${weeksNeeded} nedelja</div>
+              </div>
             </div>
-            <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
-              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Procena cilja</div>
-              <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3">${etaStr}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">~${weeksNeeded} nedelja</div>
+          </div>`;
+      }
+
+      // Gain scenario
+      if (tw > w) {
+        const dailySurplus = goal - tdee;
+        if (dailySurplus <= 0) return `
+          <div class="card">
+            <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--blue)">${tw} kg</span>
+              <span style="font-size:13px;color:var(--muted)">· ostalo <strong style="color:var(--text)">${(tw - w).toFixed(1)} kg</strong></span>
             </div>
-          </div>
-        </div>`;
+            <div style="font-size:12px;color:var(--orange);background:rgba(255,179,71,0.1);padding:10px 12px;border-radius:8px;border-left:3px solid var(--orange)">
+              ⚠ Tvoj cilj (${goal} kcal) je jednak ili niži od TDEE. Nema suficita — gojenje neće biti moguće.
+            </div>
+          </div>`;
+        const weeklyGain  = (dailySurplus * 7) / KCAL_PER_KG_FAT;
+        const weeksNeeded = Math.ceil((tw - w) / weeklyGain);
+        const eta         = new Date();
+        eta.setDate(eta.getDate() + weeksNeeded * 7);
+        const etaStr = eta.toLocaleDateString('sr-RS', { day: 'numeric', month: 'long', year: 'numeric' });
+        const startWeight = log.length > 1 ? log[log.length - 1].weight : w;
+        const progressPct = startWeight < tw
+          ? Math.min(100, Math.max(0, Math.round(((w - startWeight) / (tw - startWeight)) * 100)))
+          : 0;
+        return `
+          <div class="card">
+            <div class="card-label" style="margin-bottom:10px">🎯 Put do cilja</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+              <div>
+                <div style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--blue);line-height:1">${tw}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">kg cilj</div>
+              </div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px">
+                  <span>${w} kg</span><span style="color:var(--blue)">${tw} kg</span>
+                </div>
+                <div style="height:5px;background:var(--s4);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${progressPct}%;background:var(--blue);border-radius:3px"></div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:5px">ostalo: <span style="color:var(--text);font-weight:700">+${(tw - w).toFixed(1)} kg</span></div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Dnevni suficit</div>
+                <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--blue)">+${Math.round(dailySurplus)} kcal</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">+${weeklyGain.toFixed(2)} kg/ned</div>
+              </div>
+              <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Procena cilja</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3">${etaStr}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">~${weeksNeeded} nedelja</div>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      return '';
     })();
 
     return subNav + `
@@ -2658,13 +2834,24 @@ function zdravljeTabHTML() {
           <span style="font-size:10px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'};margin-left:6px">${state.calorieGoalManual ? 'ručno' : 'auto'}</span>
         </span>
         <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="zdravlje-stat-val" style="color:${goal <= suggestedGoal+100 ? 'var(--green)' : 'var(--orange)'}">
-            ${goal} kcal ${goal > suggestedGoal+100 ? '↑' : '✓'}
-          </span>
-          ${goal > suggestedGoal + 100 ? `
-          <button onclick="applyRecommendedGoal(${suggestedGoal})" style="background:var(--green);border:none;border-radius:7px;color:#0a0a0a;font-size:11px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:var(--sans);white-space:nowrap">
-            Primeni preporuku
-          </button>` : ''}
+          ${(() => {
+            // For gain/maintain: flag when goal is too low (below recommendation)
+            // For lose: flag when goal is too high (above recommendation)
+            const isOffTarget = state.fitnessGoal === 'lose'
+              ? goal > suggestedGoal + 100
+              : goal < suggestedGoal - 100;
+            const goalColor = isOffTarget ? 'var(--orange)' : 'var(--green)';
+            const goalArrow = isOffTarget
+              ? (state.fitnessGoal === 'lose' ? '↑' : '↓')
+              : '✓';
+            return `<span class="zdravlje-stat-val" style="color:${goalColor}">
+              ${goal} kcal ${goalArrow}
+            </span>
+            ${isOffTarget ? `
+            <button onclick="applyRecommendedGoal(${suggestedGoal})" style="background:var(--green);border:none;border-radius:7px;color:#0a0a0a;font-size:11px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:var(--sans);white-space:nowrap">
+              Primeni preporuku
+            </button>` : ''}`;
+          })()}
         </span>
       </div>
     </div>
@@ -2782,10 +2969,12 @@ function zdravljeTabHTML() {
             let dotColor = 'var(--s7)';
             if (i < log.length - 1) {
               const d = e.weight - log[i + 1].weight;
-              const c = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
-              const cAlpha = d < 0 ? 'rgba(143,212,46,0.13)' : d > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
+              // For gain mode: weight increase (d > 0) is good (green)
+              const isGood = state.fitnessGoal === 'gain' ? d > 0 : d < 0;
+              const c = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
+              const cAlpha = isGood ? 'rgba(143,212,46,0.13)' : d === 0 ? 'rgba(85,85,85,0.13)' : 'rgba(255,79,79,0.13)';
               diffBadge = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
-              dotColor = d < 0 ? 'var(--green)' : d > 0 ? 'var(--red)' : 'var(--muted)';
+              dotColor = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
             }
             const barPct = Math.max(10, Math.round(((e.weight - minW) / wRange) * 80) + 20);
             const isLatest = i === 0;
@@ -2816,7 +3005,7 @@ function zdravljeTabHTML() {
           <div style="flex:1;min-width:0">${progHTML}</div>
           <button onclick="clearTargetWeight()" style="background:none;border:1px solid var(--s6);border-radius:6px;color:var(--s10);padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0;white-space:nowrap">izmeni</button>
         </div>` :
-        `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">Postavi ciljnu težinu da vidiš prognozu mršavljenja.</div>`}
+        `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">${state.fitnessGoal === 'gain' ? 'Postavi ciljnu težinu da vidiš prognozu gojenja.' : 'Postavi ciljnu težinu da vidiš prognozu mršavljenja.'}</div>`}
       ${state.editTargetWeight ? `
         <div class="target-input-row">
           <span style="font-size:12px;color:var(--muted)">Cilj:</span>
@@ -2888,6 +3077,13 @@ function render() {
             <option value="active" ${state.activity==='active'?'selected':''}>Aktivan (6-7x nedeljno)</option>
           </select>
         </div>
+        <div class="onboard-field">
+          <div class="onboard-label">Cilj</div>
+          <select class="onboard-select" id="ob_goal">
+            <option value="lose"     ${state.fitnessGoal==='lose'    ?'selected':''}>🔥 Mršavljenje</option>
+            <option value="gain"     ${state.fitnessGoal==='gain'    ?'selected':''}>💪 Gojenje</option>
+          </select>
+        </div>
         <button class="onboard-btn" onclick="saveOnboarding()">POČNI →</button>
       </div>`;
     return;
@@ -2905,7 +3101,9 @@ function render() {
     const streakMsg = streak === 0
       ? 'Još nema niza. Počni danas!'
       : streak === 1 ? 'Odličan početak! Nastavi sutra.'
-      : `${streak} dana zaredom ispod cilja!`;
+      : state.fitnessGoal === 'gain'
+        ? `${streak} dana zaredom u suficitu!`
+        : `${streak} dana zaredom ispod cilja!`;
 
     statsContent = `
     <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px">
@@ -2917,7 +3115,7 @@ function render() {
       <div style="width:100%">
         <div class="goal-row" style="justify-content:center;margin-bottom:12px">
           Cilj: <strong style="font-family:var(--mono);color:var(--green);margin:0 4px">${state.calorieGoal}</strong> kcal
-          <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : 'BMI preporuka'}</span>
+          <span style="font-size:11px;color:${state.calorieGoalManual ? 'var(--orange)' : 'var(--blue)'}"> · ${state.calorieGoalManual ? 'ručno' : state.fitnessGoal === 'gain' ? 'auto · gojenje' : 'BMI preporuka'}</span>
         </div>
         <div class="stats-chain">
           <!-- Uneseno -->
@@ -2943,7 +3141,11 @@ function render() {
           <!-- Neto -->
           <div class="stats-chain-item">
             <div class="stat-label">Neto</div>
-            <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)'};font-size:18px">
+            <div class="stat-val" style="color:${
+              state.fitnessGoal === 'gain'
+                ? (t.net >= state.calorieGoal ? 'var(--green)' : 'var(--orange)')
+                : (t.net > state.calorieGoal ? 'var(--red)' : 'var(--green)')
+            };font-size:18px">
               ${Math.round(t.net)}
               <span style="color:var(--muted);font-size:10px">kcal</span>
             </div>
@@ -2951,9 +3153,16 @@ function render() {
         </div>
         <!-- Preostalo as result row below the chain -->
         <div class="stats-chain-result">
-          <div class="stat-label">Preostalo do cilja</div>
-          <div class="stat-val" style="color:${t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)'}">
-            ${t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net)}
+          <div class="stat-label">${state.fitnessGoal === 'gain' ? 'Preostalo do suficita' : 'Preostalo do cilja'}</div>
+          <div class="stat-val" style="color:${
+            state.fitnessGoal === 'gain'
+              ? (t.net >= state.calorieGoal ? 'var(--green)' : 'var(--text-secondary)')
+              : (t.net > state.calorieGoal ? 'var(--red)' : 'var(--text-secondary)')
+          }">
+            ${state.fitnessGoal === 'gain'
+              ? (t.net >= state.calorieGoal ? '✓ suficit +' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net))
+              : (t.net > state.calorieGoal ? '+' + Math.round(t.net - state.calorieGoal) : Math.round(state.calorieGoal - t.net))
+            }
             <span style="color:var(--muted);font-size:10px">kcal</span>
           </div>
         </div>
@@ -3058,8 +3267,9 @@ function render() {
 
   const hour = new Date().getHours();
 
-  const emptyMsg = hour < 11 ? 'Šta si pojeo za doručak?' :
-                   hour < 15 ? 'Vreme je za ručak! Šta si jeo?' :
+  const isFemale = state.gender === 'female';
+  const emptyMsg = hour < 11 ? `Šta si ${isFemale ? 'pojela' : 'pojeo'} za doručak?` :
+                   hour < 15 ? `Vreme je za ručak! Šta si ${isFemale ? 'jela' : 'jeo'}?` :
                    hour < 19 ? 'Dodaj popodnevni obrok ili vežbu.' :
                                 'Večernji unos zatvara dan.';
   const emptyIcon = hour < 11 ? '🌅' : hour < 15 ? '☀️' : hour < 19 ? '🌤' : '🌙';
@@ -3068,21 +3278,29 @@ function render() {
     <div class="empty">
       <span class="empty-icon">${emptyIcon}</span>
       <div class="empty-title">${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">${state.date === todayStr() ? 'Upiši šta si jeo ili sfotografiši obrok' : ''}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${state.date === todayStr() ? `Upiši šta si ${isFemale ? 'jela' : 'jeo'} ili fotografiši obrok` : ''}</div>
     </div>` : '';
 
   const placeholder = state.mode === 'food'
-    ? 'npr. jeo sam 200g pilećih prsa sa 100g pirinča...'
-    : 'npr. uradio sam 50 čučnjeva i prošetao 4000 koraka...';
+    ? `npr. ${isFemale ? 'jela sam' : 'jeo sam'} 200g pilećih prsa sa 100g pirinča...`
+    : `npr. ${isFemale ? 'uradila sam' : 'uradio sam'} 50 čučnjeva i ${isFemale ? 'prošetala' : 'prošetao'} 4000 koraka...`;
 
   const btnText = state.loading ? '⏳ Analiziram...' : state.mode === 'food' ? '+ Dodaj obrok' : '+ Dodaj vežbu';
 
   const progressPct = state.calorieGoal > 0 ? Math.min(100, (t.net / state.calorieGoal) * 100) : 0;
-  const progressColor = progressPct >= 100 ? 'var(--red)' : progressPct >= 85 ? 'var(--orange)' : 'var(--green)';
+  const isGainMode  = state.fitnessGoal === 'gain';
+  // For gain: reaching 100% is the goal (green); for lose: going over is bad (red/orange)
+  const progressColor = isGainMode
+    ? (progressPct >= 100 ? 'var(--green)' : progressPct >= 85 ? 'var(--blue)' : 'var(--green)')
+    : (progressPct >= 100 ? 'var(--red)' : progressPct >= 85 ? 'var(--orange)' : 'var(--green)');
   const remaining = state.calorieGoal - Math.round(t.net);
-  const progressLabel = progressPct >= 100
-    ? `<span style="color:var(--red);font-weight:700">+${Math.round(t.net - state.calorieGoal)} kcal preko cilja</span>`
-    : `<span style="color:${remaining < 200 ? 'var(--orange)' : 'var(--muted)'}">${remaining} kcal preostalo</span>`;
+  const progressLabel = isGainMode
+    ? (progressPct >= 100
+        ? `<span style="color:var(--green);font-weight:700">✓ suficit +${Math.round(t.net - state.calorieGoal)} kcal</span>`
+        : `<span style="color:${remaining < 200 ? 'var(--blue)' : 'var(--muted)'}">${remaining} kcal do suficita</span>`)
+    : (progressPct >= 100
+        ? `<span style="color:var(--red);font-weight:700">+${Math.round(t.net - state.calorieGoal)} kcal preko cilja</span>`
+        : `<span style="color:${remaining < 200 ? 'var(--orange)' : 'var(--muted)'}">${remaining} kcal preostalo</span>`);
 
   app.innerHTML = `
     <div class="header">
@@ -3584,13 +3802,20 @@ async function scoreNutrition() {
     ).join(' | ');
     const profile      = buildUserProfile();
     const overVerb = state.gender === 'female' ? 'Prešla' : 'Prešao';
+    // Status message adapts to the user's fitness goal (lose / gain)
+    const goalMode = state.fitnessGoal === 'gain' ? 'gojenje (kalorijski suficit)'
+      : 'mršavljenje (kalorijski deficit)';
     const deficitStatus = t.consumed < state.calorieGoal
-      ? `U kalorijskom deficitu ✓ (${state.calorieGoal - Math.round(t.consumed)} kcal ispod cilja).`
-      : `${overVerb} kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
+      ? state.fitnessGoal === 'gain'
+        ? `Ispod kalorijskog cilja za gojenje ⚠ (${state.calorieGoal - Math.round(t.consumed)} kcal nedostaje do suficita).`
+        : `U kalorijskom deficitu ✓ (${state.calorieGoal - Math.round(t.consumed)} kcal ispod cilja).`
+      : state.fitnessGoal === 'gain'
+        ? `Kalorijski suficit ✓ za gojenje (+${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`
+        : `${overVerb} kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
 
     const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
 ${profile}
-Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski minimum: ${ml.protMin}g.
+Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski minimum: ${ml.protMin}g. Cilj korisnika: ${goalMode}.
 Status danas: ${deficitStatus}
 Obroci: ${mealsSummary}
 Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
@@ -3638,6 +3863,7 @@ function saveOnboarding() {
   const age = parseInt(document.getElementById('ob_age')?.value);
   const gender = document.getElementById('ob_gender')?.value;
   const activity = document.getElementById('ob_activity')?.value;
+  const fitnessGoal = document.getElementById('ob_goal')?.value || 'lose';
 
   if (!w || !h || !age) { showToast('Unesi sve podatke', 'err'); return; }
 
@@ -3646,6 +3872,7 @@ function saveOnboarding() {
   state.age = age; localStorage.setItem('fitlog_age', age);
   state.gender = gender; localStorage.setItem('fitlog_gender', gender);
   state.activity = activity; localStorage.setItem('fitlog_activity', activity);
+  state.fitnessGoal = fitnessGoal; localStorage.setItem('fitlog_fitness_goal', fitnessGoal);
   localStorage.setItem('fitlog_onboarding_done', '1');
 
   // Save weight to log
@@ -3704,10 +3931,12 @@ async function scoreMeal(mealId) {
     const mealHour   = parseInt(meal.time?.split(':')[0]) || 12;
     const mealContext = mealHour < 10 ? 'doručak' : mealHour < 14 ? 'ručak' : mealHour < 18 ? 'užina' : 'večera';
 
-    // Build goal context from actual user state instead of hardcoding weight loss
+    // Build goal context from actual user state
+    const goalMode = state.fitnessGoal === 'gain' ? 'gojenje (kalorijski suficit)'
+      : 'mršavljenje (kalorijski deficit)';
     const goalContext = state.calorieGoalManual
-      ? `kalorijski cilj ${state.calorieGoal} kcal (ručno postavljeno)`
-      : `cilj mršavljenje, kalorijski cilj ${state.calorieGoal} kcal`;
+      ? `kalorijski cilj ${state.calorieGoal} kcal (ručno postavljeno), cilj: ${goalMode}`
+      : `cilj ${goalMode}, kalorijski cilj ${state.calorieGoal} kcal`;
 
     const profile = buildUserProfile();
 
