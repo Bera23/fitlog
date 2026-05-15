@@ -190,10 +190,10 @@
   .card-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
 
   /* MODE TOGGLE */
-  .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
-  .mode-btn { flex: 1; padding: 13px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; font-family: var(--sans); transition: background 0.15s var(--ease), color 0.15s var(--ease); min-height: 44px; }
-  .mode-btn.active { background: var(--green); color: var(--bg); }
-  .mode-btn.inactive { background: var(--s4); color: var(--s11); }
+  .mode-toggle { display: flex; gap: 4px; margin-bottom: 10px; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
+  .mode-btn { flex: 1; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; min-height: 44px; }
+  .mode-btn.active { background: var(--green); color: #0a0a0a; font-weight: 800; }
+  .mode-btn.inactive { background: transparent; color: var(--s11); }
 
   /* INPUT */
   .msg-input { width: 100%; background: var(--s1); border: 1px solid var(--s6); border-radius: 12px; color: var(--text); padding: 12px 14px; font-size: 14px; font-family: var(--sans); resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
