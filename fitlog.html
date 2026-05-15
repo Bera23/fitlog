@@ -3094,11 +3094,17 @@ function render() {
                                 'Večernji unos zatvara dan.';
   const emptyIcon = hour < 11 ? '🌅' : hour < 15 ? '☀️' : hour < 19 ? '🌤' : '🌙';
 
-  const emptyHTML = (!d.meals.length && !d.exercises.length) ? `
+  const emptyHTML = (state.mode === 'food' && !d.meals.length) ? `
     <div class="empty">
       <span class="empty-icon">${emptyIcon}</span>
       <div class="empty-title">${state.date === todayStr() ? emptyMsg : 'Nema unosa za ovaj dan.'}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px">${state.date === todayStr() ? `Upiši šta si ${isFemale ? 'jela' : 'jeo'} ili fotografiši obrok` : ''}</div>
+    </div>`
+  : (state.mode === 'exercise' && !d.exercises.length) ? `
+    <div class="empty">
+      <span class="empty-icon">💪</span>
+      <div class="empty-title">Nema unesenih vežbi.</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${state.date === todayStr() ? 'Opiši svoju vežbu iznad.' : ''}</div>
     </div>` : '';
 
   const placeholder = state.mode === 'food'
@@ -3225,8 +3231,8 @@ function render() {
               <div class="skeleton skeleton-pill"></div>
             </div>
           </div>` : ''}
-        ${mealsHTML}
-        ${exHTML}
+        ${state.mode === 'food' ? mealsHTML : ''}
+        ${state.mode === 'exercise' ? exHTML : ''}
         ${emptyHTML}
         ${d.meals.length ? `
           <div id="nutrition-score-card" class="card" style="padding:0;overflow:hidden">
