@@ -384,7 +384,7 @@
   .meal-time-badge { font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; min-width: 36px; }
   .meal-summary { flex: 1; font-size: 13px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meal-kcal-badge { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--green); white-space: nowrap; }
-  .meal-chevron { font-size: 11px; color: var(--s11); margin-left: 4px; transition: transform 0.2s var(--ease), color 0.15s; }
+  .meal-chevron { font-size: 18px; color: var(--s9); margin-left: 6px; transition: transform 0.2s var(--ease), color 0.15s; line-height: 1; }
   .meal-chevron.open { transform: rotate(180deg); color: var(--green); }
   /* Pills row — shown when collapsed, hidden when expanded */
   .meal-pills-row { padding: 0 16px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
@@ -489,8 +489,9 @@
     letter-spacing: 1.2px; text-transform: uppercase;
   }
   .drawer-acc-chevron {
-    font-size: 10px; color: var(--s11);
+    font-size: 16px; color: var(--s9);
     transition: transform 0.22s var(--ease);
+    line-height: 1;
   }
   .drawer-acc-chevron.open { transform: rotate(180deg); color: var(--green); }
   .drawer-acc-body {
@@ -1665,7 +1666,7 @@ function historyDayDetailHTML(date) {
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${ms ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${ms.score>=7?'var(--green)':ms.score>=5?'var(--orange)':'var(--red)'}">${ms.score}/10</span>` : ''}
           <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--green)">${Math.round(m.calories)}</span>
-          <span class="hist-meal-chevron" style="color:var(--muted);font-size:11px">${isExp ? '▲' : '▼'}</span>
+          <span class="hist-meal-chevron" style="color:var(--s9);font-size:18px;line-height:1">${isExp ? '▲' : '▼'}</span>
         </div>
       </div>
       <!-- Collapsed view: macro pills — hidden when .expanded -->
@@ -1974,7 +1975,7 @@ function historyTabHTML() {
         <div style="display:flex;align-items:center;gap:6px">
           ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
           <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
-          <span style="font-size:16px;color:var(--s11);font-weight:300">›</span>
+          <span style="font-size:20px;color:var(--s8);font-weight:400;line-height:1">›</span>
         </div>
       </div>`;
     }).join('');
@@ -3279,10 +3280,7 @@ function render() {
                 <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:${state.nutritionScoreCollapsed ? '0' : '12px'}">
                   <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
                   <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                  <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
-                    <button onclick="scoreNutrition()" title="Oceni ponovo" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">↺</button>
-                    <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
-                  </div>
+                  <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="margin-left:auto;background:none;border:none;color:var(--s9);cursor:pointer;font-size:20px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
                 </div>
                 ${state.nutritionScoreCollapsed ? '' : `
                 <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
@@ -3290,6 +3288,7 @@ function render() {
                 <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
                 <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
                 <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
+                <button onclick="scoreNutrition()" style="margin-top:14px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:40px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='none'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='none'">↺ Ponovo oceni</button>
                 `}
               </div>` : `
               <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
@@ -3789,16 +3788,14 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
             <div class="score-num" style="color:${scoreColor}">${score.score}</div>
             <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-            <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
-              <button onclick="scoreNutrition()" title="Oceni ponovo" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">↺</button>
-              <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:16px;padding:4px 6px;line-height:1">▾</button>
-            </div>
+            <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="margin-left:auto;background:none;border:none;color:var(--s9);cursor:pointer;font-size:20px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">▾</button>
           </div>
           <div class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
           <div class="score-row"><span>${score.fat}</span></div>
           <div class="score-row"><span>${score.sugar}</span></div>
           <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${score.tip}</div>
+          <button onclick="scoreNutrition()" style="margin-top:14px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:40px">↺ Ponovo oceni</button>
         </div>`;
     }
   } catch(e) {
