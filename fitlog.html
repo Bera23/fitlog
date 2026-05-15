@@ -3276,21 +3276,28 @@ function render() {
                 🤖 AI analizira tvoj unos...
               </div>` :
             state.nutritionScore ? `
-              <div style="padding:16px">
-                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:${state.nutritionScoreCollapsed ? '0' : '12px'}">
-                  <div class="score-num" style="color:${state.nutritionScore.score >= 7 ? 'var(--green)' : state.nutritionScore.score >= 5 ? 'var(--orange)' : 'var(--red)'}">${state.nutritionScore.score}</div>
-                  <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-                  <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="margin-left:auto;background:none;border:none;color:var(--s9);cursor:pointer;font-size:20px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
-                </div>
-                ${state.nutritionScoreCollapsed ? '' : `
-                <div class="score-row"><span>${state.nutritionScore.calories}</span></div>
-                <div class="score-row"><span>${state.nutritionScore.protein}</span></div>
-                <div class="score-row"><span>${state.nutritionScore.fat}</span></div>
-                <div class="score-row"><span>${state.nutritionScore.sugar}</span></div>
-                <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${state.nutritionScore.tip}</div>
+              ${(() => {
+                const sc = state.nutritionScore;
+                const scoreColor = sc.score >= 7 ? 'var(--green)' : sc.score >= 5 ? 'var(--orange)' : 'var(--red)';
+                const pct = sc.score * 10;
+                const barColor = sc.score >= 7 ? '#8fd42e' : sc.score >= 5 ? '#ffb347' : '#ff4f4f';
+                return `
+              <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
+              <div class="score-header-row" style="padding:13px 16px;display:flex;align-items:center;gap:10px">
+                <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${sc.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
+                <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
+                <button class="score-chevron-btn" onclick="toggleNutritionScore()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
+              </div>
+              <div class="score-body" style="display:${state.nutritionScoreCollapsed ? 'none' : 'block'};padding:0 16px 16px;border-top:1px solid var(--s3)">
+                <div style="height:12px"></div>
+                <div class="score-row"><span>${sc.calories}</span></div>
+                <div class="score-row"><span>${sc.protein}</span></div>
+                <div class="score-row"><span>${sc.fat}</span></div>
+                <div class="score-row"><span>${sc.sugar}</span></div>
+                <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${sc.tip}</div>
                 <button onclick="scoreNutrition()" style="margin-top:14px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:40px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='none'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='none'">↺ Ponovo oceni</button>
-                `}
-              </div>` : `
+              </div>`;
+              })()}` : `
               <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
           </div>` : ''}
       `}
@@ -3783,13 +3790,17 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
     const resultCard = getCard();
     if (resultCard) {
       const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      const pct = score.score * 10;
+      const barColor = score.score >= 7 ? '#8fd42e' : score.score >= 5 ? '#ffb347' : '#ff4f4f';
       resultCard.innerHTML = `
-        <div style="padding:16px">
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
-            <div class="score-num" style="color:${scoreColor}">${score.score}</div>
-            <div style="font-size:13px;color:var(--muted)">/10 — kvalitet ishrane</div>
-            <button onclick="state.nutritionScoreCollapsed=!state.nutritionScoreCollapsed;scheduleRender()" style="margin-left:auto;background:none;border:none;color:var(--s9);cursor:pointer;font-size:20px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">▾</button>
-          </div>
+        <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
+        <div class="score-header-row" style="padding:13px 16px;display:flex;align-items:center;gap:10px">
+          <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${score.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
+          <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
+          <button class="score-chevron-btn" onclick="toggleNutritionScore()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">▾</button>
+        </div>
+        <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
+          <div style="height:12px"></div>
           <div class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
           <div class="score-row"><span>${score.fat}</span></div>
@@ -3955,6 +3966,25 @@ function toggleHistoryMeal(id) {
   if (chevron) chevron.textContent = isExpanded ? '▲' : '▼';
   if (isExpanded) state.expandedHistoryMealIds.add(id);
   else state.expandedHistoryMealIds.delete(id);
+}
+
+// Toggle expand/collapse of the daily nutrition score card — DOM-only, no render
+function toggleNutritionScore() {
+  state.nutritionScoreCollapsed = !state.nutritionScoreCollapsed;
+
+  const card = document.getElementById('nutrition-score-card');
+  if (!card) return;
+
+  const body = card.querySelector('.score-body');
+  const btn  = card.querySelector('.score-chevron-btn');
+
+  if (state.nutritionScoreCollapsed) {
+    if (body) body.style.display = 'none';
+    if (btn)  btn.textContent = '▸';
+  } else {
+    if (body) body.style.display = 'block';
+    if (btn)  btn.textContent = '▾';
+  }
 }
 
 function toggleHistoryScore(date) {
