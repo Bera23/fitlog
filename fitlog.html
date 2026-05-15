@@ -2205,7 +2205,8 @@ function weeklyReportHTML(weekData) {
         <span class="report-stat-label">${isGainMode ? 'Procenjen dobitak mase' : 'Procenjen gubitak masti'}</span>
         <span class="report-stat-val" style="color:${isGainMode
           ? (avgDeficit < 0 ? 'var(--green)' : 'var(--orange)')     // gain: surplus achieved=green
-          : (avgDeficit > 0 ? 'var(--green)' : 'var(--red)')}">     // lose: deficit achieved=green
+          : (avgDeficit > 0 ? 'var(--green)' : 'var(--red)')        // lose: deficit achieved=green
+        }">
           ${isGainMode
             ? (avgDeficit < 0 ? `~${Math.abs(parseFloat(projectedLoss))} kg` : 'Nema suficita')
             : (avgDeficit > 0 ? `~${projectedLoss} kg` : 'Nema deficita')}
