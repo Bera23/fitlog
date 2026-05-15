@@ -95,12 +95,14 @@
   .report-stat:last-child { border-bottom: none; }
   .report-stat-label { font-size: 13px; color: var(--muted); }
   .report-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; }
-  .report-day-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--s2); font-size: 13px; }
+  .report-day-row { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid var(--s3); }
   .report-day-row:last-child { border-bottom: none; }
-  .report-day-name { color: var(--muted); min-width: 28px; font-family: var(--mono); }
-  .report-day-bar-wrap { flex: 1; height: 7px; background: var(--s4); border-radius: 99px; overflow: hidden; }
-  .report-day-bar { height: 100%; border-radius: 99px; }
-  .report-day-val { min-width: 50px; text-align: right; font-family: var(--mono); font-weight: 700; font-size: 11px; }
+  .report-day-name { font-family: var(--mono); font-size: 12px; font-weight: 700; min-width: 22px; }
+  .report-day-bar-wrap { flex: 1; position: relative; height: 5px; }
+  /* Three number columns: consumed | burned | delta */
+  .rdr-consumed { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); min-width: 34px; text-align: right; }
+  .rdr-burned   { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--blue); min-width: 26px; text-align: right; }
+  .rdr-delta    { font-family: var(--mono); font-size: 11px; font-weight: 700; min-width: 36px; text-align: right; }
   .report-grade { font-size: 48px; text-align: center; margin: 8px 0 4px; }
   .report-grade-label { text-align: center; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
   .report-grade-sub { text-align: center; font-size: 13px; color: var(--muted); }
@@ -2087,59 +2089,61 @@ function weeklyReportHTML(weekData) {
               : deficitRatio >= 0.29 ? { emoji: '😐', label: 'Može bolje', color: 'var(--orange)' }
               : { emoji: '😔', label: 'Treba raditi', color: 'var(--red)' };
 
+  // Scale bar by consumed (not net) so burn doesn't shrink the bar
+  const maxConsumed = Math.max(goal * 1.1, ...weekData.map(d => d.consumed));
   const dayNames = ['Ne', 'Po', 'Ut', 'Sr', 'Če', 'Pe', 'Su'];
-  // maxNet accounts for per-day goals (via goalSnapshot) for correct bar scaling
-  const maxNet = Math.max(...weekData.map(d => Math.max(d.net, d.goal || goal)), 1);
 
   const dayRows = weekData.map(d => {
     const dayObj = new Date(d.date + 'T12:00:00');
     const name = dayNames[dayObj.getDay()];
-    // Use per-day snapshotted goal, fall back to current week goal
     const dayGoal = d.goal || goal;
+    const isToday = !d.future && d.date === todayStr();
 
     if (d.future) return `
       <div class="report-day-row">
         <span class="report-day-name" style="color:var(--s6)">${name}</span>
-        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
-          <div style="height:100%;width:0%;background:var(--s4);border-radius:4px"></div>
+        <div class="report-day-bar-wrap">
+          <div style="position:absolute;inset:0;background:var(--s4);border-radius:99px"></div>
         </div>
-        <span class="report-day-val" style="color:var(--s6);min-width:36px;text-align:right">—</span>
-        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--s6)"></span>
+        <span class="rdr-consumed" style="color:var(--s6)">—</span>
+        <span class="rdr-burned"></span>
+        <span class="rdr-delta"></span>
       </div>`;
 
     if (!d.hasData) return `
       <div class="report-day-row">
         <span class="report-day-name" style="color:var(--s7)">${name}</span>
-        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
-          <div style="height:100%;width:100%;background:var(--s3);border-radius:4px"></div>
-          <!-- Goal line marker -->
-          <div style="position:absolute;top:0;bottom:0;left:${Math.min(97, (dayGoal / maxNet) * 100)}%;width:2px;background:var(--s7);border-radius:1px"></div>
+        <div class="report-day-bar-wrap">
+          <div style="position:absolute;inset:0;background:var(--s3);border-radius:99px"></div>
+          <div style="position:absolute;top:-3px;bottom:-3px;left:${Math.min(97,(dayGoal/maxConsumed)*100)}%;width:1.5px;background:rgba(255,255,255,0.15);border-radius:1px"></div>
         </div>
-        <span class="report-day-val" style="color:var(--s7);min-width:36px;text-align:right">—</span>
-        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--s7)"></span>
+        <span class="rdr-consumed" style="color:var(--s7)">—</span>
+        <span class="rdr-burned"></span>
+        <span class="rdr-delta"></span>
       </div>`;
 
-    const pct     = Math.min(100, (d.net / maxNet) * 100);
-    const goalPct = Math.min(97, (dayGoal / maxNet) * 100);
-    const delta   = Math.round(d.net - dayGoal);
-    const inDef   = delta < 0;
-    // For gain mode: being above goal (surplus, delta > 0) is good = green
-    const color   = isGainMode ? (!inDef ? 'var(--green)' : 'var(--red)') : (inDef ? 'var(--green)' : 'var(--red)');
+    const consumedPct = Math.min(100, (d.consumed / maxConsumed) * 100);
+    const goalPct     = Math.min(97,  (dayGoal    / maxConsumed) * 100);
+    const delta       = Math.round(d.net - dayGoal);
+    const inDef       = delta < 0;
+    // For gain mode: surplus (delta > 0) is good = green
+    const color = isGainMode ? (!inDef ? 'var(--green)' : 'var(--red)') : (inDef ? 'var(--green)' : 'var(--red)');
     const deltaStr = inDef ? `−${Math.abs(delta)}` : `+${delta}`;
-    const clickable = isCurrentWeek ? `onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="cursor:pointer"` : '';
+    const todayStyle = isToday ? 'background:rgba(143,212,46,0.05);margin:0 -16px;padding:7px 16px;' : '';
+    const clickable = isCurrentWeek ? `onclick="setTab('history');state.selectedHistoryDate='${d.date}';scheduleRender()" style="${todayStyle}cursor:pointer"` : (todayStyle ? `style="${todayStyle}"` : '');
 
     return `
       <div class="report-day-row" ${clickable}>
-        <span class="report-day-name" style="color:${color}">${name}</span>
-        <div class="report-day-bar-wrap" style="height:20px;position:relative;overflow:hidden;border-radius:4px">
-          <!-- Bar fill -->
-          <div style="position:absolute;inset:0;background:var(--s3);border-radius:4px"></div>
-          <div style="position:absolute;top:0;bottom:0;left:0;width:${pct}%;background:${color}44;border-radius:4px;transition:width 0.4s ease"></div>
-          <!-- Goal line -->
-          <div style="position:absolute;top:0;bottom:0;left:${goalPct}%;width:2px;background:rgba(255,255,255,0.4);border-radius:1px"></div>
+        <span class="report-day-name" style="color:${color}">${name}${isToday ? '<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green);margin-left:2px;vertical-align:middle;margin-bottom:1px"></span>' : ''}</span>
+        <div class="report-day-bar-wrap">
+          <div style="position:absolute;inset:0;background:var(--s4);border-radius:99px"></div>
+          <div style="position:absolute;top:0;bottom:0;left:0;width:${consumedPct}%;background:${color}33;border-radius:99px;transition:width 0.4s ease"></div>
+          <div style="position:absolute;top:-3px;bottom:-3px;left:${goalPct}%;width:1.5px;background:rgba(255,255,255,0.2);border-radius:1px"></div>
+          <div style="position:absolute;top:50%;left:${consumedPct}%;width:8px;height:8px;border-radius:50%;background:${color};transform:translate(-50%,-50%);border:1.5px solid var(--card)"></div>
         </div>
-        <span class="report-day-val" style="color:${color};min-width:36px;text-align:right">${Math.round(d.net)}</span>
-        <span style="min-width:42px;text-align:right;font-family:var(--mono);font-size:10px;font-weight:700;color:${color}">${deltaStr}</span>
+        <span class="rdr-consumed">${Math.round(d.consumed)}</span>
+        <span class="rdr-burned" style="color:${d.burned > 0 ? 'var(--blue)' : 'var(--muted)'}">${d.burned > 0 ? Math.round(d.burned) : '—'}</span>
+        <span class="rdr-delta" style="color:${color}">${deltaStr}</span>
       </div>`;
   }).join('');
 
@@ -2234,8 +2238,16 @@ function weeklyReportHTML(weekData) {
 
     <div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Dani — neto kalorije</span>
+        <span>Kalorije po danu</span>
         <span style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.3px;font-family:var(--mono)">${weekLabel}</span>
+      </div>
+      <!-- Column headers -->
+      <div style="display:flex;align-items:center;gap:6px;padding-bottom:6px;border-bottom:1px solid var(--s3);margin-bottom:0">
+        <span style="min-width:22px"></span>
+        <div style="flex:1"></div>
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;min-width:34px;text-align:right">Unos</span>
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;min-width:26px;text-align:right">Sag.</span>
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;min-width:36px;text-align:right">Delta</span>
       </div>
       ${dayRows}
       ${isCurrentWeek ? '<div style="display:flex;justify-content:flex-end;margin-top:8px"><span style="font-size:10px;color:var(--s6)">Tapni dan za detalje</span></div>' : ''}
