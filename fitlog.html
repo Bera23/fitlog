@@ -3279,12 +3279,20 @@ function render() {
                 const scoreColor = sc.score >= 7 ? 'var(--green)' : sc.score >= 5 ? 'var(--orange)' : 'var(--red)';
                 const pct = sc.score * 10;
                 const barColor = sc.score >= 7 ? '#8fd42e' : sc.score >= 5 ? '#ffb347' : '#ff4f4f';
+                const statusTxt = sc.score >= 7 ? 'Odličan dan · samo nastavi' : sc.score >= 5 ? 'Solidan dan · ima prostora' : 'Loš dan · potrebna korekcija';
                 return `
               <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
-              <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer">
-                <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${sc.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
-                <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
-                <span class="score-chevron-btn meal-chevron${state.nutritionScoreCollapsed ? '' : ' open'}">${state.nutritionScoreCollapsed ? '▼' : '▼'}</span>
+              <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:12px 16px;display:flex;align-items:center;gap:0;cursor:pointer">
+                <div style="display:flex;align-items:baseline;gap:3px;margin-right:14px;flex-shrink:0">
+                  <span style="font-size:38px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${sc.score}</span>
+                  <span style="font-size:16px;font-weight:700;font-family:var(--mono);color:var(--s5);align-self:flex-end;margin-bottom:3px">/10</span>
+                </div>
+                <div style="width:1px;height:36px;background:var(--s3);margin-right:14px;flex-shrink:0"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;color:var(--muted)">Kvalitet ishrane</div>
+                  <div style="font-size:11px;color:${scoreColor};font-weight:700;margin-top:3px">${statusTxt}</div>
+                </div>
+                <span class="score-chevron-btn meal-chevron${state.nutritionScoreCollapsed ? '' : ' open'}" style="margin-left:10px">▼</span>
               </div>
               <div class="score-body" style="display:${state.nutritionScoreCollapsed ? 'none' : 'block'};padding:0 16px 16px;border-top:1px solid var(--s3)">
                 <div style="height:12px"></div>
@@ -3790,12 +3798,20 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
       const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
       const pct = score.score * 10;
       const barColor = score.score >= 7 ? '#8fd42e' : score.score >= 5 ? '#ffb347' : '#ff4f4f';
+      const statusTxt = score.score >= 7 ? 'Odličan dan · samo nastavi' : score.score >= 5 ? 'Solidan dan · ima prostora' : 'Loš dan · potrebna korekcija';
       resultCard.innerHTML = `
         <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
-        <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer">
-          <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${score.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
-          <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
-          <span class="score-chevron-btn meal-chevron open">▼</span>
+        <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:12px 16px;display:flex;align-items:center;gap:0;cursor:pointer">
+          <div style="display:flex;align-items:baseline;gap:3px;margin-right:14px;flex-shrink:0">
+            <span style="font-size:38px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${score.score}</span>
+            <span style="font-size:16px;font-weight:700;font-family:var(--mono);color:var(--s5);align-self:flex-end;margin-bottom:3px">/10</span>
+          </div>
+          <div style="width:1px;height:36px;background:var(--s3);margin-right:14px;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;color:var(--muted)">Kvalitet ishrane</div>
+            <div style="font-size:11px;color:${scoreColor};font-weight:700;margin-top:3px">${statusTxt}</div>
+          </div>
+          <span class="score-chevron-btn meal-chevron open" style="margin-left:10px">▼</span>
         </div>
         <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
           <div style="height:12px"></div>
