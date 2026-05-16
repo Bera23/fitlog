@@ -3492,7 +3492,7 @@ function render() {
                 const scoreColor = sc.score >= 7 ? 'var(--green)' : sc.score >= 5 ? 'var(--orange)' : 'var(--red)';
                 const pct = sc.score * 10;
                 const barColor = sc.score >= 7 ? '#8fd42e' : sc.score >= 5 ? '#ffb347' : '#ff4f4f';
-                const statusTxt = sc.score >= 7 ? 'Odličan dan · samo nastavi' : sc.score >= 5 ? 'Solidan dan · ima prostora' : 'Loš dan · potrebna korekcija';
+                const statusTxt = sc.score >= 7 ? 'Odličan dan' : sc.score >= 5 ? 'Solidan dan' : 'Loš dan';
                 return `
               <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
               <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:12px 16px;display:flex;align-items:center;gap:0;cursor:pointer">
@@ -4027,6 +4027,9 @@ PRAVILA ZA OCENJIVANJE:
 - Ako je unos ispod bazalnog metabolizma, označi to sa ⚠️ u polju "calories" kao informaciju — to NE utiče na score.
 - Polje "calories" koristi ✅ za zdrav deficit pri mršavljenju, ⚠️ za unos ispod BMR-a, ❌ samo za značajno prekoračenje kalorijskog cilja.
 - Ako je korisnik prekoračio kalorijski cilj za mršavljenje, to može negativno uticati na score.
+- "tip" mora početi sa jednim od: Dodaj / Smanji / Izbegaj / Uključi / Zameni
+- "tip" mora biti specifičan za današnji unos, ne generički (ne "pij više vode" nego npr. "Dodaj proteine u večeru — danas si 30g ispod cilja")
+- "tip" max 15 reči, direktan, bez uvoda
 
 Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
 
@@ -4041,7 +4044,7 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
       const scoreColor = score.score >= 7 ? 'var(--green)' : score.score >= 5 ? 'var(--orange)' : 'var(--red)';
       const pct = score.score * 10;
       const barColor = score.score >= 7 ? '#8fd42e' : score.score >= 5 ? '#ffb347' : '#ff4f4f';
-      const statusTxt = score.score >= 7 ? 'Odličan dan · samo nastavi' : score.score >= 5 ? 'Solidan dan · ima prostora' : 'Loš dan · potrebna korekcija';
+      const statusTxt = score.score >= 7 ? 'Odličan dan' : score.score >= 5 ? 'Solidan dan' : 'Loš dan';
       resultCard.innerHTML = `
         <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
         <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:12px 16px;display:flex;align-items:center;gap:0;cursor:pointer">
