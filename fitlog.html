@@ -1080,6 +1080,10 @@ function settingsDrawerHTML() {
         <option value="gain"     ${state.fitnessGoal === 'gain'     ? 'selected' : ''}>💪 Gojenje</option>
       </select>
     </div>
+    <div class="drawer-field">
+      <div class="drawer-field-label">Ciljna težina (kg)</div>
+      <input class="drawer-input" type="number" id="drawerTargetWeight" value="${state.targetWeight || ''}" min="30" max="300" placeholder="npr. 85"/>
+    </div>
     <button onclick="saveDrawerProfile()" class="drawer-btn" style="background:var(--green);color:var(--bg);font-weight:700;border-color:transparent;text-align:center;margin-bottom:0">Sačuvaj profil</button>`;
 
   const goalBody = (() => {
@@ -1186,6 +1190,18 @@ function saveDrawerProfile() {
   if (!isNaN(height) && height >= 100 && height <= 250) {
     state.height = height;
     localStorage.setItem('fitlog_height', height);
+  }
+
+  // Save target weight if provided and valid
+  const targetWeightRaw = document.getElementById('drawerTargetWeight')?.value;
+  const targetWeightVal = parseFloat(targetWeightRaw);
+  if (!isNaN(targetWeightVal) && targetWeightVal >= 30 && targetWeightVal <= 300) {
+    state.targetWeight = targetWeightVal;
+    localStorage.setItem('fitlog_target_weight', targetWeightVal);
+  } else if (targetWeightRaw === '') {
+    // Explicitly cleared — remove target
+    state.targetWeight = null;
+    localStorage.removeItem('fitlog_target_weight');
   }
 
   if (goalChanged) {
@@ -2522,7 +2538,14 @@ function zdravljeTabHTML() {
     const diff = current.weight - prev.weight;
     const col = diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)';
     const colAlpha = diff < 0 ? 'rgba(143,212,46,0.13)' : diff > 0 ? 'rgba(255,79,79,0.13)' : 'rgba(85,85,85,0.13)';
-    diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>`;
+    const colFade = diff < 0 ? 'rgba(143,212,46,0.45)' : diff > 0 ? 'rgba(255,79,79,0.45)' : 'rgba(153,153,153,0.45)';
+    // Calculate days between the two measurements for temporal context
+    const dayDiff = Math.round((new Date(current.date) - new Date(prev.date)) / 86400000);
+    const whenLabel = dayDiff === 1 ? 'juče' : dayDiff < 7 ? `${dayDiff}d` : `${Math.round(dayDiff / 7)} ned`;
+    diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col};display:inline-flex;align-items:center;gap:4px">
+      <span>${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
+      <span style="color:${colFade};font-size:10px;font-weight:600">· ${whenLabel}</span>
+    </span>`;
   }
 
   const sub = state.zdravljeSubTab || 'tezina';
@@ -2749,26 +2772,45 @@ function zdravljeTabHTML() {
   return subNav + `
 
     <div class="card">
-      <div class="card-label" style="margin-bottom:10px">Trenutna težina</div>
-      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-        <div style="font-size:52px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1;letter-spacing:-1px">${current ? current.weight : '—'}</div>
-        <div style="font-size:14px;color:var(--muted);align-self:flex-end;padding-bottom:6px">kg</div>
-        ${diffHTML ? `<div style="align-self:flex-end;padding-bottom:6px">${diffHTML}</div>` : ''}
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid var(--s3)">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <span style="font-size:12px;color:var(--muted)">
-            ${h
-              ? `Visina: <span style="color:var(--green);font-weight:700">${h} cm</span>`
-              : `<span style="color:var(--muted)">Visina nije uneta</span>`}
-          </span>
-          ${startEntry ? `
-          <span style="font-size:12px;color:var(--muted)">Početna: <span style="font-weight:700;color:var(--text-secondary)">${startEntry.weight} kg</span> <span style="color:${weightDeltaColor};font-weight:700;font-size:11px">${weightDeltaStr}</span></span>` : ''}
+      <div class="card-label" style="margin-bottom:12px">Trenutna težina</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div style="display:flex;align-items:baseline;gap:4px">
+          ${(() => {
+            // Split weight into integer and decimal parts for visual hierarchy
+            const wStr = current ? String(current.weight) : '—';
+            const parts = wStr.split('.');
+            const intPart = parts[0];
+            const decPart = parts[1] !== undefined ? '.' + parts[1] : '';
+            return `
+              <span style="font-size:52px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1;letter-spacing:-1px">${intPart}</span>
+              ${decPart ? `<span style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--text-secondary);line-height:1;letter-spacing:-1px">${decPart}</span>` : ''}
+              <span style="font-size:14px;color:var(--muted);padding-bottom:4px;align-self:flex-end">kg</span>
+              ${diffHTML ? `<span style="align-self:flex-end;padding-bottom:4px;margin-left:4px">${diffHTML}</span>` : ''}
+            `;
+          })()}
         </div>
-        <button class="weight-btn" onclick="startEditWeight()" style="font-size:11px">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
+        <button class="weight-btn" onclick="startEditWeight()" style="font-size:12px;flex-shrink:0">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
+      </div>
+      <div style="display:flex;gap:0;padding-top:12px;border-top:1px solid var(--s3)">
+        ${h ? `
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:2px">${h} cm</div>
+          <div style="font-size:10px;color:var(--muted)">visina</div>
+        </div>
+        <div style="width:1px;background:var(--s3);margin:0 12px;align-self:stretch"></div>` : ''}
+        ${startEntry ? `
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:2px">${startEntry.weight} kg</div>
+          <div style="font-size:10px;color:var(--muted)">početna</div>
+        </div>
+        <div style="width:1px;background:var(--s3);margin:0 12px;align-self:stretch"></div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:${weightDeltaColor};margin-bottom:2px">${weightDeltaStr}</div>
+          <div style="font-size:10px;color:var(--muted)">ukupno</div>
+        </div>` : ''}
       </div>
       ${state.editWeight ? `
-        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--s3);align-items:center">
           <span style="font-size:12px;color:var(--muted);white-space:nowrap">Nova težina:</span>
           <input class="weight-input" id="wInput" type="number" value="${state.weightInput}" placeholder="kg"/>
           <button class="save-btn" onclick="saveWeight()">Sačuvaj</button>
@@ -2863,7 +2905,7 @@ function zdravljeTabHTML() {
             <div style="font-size:42px;font-weight:800;font-family:var(--mono);color:${progGoalColor};line-height:1">${state.targetWeight}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:3px">kg cilj</div>
           </div>
-          <button onclick="clearTargetWeight()" style="background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);padding:6px 10px;font-size:12px;cursor:pointer;min-height:36px">✏ izmeni</button>
+
         </div>
         <div style="margin-bottom:14px">
           <div style="height:7px;background:var(--s4);border-radius:4px;position:relative;margin-bottom:8px">
@@ -2890,16 +2932,10 @@ function zdravljeTabHTML() {
           </div>
         </div>` :
         `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">${state.fitnessGoal === 'gain' ? 'Postavi ciljnu težinu da vidiš prognozu gojenja.' : 'Postavi ciljnu težinu da vidiš prognozu mršavljenja.'}</div>`}
-      ${state.editTargetWeight ? `
-        <div class="target-input-row">
-          <span style="font-size:12px;color:var(--muted)">Cilj:</span>
-          <input class="target-input" id="twInput" type="number" placeholder="kg" value="${state.targetWeightInput}"/>
-          <button class="save-btn" onclick="saveTargetWeight()">Sačuvaj</button>
-          <button onclick="state.editTargetWeight=false;scheduleRender()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✕</button>
-        </div>` : `
-        <button class="weight-btn" onclick="startEditTargetWeight()" style="font-size:12px;margin-top:${state.targetWeight ? '12' : '4'}px">
-          ${state.targetWeight ? '✏ ' : '+ '}Postavi ciljnu težinu
-        </button>`}
+      ${!state.targetWeight && !state.editTargetWeight ? `
+        <button class="weight-btn" onclick="openDrawer()" style="font-size:12px;margin-top:4px">
+          + Postavi ciljnu težinu
+        </button>` : ''}
     </div>`;
 }
 
