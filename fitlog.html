@@ -1772,7 +1772,9 @@ function historyDayDetailHTML(date) {
         <div class="score-row"><span>${score.protein}</span></div>
         <div class="score-row"><span>${score.fat}</span></div>
         <div class="score-row"><span>${score.sugar}</span></div>
-        <div style="margin-top:8px;font-size:13px;color:var(--muted)">${score.tip}</div>
+        <div style="margin-top:10px;background:var(--s4);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:8px 10px;font-size:12px;color:var(--text-secondary);line-height:1.5">
+          💡 ${score.tip.replace(/^💡\s*/, '')}
+        </div>
       </div>
     </div>`;
     })()}
@@ -3295,13 +3297,21 @@ function render() {
                 <span class="score-chevron-btn meal-chevron${state.nutritionScoreCollapsed ? '' : ' open'}" style="margin-left:10px">▼</span>
               </div>
               <div class="score-body" style="display:${state.nutritionScoreCollapsed ? 'none' : 'block'};padding:0 16px 16px;border-top:1px solid var(--s3)">
-                <div style="height:12px"></div>
+                <!-- section label divider -->
+                <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
+                  <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Detalji</span>
+                  <div style="flex:1;height:1px;background:var(--s4)"></div>
+                </div>
                 <div class="score-row"><span>${sc.calories}</span></div>
                 <div class="score-row"><span>${sc.protein}</span></div>
                 <div class="score-row"><span>${sc.fat}</span></div>
                 <div class="score-row"><span>${sc.sugar}</span></div>
-                <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${sc.tip}</div>
-                <button onclick="scoreNutrition()" style="margin-top:14px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:40px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='none'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='none'">↺ Ponovo oceni</button>
+                <!-- tip callout box -->
+                <div style="margin-top:14px;background:var(--s3);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:10px 12px;font-size:13px;color:var(--text-secondary);line-height:1.5">
+                  💡 ${sc.tip.replace(/^💡\s*/, '')}
+                </div>
+                <!-- re-score button — prominent -->
+                <button onclick="scoreNutrition()" style="margin-top:12px;background:var(--s3);border:1px solid var(--s6);border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:12px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:44px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='var(--s3)'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='var(--s3)'">↺ Ponovo oceni</button>
               </div>`;
               })()}` : `
               <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
@@ -3785,6 +3795,13 @@ Status danas: ${deficitStatus}
 Obroci: ${mealsSummary}
 Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
 
+PRAVILA ZA OCENJIVANJE:
+- Ocena (score) reflektuje ISKLJUČIVO kvalitet odabira hrane: nutritivnu gustinu, makro balans, raznovrsnost i zdrave navike.
+- Kalorijski deficit za mršavljenje je pozitivan ishod i NE umanjuje ocenu.
+- Ako je unos ispod bazalnog metabolizma, označi to sa ⚠️ u polju "calories" kao informaciju — to NE utiče na score.
+- Polje "calories" koristi ✅ za zdrav deficit pri mršavljenju, ⚠️ za unos ispod BMR-a, ❌ samo za značajno prekoračenje kalorijskog cilja.
+- Ako je korisnik prekoračio kalorijski cilj za mršavljenje, to može negativno uticati na score.
+
 Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
 
     const raw = await callGemini([{ text: prompt }], 0.3);
@@ -3814,13 +3831,21 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
           <span class="score-chevron-btn meal-chevron open" style="margin-left:10px">▼</span>
         </div>
         <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
-          <div style="height:12px"></div>
+          <!-- section label divider -->
+          <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
+            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Detalji</span>
+            <div style="flex:1;height:1px;background:var(--s4)"></div>
+          </div>
           <div class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
           <div class="score-row"><span>${score.fat}</span></div>
           <div class="score-row"><span>${score.sugar}</span></div>
-          <div style="margin-top:12px;font-size:13px;color:var(--muted);line-height:1.5">${score.tip}</div>
-          <button onclick="scoreNutrition()" style="margin-top:14px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--muted);font-size:12px;padding:8px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:40px">↺ Ponovo oceni</button>
+          <!-- tip callout box -->
+          <div style="margin-top:14px;background:var(--s3);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:10px 12px;font-size:13px;color:var(--text-secondary);line-height:1.5">
+            💡 ${score.tip.replace(/^💡\s*/, '')}
+          </div>
+          <!-- re-score button — prominent, placed after tip -->
+          <button onclick="scoreNutrition()" style="margin-top:12px;background:var(--s3);border:1px solid var(--s6);border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:12px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:44px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='var(--s3)'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='var(--s3)'">↺ Ponovo oceni</button>
         </div>`;
     }
   } catch(e) {
