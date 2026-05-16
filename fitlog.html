@@ -2773,25 +2773,31 @@ function zdravljeTabHTML() {
 
     <div class="card">
       <div class="card-label" style="margin-bottom:12px">Trenutna težina</div>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
-        <div style="display:flex;align-items:baseline;gap:4px">
-          ${(() => {
-            // Split weight into integer and decimal parts for visual hierarchy
-            const wStr = current ? String(current.weight) : '—';
-            const parts = wStr.split('.');
-            const intPart = parts[0];
-            const decPart = parts[1] !== undefined ? '.' + parts[1] : '';
-            return `
-              <span style="font-size:52px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1;letter-spacing:-1px">${intPart}</span>
-              ${decPart ? `<span style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--text-secondary);line-height:1;letter-spacing:-1px">${decPart}</span>` : ''}
-              <span style="font-size:14px;color:var(--muted);padding-bottom:4px;align-self:flex-end">kg</span>
-              ${diffHTML ? `<span style="align-self:flex-end;padding-bottom:4px;margin-left:4px">${diffHTML}</span>` : ''}
-            `;
-          })()}
-        </div>
+
+      <!-- Row 1: big weight number -->
+      <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:12px">
+        ${(() => {
+          // Split weight into integer and decimal parts for visual hierarchy
+          const wStr = current ? String(current.weight) : '—';
+          const parts = wStr.split('.');
+          const intPart = parts[0];
+          const decPart = parts[1] !== undefined ? '.' + parts[1] : '';
+          return `
+            <span style="font-size:52px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1;letter-spacing:-1px">${intPart}</span>
+            ${decPart ? `<span style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--text-secondary);line-height:1;letter-spacing:-1px">${decPart}</span>` : ''}
+            <span style="font-size:14px;color:var(--muted);padding-bottom:4px;align-self:flex-end">kg</span>
+          `;
+        })()}
+      </div>
+
+      <!-- Row 2: badge + action button -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--s3);border-bottom:1px solid var(--s3)">
+        <div>${diffHTML || ''}</div>
         <button class="weight-btn" onclick="startEditWeight()" style="font-size:12px;flex-shrink:0">${current ? '✏ Upiši merenje' : '+ Unesi težinu'}</button>
       </div>
-      <div style="display:flex;gap:0;padding-top:12px;border-top:1px solid var(--s3)">
+
+      <!-- Row 3: stats -->
+      <div style="display:flex;gap:0;padding-top:12px">
         ${h ? `
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:2px">${h} cm</div>
@@ -2809,6 +2815,8 @@ function zdravljeTabHTML() {
           <div style="font-size:10px;color:var(--muted)">ukupno</div>
         </div>` : ''}
       </div>
+
+      <!-- Edit row: shown below all content when active -->
       ${state.editWeight ? `
         <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--s3);align-items:center">
           <span style="font-size:12px;color:var(--muted);white-space:nowrap">Nova težina:</span>
