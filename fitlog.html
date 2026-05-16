@@ -788,12 +788,26 @@ function debounce(fn, ms) {
 // Multiple calls within the same synchronous block collapse to one paint frame.
 // Keep render() only where the new DOM is needed immediately (e.g. focus() after).
 let _renderScheduled = false;
+
+// Stores cursor position before render so the search input can be refocused
+// after innerHTML wipes the DOM — prevents mobile keyboard from dismissing.
+let _searchCursorPos = null;
+
 function scheduleRender() {
   if (_renderScheduled) return;
   _renderScheduled = true;
   requestAnimationFrame(() => {
     _renderScheduled = false;
     render();
+    // Restore focus to product history search input if it was active before render
+    if (_searchCursorPos !== null) {
+      const el = document.querySelector('input[data-search="product-history"]');
+      if (el) {
+        el.focus();
+        try { el.setSelectionRange(_searchCursorPos, _searchCursorPos); } catch(_) {}
+      }
+      _searchCursorPos = null;
+    }
   });
 }
 
@@ -2136,9 +2150,10 @@ function productsHistoryHTML() {
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none">🔍</span>
         <input
           type="search"
+          data-search="product-history"
           placeholder="Pretraži proizvode…"
           value="${rawQuery.replace(/"/g, '&quot;')}"
-          oninput="state.productHistorySearch=this.value;scheduleRender()"
+          oninput="_searchCursorPos=this.selectionStart;state.productHistorySearch=this.value;scheduleRender()"
           style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px 10px 36px;font-size:14px;font-family:var(--sans);outline:none;min-height:44px"
         />
       </div>
