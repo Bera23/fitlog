@@ -488,12 +488,7 @@
     font-size: 10px; color: var(--muted); font-weight: 700;
     letter-spacing: 1.2px; text-transform: uppercase;
   }
-  .drawer-acc-chevron {
-    font-size: 16px; color: var(--s9);
-    transition: transform 0.22s var(--ease);
-    line-height: 1;
-  }
-  .drawer-acc-chevron.open { transform: rotate(180deg); color: var(--green); }
+  .drawer-acc-chevron { /* alias for meal-chevron — class kept for JS querySelector compat */ }
   .drawer-acc-body {
     overflow: hidden;
     max-height: 0;
@@ -1020,7 +1015,7 @@ function settingsDrawerHTML() {
   const acc = (id, title, bodyHTML) => `
     <div class="drawer-acc-header" onclick="toggleDrawerSection('${id}')">
       <span class="drawer-acc-title">${title}</span>
-      <span class="drawer-acc-chevron" id="chev-${id}">▼</span>
+      <span class="drawer-acc-chevron meal-chevron" id="chev-${id}">▼</span>
     </div>
     <div class="drawer-acc-body" id="body-${id}">
       <div class="drawer-acc-inner">${bodyHTML}</div>
@@ -1666,7 +1661,7 @@ function historyDayDetailHTML(date) {
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${ms ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${ms.score>=7?'var(--green)':ms.score>=5?'var(--orange)':'var(--red)'}">${ms.score}/10</span>` : ''}
           <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--green)">${Math.round(m.calories)}</span>
-          <span class="hist-meal-chevron" style="color:var(--s9);font-size:18px;line-height:1">${isExp ? '▲' : '▼'}</span>
+          <span class="meal-chevron${isExp ? ' open' : ''}">▼</span>
         </div>
       </div>
       <!-- Collapsed view: macro pills — hidden when .expanded -->
@@ -1767,7 +1762,10 @@ function historyDayDetailHTML(date) {
     <div id="history-score-${date}" style="margin-top:16px;padding:12px;background:var(--s3);border-radius:12px;cursor:pointer" onclick="toggleHistoryScore('${date}')">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:13px;color:var(--muted)">🤖 Analiza ishrane</span>
-        <span class="history-score-chevron" style="font-family:var(--mono);font-size:15px;font-weight:800;color:${scoreColor}">${score.score}/10 ${isExpanded ? '▲' : '▼'}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:${scoreColor}">${score.score}/10</span>
+          <span class="history-score-chevron meal-chevron${isExpanded ? ' open' : ''}">▼</span>
+        </div>
       </div>
       <div class="history-score-content" style="display:${isExpanded ? 'block' : 'none'}">
         <div class="score-row"><span>${score.calories}</span></div>
@@ -3283,10 +3281,10 @@ function render() {
                 const barColor = sc.score >= 7 ? '#8fd42e' : sc.score >= 5 ? '#ffb347' : '#ff4f4f';
                 return `
               <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
-              <div class="score-header-row" style="padding:13px 16px;display:flex;align-items:center;gap:10px">
+              <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer">
                 <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${sc.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
                 <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
-                <button class="score-chevron-btn" onclick="toggleNutritionScore()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">${state.nutritionScoreCollapsed ? '▸' : '▾'}</button>
+                <span class="score-chevron-btn meal-chevron${state.nutritionScoreCollapsed ? '' : ' open'}">${state.nutritionScoreCollapsed ? '▼' : '▼'}</span>
               </div>
               <div class="score-body" style="display:${state.nutritionScoreCollapsed ? 'none' : 'block'};padding:0 16px 16px;border-top:1px solid var(--s3)">
                 <div style="height:12px"></div>
@@ -3794,10 +3792,10 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
       const barColor = score.score >= 7 ? '#8fd42e' : score.score >= 5 ? '#ffb347' : '#ff4f4f';
       resultCard.innerHTML = `
         <div style="height:4px;background:linear-gradient(90deg,${barColor} ${pct}%,var(--s4) ${pct}%)"></div>
-        <div class="score-header-row" style="padding:13px 16px;display:flex;align-items:center;gap:10px">
+        <div class="score-header-row" onclick="toggleNutritionScore()" style="padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer">
           <div style="font-size:22px;font-weight:800;font-family:var(--mono);color:${scoreColor};line-height:1">${score.score}<span style="font-size:13px;color:var(--s7);font-family:var(--mono)">/10</span></div>
           <div style="font-size:13px;color:var(--muted);flex:1">kvalitet ishrane</div>
-          <button class="score-chevron-btn" onclick="toggleNutritionScore()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:6px 8px;line-height:1;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">▾</button>
+          <span class="score-chevron-btn meal-chevron open">▼</span>
         </div>
         <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
           <div style="height:12px"></div>
@@ -3962,8 +3960,8 @@ function toggleHistoryMeal(id) {
   const item = document.querySelector(`.hist-meal-item[data-hist-meal-id="${id}"]`);
   if (!item) return;
   const isExpanded = item.classList.toggle('expanded');
-  const chevron = item.querySelector('.hist-meal-chevron');
-  if (chevron) chevron.textContent = isExpanded ? '▲' : '▼';
+  const chevron = item.querySelector('.hist-meal-item .meal-chevron') || item.querySelector('.meal-chevron');
+  if (chevron) chevron.classList.toggle('open', isExpanded);
   if (isExpanded) state.expandedHistoryMealIds.add(id);
   else state.expandedHistoryMealIds.delete(id);
 }
@@ -3975,15 +3973,15 @@ function toggleNutritionScore() {
   const card = document.getElementById('nutrition-score-card');
   if (!card) return;
 
-  const body = card.querySelector('.score-body');
-  const btn  = card.querySelector('.score-chevron-btn');
+  const body    = card.querySelector('.score-body');
+  const chevron = card.querySelector('.score-chevron-btn');
 
   if (state.nutritionScoreCollapsed) {
-    if (body) body.style.display = 'none';
-    if (btn)  btn.textContent = '▸';
+    if (body)    body.style.display = 'none';
+    if (chevron) chevron.classList.remove('open');
   } else {
-    if (body) body.style.display = 'block';
-    if (btn)  btn.textContent = '▾';
+    if (body)    body.style.display = 'block';
+    if (chevron) chevron.classList.add('open');
   }
 }
 
@@ -3999,12 +3997,12 @@ function toggleHistoryScore(date) {
     // Collapse
     state.expandedScoreDate = null;
     if (content) content.style.display = 'none';
-    if (chevronEl) chevronEl.textContent = chevronEl.textContent.replace('▲', '▼');
+    if (chevronEl) chevronEl.classList.remove('open');
   } else {
     // Expand
     state.expandedScoreDate = date;
     if (content) content.style.display = 'block';
-    if (chevronEl) chevronEl.textContent = chevronEl.textContent.replace('▼', '▲');
+    if (chevronEl) chevronEl.classList.add('open');
   }
 }
 
