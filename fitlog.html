@@ -520,7 +520,7 @@ const DEFAULT_WATER_GOAL_ML = 2000;  // fallback water goal when weight is unkno
 const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}';
 const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
 const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}';
-const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom"}';
+const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom, max 12 reči","suggestion":"konkretna preporuka za sledeći obrok ili null"}';
 // Schema for product/label analysis — nutritional data per 100g + serving size + AI rating
 const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
 // localStorage key prefix for scanned products
@@ -1708,7 +1708,17 @@ function historyDayDetailHTML(date) {
     const isExp = state.expandedHistoryMealIds.has(m.id);
     const msHTML = ms ? (() => {
       const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-      return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:13px;line-height:1.4">${ms.comment}</span></div>`;
+      // Render suggestion only when present
+      const suggHTML = ms.suggestion
+        ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.4">💡 ${ms.suggestion}</div>`
+        : '';
+      return `<div class="meal-score-inline" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <div style="display:flex;align-items:center;gap:8px;width:100%">
+          <span class="meal-score-num" style="color:${c}">${ms.score}/10</span>
+          <span style="flex:1;font-size:13px;line-height:1.4">${ms.comment}</span>
+        </div>
+        ${suggHTML}
+      </div>`;
     })() : '';
 
     return `
@@ -3237,8 +3247,20 @@ function render() {
         const scoreHTML = state.mealScoreLoading === m.id
           ? `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`
           : ms
-            ? (() => { const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-                return `<div class="meal-score-inline"><span class="meal-score-num" style="color:${c}">${ms.score}/10</span><span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span><button onclick="clearMealScore('${m.id}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button></div>`; })()
+            ? (() => {
+                const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
+                // Render suggestion only when present
+                const suggHTML = ms.suggestion
+                  ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.4">💡 ${ms.suggestion}</div>`
+                  : '';
+                return `<div class="meal-score-inline" style="flex-direction:column;align-items:flex-start;gap:4px">
+                  <div style="display:flex;align-items:center;gap:8px;width:100%">
+                    <span class="meal-score-num" style="color:${c}">${ms.score}/10</span>
+                    <span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span>
+                    <button onclick="clearMealScore('${m.id}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
+                  </div>
+                  ${suggHTML}
+                </div>`; })()
             : `<button class="meal-score-btn" onclick="scoreMeal('${m.id}')">🤖 Oceni obrok</button>`;
         return `
           <div class="log-item${isOpen ? ' expanded' : ''}" data-id="${m.id}" ontouchstart="swipeStart(event,'${m.id}','meal')" ontouchmove="swipeMove(event,'${m.id}')" ontouchend="swipeEnd(event,'${m.id}','meal')" ontouchcancel="swipeCancel('${m.id}')">
@@ -4147,10 +4169,22 @@ async function scoreMeal(mealId) {
 
     const profile = buildUserProfile();
 
-    const prompt = `Oceni ovaj obrok (${mealContext}) u jednoj rečenici (max 15 reči) i daj ocenu 1-10.
+    // Calculate calories consumed before this meal and remaining after it
+    const consumedBefore = state.dayData.meals
+      .filter(m2 => m2.id !== mealId)
+      .reduce((s, m2) => s + (m2.calories || 0), 0);
+    const consumedAfter  = consumedBefore + (meal.calories || 0);
+    const remainingAfter = Math.round(state.calorieGoal - consumedAfter);
+
+    const prompt = `Oceni ovaj obrok (${mealContext}) i daj ocenu 1-10.
 Obrok: ${items}
 Ukupno: ${Math.round(meal.calories)} kcal, P${Math.round(meal.protein)}g UH${Math.round(meal.carbs)}g M${Math.round(meal.fat)}g Š${Math.round(meal.sugar||0)}g
+Kontekst dana: pre ovog obroka ${Math.round(consumedBefore)} kcal, nakon ovog obroka ostaje ${remainingAfter} kcal od dnevnog cilja.
 ${profile} ${goalContext}.
+PRAVILA:
+- "comment" mora biti TAČNO max 12 reči — ovo je strogo pravilo, ne smernica
+- "suggestion" mora početi sa jednim od: Dodaj / Smanji / Izbegaj / Uključi / Zameni, i biti specifičan za ovaj obrok i ostatak dana (ne "jedi više povrća" nego npr. "Dodaj proteine u večeru — danas si ispod cilja") ili null ako nema smislene preporuke
+- Ton: direktan, bez uvoda, bez pohvala tipa "Odličan izbor!"
 Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const raw = await callGemini([{ text: prompt }], 0.2);
     const result = parseGeminiJson(raw);
@@ -4161,11 +4195,18 @@ Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const resultArea = getArea();
     if (resultArea) {
       const c = result.score >= 7 ? 'var(--green)' : result.score >= 5 ? 'var(--orange)' : 'var(--red)';
+      // Render suggestion block only when AI returned a non-null value
+      const suggHTML = result.suggestion
+        ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.4">💡 ${result.suggestion}</div>`
+        : '';
       resultArea.innerHTML = `
-        <div class="meal-score-inline">
-          <span class="meal-score-num" style="color:${c}">${result.score}/10</span>
-          <span style="flex:1;font-size:12px;line-height:1.4">${result.comment}</span>
-          <button onclick="clearMealScore('${mealId}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
+        <div class="meal-score-inline" style="flex-direction:column;align-items:flex-start;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <span class="meal-score-num" style="color:${c}">${result.score}/10</span>
+            <span style="flex:1;font-size:12px;line-height:1.4">${result.comment}</span>
+            <button onclick="clearMealScore('${mealId}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
+          </div>
+          ${suggHTML}
         </div>`;
     }
   } catch(e) {
