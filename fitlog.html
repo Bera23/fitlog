@@ -562,6 +562,8 @@ const state = {
   expandedProductIds: new Set(),       // product cards expanded on today's log
   expandedHistoryProductIds: new Set(), // product cards expanded in history view
   historySubTab: 'obroci',             // 'obroci' | 'proizvodi'
+  historyMonthOffset: 0,               // 0 = current month, 1 = one month back, etc.
+  productHistorySearch: '',            // search query for products history
   productLoading: false,               // loading state for product analysis
   productImageBase64: null,            // selected image for product scanner
   productImageMime: null,
@@ -1943,15 +1945,12 @@ function historyTabHTML() {
     return subTabBar + productsHistoryHTML();
   }
 
-  // ── OBROCI sub-tab (existing logic) ──────────────────────────────────────────
+  // ── OBROCI sub-tab — paginated by month ──────────────────────────────────────
   const entries = getHistoryData();
-  if (entries.length === 0) {
-    return subTabBar + `<div class="card"><div class="hist-empty">📭 Još nema istorije.<br>Počni da unosiš obroke u Dnevniku!</div></div>`;
-  }
-
   const goal = state.calorieGoal;
   const todayDate = todayStr();
 
+  // Build month list from all entries + current month (even if no data yet)
   const byMonth = {};
   entries.forEach(e => {
     const month = e.date.slice(0, 7);
@@ -1959,51 +1958,85 @@ function historyTabHTML() {
     byMonth[month].push(e);
   });
 
-  let html = '';
-  Object.keys(byMonth).sort().reverse().forEach(month => {
-    const [yr, mo] = month.split('-');
-    const monthLabel = `${mo}.${yr}`;
-    const monthEntries = byMonth[month];
-    const monthAvg = Math.round(monthEntries.reduce((s, e) => s + e.net, 0) / monthEntries.length);
-    const monthDeficit = monthEntries.filter(e => e.net < goal).length;
-    const monthSurplus = monthEntries.length - monthDeficit;
-    // For gain mode: green = above goal (surplus); for lose: green = below goal (deficit)
-    const avgColor = state.fitnessGoal === 'gain'
-      ? (monthAvg >= goal ? 'var(--green)' : 'var(--red)')
-      : (monthAvg < goal ? 'var(--green)' : 'var(--red)');
-    const onTargetCount = state.fitnessGoal === 'gain' ? monthSurplus : monthDeficit;
+  // Sorted months descending (newest first)
+  const allMonths = Object.keys(byMonth).sort().reverse();
 
-    const rows = monthEntries.map(e => {
-      const isToday = e.date === todayDate;
-      const inDeficit = e.net < goal;
-      // For gain: being above goal (surplus) = good = green; for lose: deficit = good = green
-      const onTarget = state.fitnessGoal === 'gain' ? !inDeficit : inDeficit;
-      const dotColor = onTarget ? 'var(--green)' : 'var(--red)';
-      const netColor = onTarget ? 'var(--green)' : 'var(--red)';
-      const dayNum = e.date.slice(8).replace(/^0/, '');
-      const dayLabel = `${dayNum}.${e.date.slice(5,7)}.`;
-      const score = loadNutritionScore(e.date);
+  // Ensure current month is always reachable even with no data
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if (!byMonth[currentMonthKey]) {
+    allMonths.unshift(currentMonthKey);
+    byMonth[currentMonthKey] = [];
+  }
 
-      return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
-        <div class="hist-dot" style="background:${dotColor}"></div>
-        <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:44px;font-size:13px;font-family:var(--mono)">${dayLabel}</div>
-        <div style="flex:1"></div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
-          <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
-          <span style="font-size:20px;color:var(--s8);font-weight:400;line-height:1">›</span>
-        </div>
-      </div>`;
-    }).join('');
+  // Clamp offset to valid range
+  const maxOffset = allMonths.length - 1;
+  const offset = Math.min(Math.max(state.historyMonthOffset, 0), maxOffset);
+  if (state.historyMonthOffset !== offset) state.historyMonthOffset = offset;
 
-    html += `<div class="card">
-      <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
-        <span>${monthLabel}</span>
-        <span style="color:${avgColor};font-size:12px;font-weight:600">${onTargetCount}/${monthEntries.length} dana · prosek ${monthAvg} kcal</span>
+  const activeMonth = allMonths[offset];
+  const [yr, mo] = activeMonth.split('-');
+
+  // Month label in Serbian
+  const monthNames = ['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
+  const monthLabel = `${monthNames[parseInt(mo) - 1]} ${yr}`;
+
+  // Navigation bar — same style as week nav in pregled tab
+  const isCurrentMonth = offset === 0;
+  const navBar = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="shiftHistoryMonth(1)" ${offset >= maxOffset ? 'disabled' : ''} style="background:var(--s4);border:none;border-radius:8px;color:${offset < maxOffset ? 'var(--text)' : 'var(--s6)'};font-size:18px;width:36px;height:36px;cursor:${offset < maxOffset ? 'pointer' : 'default'};display:flex;align-items:center;justify-content:center;flex-shrink:0" aria-label="Prethodni mesec">&#8249;</button>
+      <div style="text-align:center">
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">${monthLabel.toUpperCase()}</div>
+        ${isCurrentMonth ? '<div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px">TEKUĆI MESEC</div>' : `<div style="font-size:10px;color:var(--muted)">${offset} mes. unazad</div>`}
       </div>
-      ${rows}
+      <button onclick="shiftHistoryMonth(-1)" ${isCurrentMonth ? 'disabled' : ''} style="background:var(--s4);border:none;border-radius:8px;color:${isCurrentMonth ? 'var(--s6)' : 'var(--text)'};font-size:18px;width:36px;height:36px;cursor:${isCurrentMonth ? 'default' : 'pointer'};display:flex;align-items:center;justify-content:center;flex-shrink:0" aria-label="Sledeći mesec">&#8250;</button>
     </div>`;
-  });
+
+  const monthEntries = byMonth[activeMonth] || [];
+
+  if (monthEntries.length === 0) {
+    return subTabBar + `<div class="card">${navBar}<div class="hist-empty">📭 Nema unosa za ovaj mesec.</div></div>`;
+  }
+
+  const monthAvg = Math.round(monthEntries.reduce((s, e) => s + e.net, 0) / monthEntries.length);
+  const monthDeficit = monthEntries.filter(e => e.net < goal).length;
+  const monthSurplus = monthEntries.length - monthDeficit;
+  const avgColor = state.fitnessGoal === 'gain'
+    ? (monthAvg >= goal ? 'var(--green)' : 'var(--red)')
+    : (monthAvg < goal ? 'var(--green)' : 'var(--red)');
+  const onTargetCount = state.fitnessGoal === 'gain' ? monthSurplus : monthDeficit;
+
+  const rows = monthEntries.sort((a, b) => b.date.localeCompare(a.date)).map(e => {
+    const isToday = e.date === todayDate;
+    const inDeficit = e.net < goal;
+    const onTarget = state.fitnessGoal === 'gain' ? !inDeficit : inDeficit;
+    const dotColor = onTarget ? 'var(--green)' : 'var(--red)';
+    const netColor = onTarget ? 'var(--green)' : 'var(--red)';
+    const dayNum = e.date.slice(8).replace(/^0/, '');
+    const dayLabel = `${dayNum}.${e.date.slice(5,7)}.`;
+    const score = loadNutritionScore(e.date);
+
+    return `<div class="hist-item" onclick="openHistoryDetail('${e.date}')">
+      <div class="hist-dot" style="background:${dotColor}"></div>
+      <div class="hist-date ${isToday ? 'today' : ''}" style="min-width:44px;font-size:13px;font-family:var(--mono)">${dayLabel}</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${score ? `<span style="font-family:var(--mono);font-size:11px;color:${score.score>=7?'var(--green)':score.score>=5?'var(--orange)':'var(--red)'};font-weight:700">${score.score}/10</span>` : ''}
+        <div class="hist-net" style="font-family:var(--mono);font-size:18px;font-weight:800;color:${netColor};min-width:42px;text-align:right">${Math.round(e.net)}</div>
+        <span style="font-size:20px;color:var(--s8);font-weight:400;line-height:1">›</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const html = `<div class="card">
+    ${navBar}
+    <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>${onTargetCount}/${monthEntries.length} dana</span>
+      <span style="color:${avgColor};font-size:12px;font-weight:600">prosek ${monthAvg} kcal</span>
+    </div>
+    ${rows}
+  </div>`;
 
   return subTabBar + html;
 }
@@ -2040,7 +2073,47 @@ function productsHistoryHTML() {
     return `<div class="card"><div class="hist-empty">📦 Još nema skeniranih proizvoda.<br>Dodaj ih na Dnevnik tabu!</div></div>`;
   }
 
-  return months.map(month => {
+  // Active search query (trimmed, lowercase for comparison)
+  const rawQuery = state.productHistorySearch || '';
+  const query = rawQuery.trim().toLowerCase();
+
+  // Search input field — oninput updates state and re-renders
+  const searchBar = `
+    <div style="padding:8px 16px 4px">
+      <div style="position:relative">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none">🔍</span>
+        <input
+          type="search"
+          placeholder="Pretraži proizvode…"
+          value="${rawQuery.replace(/"/g, '&quot;')}"
+          oninput="state.productHistorySearch=this.value;scheduleRender()"
+          style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px 10px 36px;font-size:14px;font-family:var(--sans);outline:none;min-height:44px"
+        />
+      </div>
+    </div>`;
+
+  // When search is active, flatten all products and filter — skip monthly grouping
+  if (query) {
+    const matched = allProducts.filter(p => p.name?.toLowerCase().includes(query));
+    if (!matched.length) {
+      return searchBar + `<div class="card"><div class="hist-empty">🔍 Nema rezultata za "<strong>${rawQuery}</strong>".</div></div>`;
+    }
+
+    const cards = matched.map(p => {
+      const isExp = state.expandedHistoryProductIds.has(p.id);
+      const isDup = duplicateNames.has(p.name?.trim().toLowerCase());
+      const cardHTML = productCardInnerHTML(p, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false, isDup);
+      return `
+        <div class="hist-swipe-wrap" ontouchstart="swipeStart(event,${p.id},'hist-product','${p.date||''}')" ontouchmove="swipeMove(event,${p.id})" ontouchend="swipeEnd(event,${p.id},'hist-product')" ontouchcancel="swipeCancel(${p.id})">
+          <div class="swipe-delete-bg">🗑</div>
+          <div class="hist-swipe-inner" id="swipe-hist-${p.id}">${cardHTML}</div>
+        </div>`;
+    }).join('');
+
+    return searchBar + `<div class="card">${cards}</div>`;
+  }
+  // No search active — render full monthly grouping
+  return searchBar + months.map(month => {
     const [yr, mo] = month.split('-');
     const monthLabel = `${mo}.${yr}`;
     const days = byMonth[month];
@@ -3732,8 +3805,16 @@ function addProductToMeal(productId, productDate) {
 
 // Switch history sub-tab between 'obroci' and 'proizvodi'
 function setHistoryTab(tab) {
-  state.historySubTab     = tab;
+  state.historySubTab = tab;
   state.selectedHistoryDate = null; // clear any open day detail on sub-tab switch
+  state.historyMonthOffset = 0;     // reset to current month
+  state.productHistorySearch = '';  // clear search query
+  scheduleRender();
+}
+
+// Navigate months on the obroci sub-tab (positive = older, negative = newer)
+function shiftHistoryMonth(direction) {
+  state.historyMonthOffset += direction;
   scheduleRender();
 }
 
