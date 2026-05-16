@@ -805,14 +805,26 @@ function clearRenderCache() { _renderCache = {}; }
 // ─── PROMPT HELPERS ──────────────────────────────────────────────────────────
 
 // Returns a consistent user profile string injected into every AI prompt.
+// Includes BMR (Mifflin-St Jeor) and calorie goal so every prompt has full context.
 // Single source of truth — avoids per-function duplication and drift.
 function buildUserProfile() {
-  const gender = state.gender === 'male' ? 'muškarac' : 'žena';
-  const age    = state.age    || 30;
-  const weight = state.weight || 75;
-  const height = state.height ? `, ${state.height}cm` : '';
-  const act    = ACT_LABELS[state.activity] || 'sedentarni';
-  return `Korisnik: ${gender}, ${age} god, ${weight}kg${height}, nivo aktivnosti: ${act}.`;
+  const gender     = state.gender === 'male' ? 'muškarac' : 'žena';
+  const age        = state.age    || 30;
+  const weight     = state.weight || 75;
+  const height     = state.height || null;
+  const heightStr  = height ? `, ${height}cm` : '';
+  const act        = ACT_LABELS[state.activity] || 'sedentarni';
+  const goalLabel  = state.fitnessGoal === 'gain' ? 'gojenje' : state.fitnessGoal === 'maintain' ? 'održavanje' : 'mršavljenje';
+
+  // Mifflin-St Jeor BMR — same formula used in calcTDEE / drawer stats
+  let bmrStr = '';
+  if (height) {
+    const genderOffset = state.gender === 'male' ? 5 : -161;
+    const bmr = Math.round(10 * weight + 6.25 * height - 5 * age + genderOffset);
+    bmrStr = ` BMR: ~${bmr} kcal.`;
+  }
+
+  return `Korisnik: ${gender}, ${age} god, ${weight}kg${heightStr}, nivo aktivnosti: ${act}. Kalorijski cilj: ${state.calorieGoal} kcal, cilj: ${goalLabel}.${bmrStr}`;
 }
 
 // ─── GEMINI API ───────────────────────────────────────────────────────────────
@@ -892,6 +904,10 @@ async function generateWeeklySummary(stats) {
   const profile = buildUserProfile();
   const weekLabel = stats.weekLabel || 'ova nedelja';
 
+  // Build best/worst day context if available — gives AI concrete anchors to reference
+  const bestDayStr  = stats.bestDay  ? `\n- Najbolji dan: ${stats.bestDay.date} (${stats.bestDay.net} kcal neto)` : '';
+  const worstDayStr = stats.worstDay ? `\n- Najgori dan:  ${stats.worstDay.date} (${stats.worstDay.net} kcal neto)` : '';
+
   const prompt = `Ti si motivišući nutricionistički trener. Analiziraj nedeljne statistike ishrane i daj kratak, konkretan komentar (2-4 rečenice, bez uvoda).
 ${profile}
 Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj korisnika: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
@@ -907,9 +923,11 @@ Statistike:
 - Prosečni proteini: ${stats.avgProtein}g
 - Prosečni ugljeni hidrati: ${stats.avgCarbs}g
 - Prosečne masti: ${stats.avgFat}g
-- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak mase' : 'gubitak masti'}: ${stats.projectedLoss} kg
+- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak mase' : 'gubitak masti'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
 
-Budi direktan, specifičan i motivišući. Pohvali ako je dobro, konstruktivno upozori ako nije. Odgovori na srpskom.`;
+Ako postoje podaci o najboljim/najgorim danima, konkretno ih pomeni u komentaru.
+Zabranjena su generička mesta poput: "nastavi ovako", "odličan si", "samo nastavi napred".
+Budi direktan i specifičan — pohvali konkretno, upozori konkretno. Odgovori na srpskom.`;
 
   return await callGemini([{ text: prompt }], 0.5);
 }
@@ -945,14 +963,35 @@ async function analyzeProduct(text, base64, mimeType) {
     ? 'Analiziraj deklaraciju/etiketu na slici.'
     : 'Korisnik je opisao proizvod tekstom, analiziraj na osnovu toga.';
 
+  // FSA (UK Food Standards Agency) traffic light thresholds per 100g — authoritative source.
+  // Trans fat is added separately as a hard red flag (WHO/FDA — no safe dose).
   const prompt = `Ti si nutricionistički ekspert koji analizira prehrambene proizvode.
 ${imageNote}${contextNote}
 
-Iz deklaracije izvuci nutritivne vrednosti na 100g i oceni da li je ovaj proizvod zdrav.
-Ako etiketa nije potpuno čitljiva, oceni na osnovu vidljivog dela i naznači to u polju "summary".
-Za serving_size_g: ako vidiš na etiketi standardnu porciju (npr. "1 kesica 30g"), koristi tu vrednost. Ako vidiš ukupnu masu pakovanja (npr. "220g"), koristi to. Ako nema podatka, proceni tipičnu porciju.
-Crvene zastavice su: visok sadržaj šećera (>15g/100g), palmino ulje, šećerni alkoholi (sorbitol, maltitol itd), trans masti, HFCS, aditivi E-102, E-104, E-110, E-122, E-124, E-129, E-211, E-621.
-Ako postoji zdravija alternativa ovom proizvodu, pomeni je kratko na kraju polja "summary".
+Iz deklaracije izvuci nutritivne vrednosti na 100g.
+
+Koristi FSA (UK Food Standards Agency) semafor sistem za ocenu na 100g:
+- Ukupne masti:     zeleno ≤3g    | žuto 3.1–17.5g  | crveno >17.5g
+- Saturovane masti: zeleno ≤1.5g  | žuto 1.6–5g     | crveno >5g
+- Šećer (ukupan):   zeleno ≤5g    | žuto 5.1–22.5g  | crveno >22.5g
+- So:               zeleno ≤0.3g  | žuto 0.31–1.5g  | crveno >1.5g
+
+Rating pravila — prebrojaj crvene zone:
+- "good"     = 0 crvenih
+- "moderate" = 1–2 crvenih
+- "avoid"    = 3–4 crvenih ILI trans masti > 0g (bez obzira na ostalo)
+
+Red flags: dodaj SAMO ako je vrednost u crvenoj zoni ili ako postoje trans masti.
+Format red flag stavke: naziv + vrednost, npr. "Visok šećer (28g/100g)" ili "Trans masti prisutne".
+Prazna lista [] ako nema crvenih zona.
+
+Napomena: prirodno masni proizvodi (sir, orasi, maslinovo ulje) mogu imati crvenu zonu za masti,
+ali to ne znači nužno da su nezdravi — naznači to u "summary" ako je relevantno.
+
+Ako etiketa nije potpuno čitljiva, oceni na osnovu vidljivog dela i naznači to u "summary".
+Za serving_size_g: koristi vrednost sa etikete ako postoji (npr. "1 kesica 30g" → 30), inače null.
+Ako postoji zdravija alternativa ovom proizvodu, kratko je pomeni na kraju polja "summary".
+
 Vrati SAMO validan JSON, bez ikakvog teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PRODUCT_SCHEMA}`;
 
@@ -2268,8 +2307,17 @@ function weeklyReportHTML(weekData) {
       </div>`;
   }).join('');
 
+  // Best and worst day by net calories vs goal — gives AI concrete data to reference
+  const sortedByDelta = [...daysWithData].sort((a, b) => {
+    const deltaA = Math.abs(a.net - (a.goal || goal));
+    const deltaB = Math.abs(b.net - (b.goal || goal));
+    return deltaA - deltaB; // ascending: closest to goal first = best
+  });
+  const bestDay  = sortedByDelta.length ? { date: fmtDate(sortedByDelta[0].date), net: sortedByDelta[0].net } : null;
+  const worstDay = sortedByDelta.length > 1 ? { date: fmtDate(sortedByDelta[sortedByDelta.length - 1].date), net: sortedByDelta[sortedByDelta.length - 1].net } : null;
+
   // Stats object passed to AI summary — deficitDays reinterpreted as on-target days per mode
-  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays: onTargetDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss };
+  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays: onTargetDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss, bestDay, worstDay };
   const statsJson = JSON.stringify(statsForAI).replace(/'/g, "\\'");
 
   // AI summary section — shows button, loading state, or cached result
