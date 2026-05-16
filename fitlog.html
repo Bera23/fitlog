@@ -1356,8 +1356,11 @@ function calcRecommendedGoal() {
   if (!tdee) return null;
 
   if (state.fitnessGoal === 'gain') {
-    // Moderate lean-gain surplus: +300 kcal above TDEE
-    return Math.round(tdee + 300);
+    // If target weight is set, base surplus on target weight TDEE (higher mass = higher maintenance)
+    // Falls back to current weight TDEE if no target is set
+    const gainWeight = (state.targetWeight && state.targetWeight > w) ? state.targetWeight : w;
+    const gainTdee = calcTDEE(gainWeight, h, state.age, state.gender, state.activity);
+    return Math.round((gainTdee || tdee) + 300);
   }
 
   // Default: 'lose' — BMI-based calorie deficit
@@ -3577,6 +3580,7 @@ function saveTargetWeight() {
   if (!isNaN(v) && v > 0) {
     state.targetWeight = v;
     localStorage.setItem('fitlog_target_weight', v);
+    autoCalorieGoal(); // recalculate goal based on new target weight
   }
   state.editTargetWeight = false;
   scheduleRender();
@@ -3695,10 +3699,11 @@ function undoDeleteHistoryProduct() {
   showToast('Vraćeno ✓');
 }
 
-// Undo toast — neutral style with orange action button
-function showUndoToast(msg) {
+// Generic undo toast — accepts a callback for the undo action
+function showUndoToastFor(msg, undoFn) {
+  window._currentUndoFn = undoFn;
   const el = document.getElementById('toast');
-  el.innerHTML = `<span>${msg}</span><button class="toast-undo-btn" onclick="undoDeleteHistoryProduct()">Poništi</button>`;
+  el.innerHTML = `<span>${msg}</span><button class="toast-undo-btn" onclick="window._currentUndoFn()">Poništi</button>`;
   el.className = 'toast undo';
   el.style.display = 'flex';
   clearTimeout(toastTimer);
@@ -3706,6 +3711,11 @@ function showUndoToast(msg) {
     el.classList.add('hide');
     setTimeout(() => { el.style.display = 'none'; el.classList.remove('hide'); el.innerHTML = ''; }, 300);
   }, 4000);
+}
+
+// Legacy wrapper for history product undo
+function showUndoToast(msg) {
+  showUndoToastFor(msg, undoDeleteHistoryProduct);
 }
 
 // ─── BODY FAT ESTIMATE ────────────────────────────────────────────────────────
@@ -4310,16 +4320,60 @@ async function requestWeeklySummary(stats) {
   }
 }
 
+// Pending undo state for swipe-deleted meals and exercises
+let _mealUndoPending = null, _mealUndoTimer = null;
+let _exUndoPending   = null, _exUndoTimer   = null;
+
 function deleteMeal(id) {
+  const meal = state.dayData.meals.find(m => m.id === id);
+  if (!meal) return;
+
+  // Save undo state before removing
+  _mealUndoPending = { meal };
   state.dayData.meals = state.dayData.meals.filter(m => m.id !== id);
   saveDay(state.date, state.dayData);
   scheduleRender();
+
+  showUndoToastFor(`"${meal.name}" obrisano`, undoDeleteMeal);
+  clearTimeout(_mealUndoTimer);
+  _mealUndoTimer = setTimeout(() => { _mealUndoPending = null; }, 4500);
+}
+
+function undoDeleteMeal() {
+  if (!_mealUndoPending) return;
+  const { meal } = _mealUndoPending;
+  clearTimeout(_mealUndoTimer);
+  _mealUndoPending = null;
+  state.dayData.meals.unshift(meal);
+  saveDay(state.date, state.dayData);
+  scheduleRender();
+  showToast('Vraćeno ✓');
 }
 
 function deleteEx(id) {
+  const ex = state.dayData.exercises.find(e => e.id === id);
+  if (!ex) return;
+
+  // Save undo state before removing
+  _exUndoPending = { ex };
   state.dayData.exercises = state.dayData.exercises.filter(e => e.id !== id);
   saveDay(state.date, state.dayData);
   scheduleRender();
+
+  showUndoToastFor(`"${ex.name}" obrisano`, undoDeleteEx);
+  clearTimeout(_exUndoTimer);
+  _exUndoTimer = setTimeout(() => { _exUndoPending = null; }, 4500);
+}
+
+function undoDeleteEx() {
+  if (!_exUndoPending) return;
+  const { ex } = _exUndoPending;
+  clearTimeout(_exUndoTimer);
+  _exUndoPending = null;
+  state.dayData.exercises.unshift(ex);
+  saveDay(state.date, state.dayData);
+  scheduleRender();
+  showToast('Vraćeno ✓');
 }
 
 async function handleSubmit() {
