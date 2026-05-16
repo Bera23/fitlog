@@ -4762,6 +4762,12 @@ toastEl.setAttribute('aria-atomic', 'true');
 toastEl.style.display = 'none';
 document.body.appendChild(toastEl);
 
+// Register Service Worker — enables PWA install prompt and offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/fitlog/sw.js', { scope: '/fitlog/' })
+    .catch(err => console.warn('[FitLog] SW registration failed:', err));
+}
+
 // Capture deferred install prompt — prevent default browser banner,
 // store event so we can show our own install button in the drawer.
 window.addEventListener('beforeinstallprompt', (e) => {
