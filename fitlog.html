@@ -6,12 +6,41 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="FitLog">
-<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA0klEQVR4nGNkQANcXFz/0cWoCb59+8aIzGeip+XY7GDCJUEvRzDR23J0RzAOhOXIgImwklEHjDpgmDuAhRhFKTOkGRSNODHEz2z6xLC+5RWDfbwgg1u2MMOxFR8Ytva9ob4DYGBezjOGu6e+kWQBITDgUTDgDiApCpKmSKHwZyQ9YXh85Qf9HDCaBoalA0hKA4SAVYQAg1WEAJz/4fkfhm7/B3j1jDZIRh0w6oCBdwB6X42e4Nu3b4xMMMZAWM7AgBQF9HQEsl1MuCToYTkDAwMDAHgfRNAq0mteAAAAAElFTkSuQmCC">
-<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAADuUlEQVR4nO3bu2oUYQCG4dlVEQaEoKVaCBZeguQyrHINFtY2lpbaWipW3oBY2FiJeAvaCGLlqZpGSCwkIYl7mNk57rfPUyczU7x8+feQWTGisiyPxrw//aiqajbWvQe7sXh321CR93oTEbNIn3H3cmEhU0cfYXd6QSGziS7D7uRCQqYLXYQ9b3sBMdOVLlpqFbSY6VrbpjaaeCEzhE2OII0XWswMZZPWGgUtZobWtLnaQYuZsTRpr1bQYmZsdRtcG7SYmYo6LbZ+HxqmZGXQ1pmpWdfk0qDFzFStanNh0GJm6pY16gxNlP+Cts5si0WtWmiinAnaOrNtzjdroYlyErR1ZludbtdCE0XQRJkXheMG2++4YQtNFEETRdBEETRRZl4QksRCE0XQRBE0UQRNFEETRdBEETRRBE0UQRNF0EQRNFEETRRBE0XQRBE0UQRNFEETRdBEETRRBE0UQRNF0EQRNFEETRRBE0XQRBE0UQRNlItjP0Bb91/eLK7fuTz2Y5w4PCyKR3c/N/69K9cuFA/f3Kr98+9f/S5eP/3e+D7pLDRRBE0UQRNF0EQRNFEETRRBE0XQRBE0Ubb+k8Imfn79Uzy592Xsx6BHFpoogiaKoIkiaKIImiiCJoqgiSJoogiaKIImiqCJslPf5bh641Lx+OPtXq796UNVvHjwrZdrU5+FJoqgiSJoogiaKIImiqCJImiiCJoogibKTn1S6L++81loogiaKIImiqCJImiiCJoogiaKoIkiaKIImiiCJoqgiSJoogiaKIImiqCJslNf8E+yf7BX7B/s9XqPd89/FW+f/ej1Hl2z0EQRNFEETRRBE0XQRBE0UQRNFEETRdBEmZVleTT2Q0BXLDRRBE0UQRNF0EQRNFEETRRBE0XQRBE0UQRNFEETRdBEETRRBE0UQRNF0EQRNFEETRRBE0XQRBE0UQRNFEETRdBEETRRBE0UQRNF0EQRNFHmVVXNxn4I6EJVVTMLTRRBE0XQRBE0UeZF8e8wPfaDQBvHDVtoogiaKCdBO3awrU63a6GJciZoK822Od+shSbKf0FbabbFolYtNFEWBm2lmbpljS5daFEzVavaXHnkEDVTs65JZ2iirA3aSjMVdVqstdCiZmx1G6x95BA1Y2nSXqMztKgZWtPmGr8oFDVD2aS1VnGWZXnU5vdhkTaj2eptO2tN19o21fp9aFHTlS5a6jRGRxA20eUo9rKuwqaOPv6693pcEDaL9HlMHez8K+7dNtRrrVFf0Ik805hvFPwFD8PNgrYJ3ZwAAAAASUVORK5CYII=">
+<link rel="icon" id="favicon" type="image/png">
+<link rel="apple-touch-icon" id="apple-touch-icon">
 <link rel="manifest" id="pwa-manifest">
 <title>FitLog</title>
+<!-- Preconnect to Google Fonts domains so DNS+TLS are ready before CSS loads -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <style>
+/*
+ * ─── CSS TABLE OF CONTENTS ────────────────────────────────────────────────────
+ *  1.  DESIGN TOKENS      — :root variables (colors, typography, surface scale)
+ *  2.  RESET              — box-sizing, body, scrollbar
+ *  3.  ANIMATIONS         — tab fade-in, shimmer, spin, toast keyframes
+ *  4.  HEADER             — logo bar, progress bar
+ *  5.  NAVIGATION         — bottom nav bar, nav buttons
+ *  6.  CARDS              — .card, .card-label base styles
+ *  7.  INPUTS             — textarea, mode toggle, send button, image upload
+ *  8.  SKELETON LOADER    — shimmer placeholder cards
+ *  9.  STATS              — calorie ring, macro bars, week chart, streak
+ * 10.  LOG ITEMS          — meal/exercise rows, swipe-to-delete, pills
+ * 11.  TOAST              — notification bar (ok, err, undo)
+ * 12.  EMPTY STATES       — empty tab illustrations
+ * 13.  HISTORY            — list, detail view, meal expand/collapse
+ * 14.  ZDRAVLJE TAB       — BMI scale, weight log, water tracker, sub-tabs
+ * 15.  PRODUCT CARDS      — label scanner cards, rating badges
+ * 16.  WEEKLY REPORT      — day rows, grade display
+ * 17.  NUTRITION SCORE    — daily score card, meal score inline
+ * 18.  ONBOARDING         — first-run profile form
+ * 19.  API KEY SCREEN     — API key entry screen
+ * 20.  SETTINGS DRAWER    — slide-in panel, accordion sections
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/* ── 1. DESIGN TOKENS ────────────────────────────────────────────────────────*/
   :root {
     --green: #8fd42e;
     --blue: #47c8ff;
@@ -47,20 +76,19 @@
     /* Easing */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
+/* ── 2. RESET ────────────────────────────────────────────────────────────────*/
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--sans); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
-
-  /* Webkit scrollbar — minimal */
   ::-webkit-scrollbar { width: 0; }
 
-  /* ── TAB CONTENT ANIMATION ─────────────────────────────── */
+/* ── 3. ANIMATIONS ───────────────────────────────────────────────────────────*/
   @keyframes tabFadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   .tab-content { animation: tabFadeIn 0.18s var(--ease); }
 
-  /* HEADER — logo + date */
+/* ── 4. HEADER ───────────────────────────────────────────────────────────────*/
   .header { padding: 14px 16px 4px; border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
   .logo { font-family: var(--mono); font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--green), #47ffb5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
@@ -71,7 +99,8 @@
   .header-progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), #47ffb5); transition: width 0.6s var(--ease), background 0.3s; }
   .header-progress-labels { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
 
-  /* ZDRAVLJE SUBTABS */
+/* ── 5. NAVIGATION ───────────────────────────────────────────────────────────*/
+  /* Zdravlje sub-tabs and weight entry controls */
   .sub-tabs { display: flex; gap: 4px; margin: 12px 16px 0; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
   .sub-tab { flex: 1; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; min-height: 44px; }
   .sub-tab.active { background: var(--green); color: #0a0a0a; font-weight: 800; }
@@ -80,7 +109,7 @@
   .weight-input { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 8px; font-size: 13px; width: 65px; font-family: var(--mono); outline: none; min-height: 44px; box-sizing: border-box; }
   .save-btn { background: var(--green); color: var(--bg); border: none; border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; min-height: 44px; }
 
-  /* API KEY SCREEN */
+/* ── 19. API KEY SCREEN ──────────────────────────────────────────────────────*/
   .api-screen { padding: 40px 20px; text-align: center; }
   .api-screen h2 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; font-size: 18px; }
   .api-screen p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
@@ -89,7 +118,7 @@
   .api-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
   .api-hint a { color: var(--muted); }
 
-  /* WEEKLY REPORT */
+/* ── 16. WEEKLY REPORT ───────────────────────────────────────────────────────*/
   .report-stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--s3); }
   .report-stat:last-child { border-bottom: none; }
   .report-stat-label { font-size: 13px; color: var(--muted); }
@@ -106,7 +135,7 @@
   .report-grade-label { text-align: center; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
   .report-grade-sub { text-align: center; font-size: 13px; color: var(--muted); }
 
-  /* SKELETON LOADER */
+/* ── 8. SKELETON LOADER ──────────────────────────────────────────────────────*/
   @keyframes shimmer {
     0% { background-position: -400px 0; }
     100% { background-position: 400px 0; }
@@ -123,7 +152,7 @@
   .skeleton-pill { height: 20px; width: 55px; border-radius: 8px; }
   .skeleton-kcal { height: 28px; width: 50px; border-radius: 4px; }
 
-  /* ZDRAVLJE TAB */
+/* ── 14. ZDRAVLJE TAB ────────────────────────────────────────────────────────*/
   .bmi-scale-wrap { margin: 12px 0 8px; }
   .bmi-scale-track { height: 10px; border-radius: 5px; background: linear-gradient(to right, var(--blue) 0%, var(--green) 30%, var(--orange) 55%, var(--red) 75%, #900 100%); position: relative; margin-bottom: 6px; }
   .bmi-scale-marker { position: absolute; top: -4px; width: 4px; height: 18px; background: var(--white); border-radius: 2px; transform: translateX(-50%); }
@@ -137,7 +166,7 @@
   .prognoza-bar { height: 8px; background: var(--s4); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
   .prognoza-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
 
-  /* PRODUCT CARDS */
+/* ── 15. PRODUCT CARDS ───────────────────────────────────────────────────────*/
   .product-card { position: relative; border-bottom: 1px solid var(--s5); }
   .product-card:last-child { border-bottom: none; }
   /* Inside swipe wrappers each .product-card is :last-child of .hist-swipe-inner,
@@ -159,7 +188,7 @@
   .product-macro-val  { font-family: var(--mono); font-size: 14px; font-weight: 800; }
   .product-macro-lbl  { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  /* BOTTOM NAV */
+/* ── 5b. BOTTOM NAV BAR ──────────────────────────────────────────────────────*/
   .bottom-nav {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
     width: 100%; max-width: 480px;
@@ -190,11 +219,12 @@
   .nav-btn.active .nav-icon { filter: none; }
   .nav-btn.inactive .nav-icon { opacity: 0.35; }
 
-  /* CARD */
+/* ── 6. CARDS ────────────────────────────────────────────────────────────────*/
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 16px 0; box-shadow: var(--shadow-sm); }
   .card-label { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
 
-  /* MODE TOGGLE */
+/* ── 7. INPUTS ───────────────────────────────────────────────────────────────*/
+  /* Mode toggle */
   .mode-toggle { display: flex; gap: 4px; margin-bottom: 10px; background: var(--bg); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
   .mode-btn { flex: 1; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: var(--sans); transition: background 0.15s, color 0.15s; min-height: 44px; }
   .mode-btn.active { background: var(--green); color: #0a0a0a; font-weight: 800; }
@@ -226,7 +256,7 @@
   .img-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: rgba(71,200,255,0.07); border-radius: 8px; border: 1px solid rgba(71,200,255,0.2); }
   .img-strip img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 
-  /* STATS */
+/* ── 9. STATS ────────────────────────────────────────────────────────────────*/
   .ring-wrap { position: relative; flex-shrink: 0; }
   .ring-wrap svg { display: block; }
   .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -246,25 +276,25 @@
   .kcal-footer-val { font-family: var(--mono); font-size: 20px; font-weight: 700; line-height: 1; }
   .goal-input { background: var(--s1); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px 8px; font-size: 13px; font-family: var(--mono); width: 70px; outline: none; min-height: 44px; box-sizing: border-box; }
 
-  /* MACRO BAR */
+  /* Macro bars — also used in weekly report */
   .macro-row { margin-bottom: 10px; }
   .macro-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0; }
   .macro-track { height: 5px; background: var(--s4); border-radius: 99px; overflow: hidden; }
   .macro-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
 
-  /* LOG ITEMS — better hierarchy */
+/* ── 10. LOG ITEMS ───────────────────────────────────────────────────────────*/
   .log-item { position: relative; overflow: hidden; border-bottom: 1px solid var(--s3); }
   .log-item:last-child { border-bottom: none; }
   .pills { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
   .pill { display: inline-block; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
   .log-note { margin-top: 6px; font-size: 11px; color: var(--muted); font-style: italic; }
 
-  /* EMPTY */
+/* ── 12. EMPTY STATES ────────────────────────────────────────────────────────*/
   .empty { text-align: center; padding: 48px 20px 36px; color: var(--muted); font-size: 13px; line-height: 1.6; }
   .empty-icon { font-size: 40px; margin-bottom: 14px; display: block; opacity: 0.6; }
   .empty-title { font-size: 15px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
 
-  /* TOAST — above bottom nav */
+/* ── 11. TOAST ───────────────────────────────────────────────────────────────*/
   @keyframes toastIn {
     from { opacity: 0; transform: translate(-50%, 10px) scale(0.96); }
     to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -290,7 +320,7 @@
   .hist-swipe-wrap { position: relative; overflow: hidden; }
   .hist-swipe-inner { transition: transform 0.25s var(--ease); will-change: transform; background: var(--card); }
 
-  /* STREAK */
+  /* Streak counter */
   .streak-wrap { display: flex; align-items: center; gap: 16px; }
   .streak-num { font-family: var(--mono); font-size: 48px; font-weight: 700; line-height: 1; color: var(--green); }
   .streak-num.zero { color: var(--muted); }
@@ -318,7 +348,7 @@
   .weight-log-val { font-size: 15px; font-weight: 700; font-family: var(--mono); color: var(--text); }
   .weight-log-diff { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
 
-  /* HISTORY */
+/* ── 13. HISTORY ─────────────────────────────────────────────────────────────*/
   .hist-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--s3); cursor: pointer; transition: background 0.12s; border-radius: 4px; }
   .hist-item:last-child { border-bottom: none; }
   .hist-item:active { background: var(--s4); }
@@ -345,7 +375,7 @@
   .hist-workout-entry { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--s3); font-size: 13px; }
   .hist-workout-entry:last-child { border-bottom: none; }
 
-  /* WATER TRACKER */
+  /* Water tracker drops and buttons */
   .water-drops { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
   .water-drop {
     width: 36px; height: 38px;
@@ -405,10 +435,10 @@
   .hist-meal-item .hist-meal-expanded  { display: none; }
   .hist-meal-item.expanded .hist-meal-collapsed { display: none; }
   .hist-meal-item.expanded .hist-meal-expanded  { display: block; }
-  /* HISTORY SCORE — expand/collapse via DOM toggle */
+  /* History score card — expand/collapse via DOM toggle */
   .history-score-content { display: none; margin-top: 10px; }
 
-  /* NUTRITION SCORE CARD */
+/* ── 17. NUTRITION SCORE ─────────────────────────────────────────────────────*/
   .score-btn { width: 100%; padding: 13px; background: var(--s2); border: none; border-top: 1px solid var(--s6); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; min-height: 44px; }
   .score-btn:active { background: var(--s4); }
   .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--muted); font-size: 11px; padding: 12px 16px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; min-height: 44px; }
@@ -419,7 +449,7 @@
   .score-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--s3); font-size: 13px; line-height: 1.5; }
   .score-row:last-child { border-bottom: none; }
 
-  /* ONBOARDING */
+/* ── 18. ONBOARDING ──────────────────────────────────────────────────────────*/
   .onboard-screen { padding: 32px 20px; }
   .onboard-title { font-family: var(--mono); color: var(--green); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
   .onboard-sub { color: var(--muted); font-size: 13px; line-height: 1.65; margin-bottom: 28px; }
@@ -447,10 +477,10 @@
   }
   .onboard-btn:active { transform: scale(0.98); }
 
-  /* BOTTOM NAV placeholder */
+  /* Layout spacer — keeps content above fixed bottom nav */
   .spacer { height: 20px; }
 
-  /* SETTINGS DRAWER */
+/* ── 20. SETTINGS DRAWER ─────────────────────────────────────────────────────*/
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s var(--ease); }
   .drawer-overlay.open { opacity: 1; pointer-events: all; }
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 300px; max-width: 92vw; background: var(--s1); border-left: 1px solid var(--s5); z-index: 201; transform: translateX(100%); transition: transform 0.28s var(--ease); overflow-y: auto; padding-bottom: 40px; }
@@ -475,7 +505,7 @@
   .drawer-field { margin-bottom: 10px; }
   .drawer-field-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px; }
 
-  /* ACCORDION SECTIONS */
+  /* Accordion sections inside the drawer */
   .drawer-acc-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; cursor: pointer; user-select: none;
@@ -503,6 +533,34 @@
 <div id="app"></div>
 
 <script>
+/*
+ * ─── JAVASCRIPT TABLE OF CONTENTS ────────────────────────────────────────────
+ *   §1   APP CONSTANTS         — keys, URLs, schema version, domain constants
+ *   §2   GEMINI SCHEMAS        — JSON output format strings for AI prompts
+ *   §3   STATE                 — global state object (single source of truth)
+ *   §4   UTILITY FUNCTIONS     — date helpers, debounce, scheduleRender, cache
+ *   §5   STORAGE               — localStorage read/write for every data type
+ *   §6   PROMPT HELPERS        — buildUserProfile() for consistent AI context
+ *   §7   GEMINI API            — callGemini() + all feature-specific AI calls
+ *   §8   SETTINGS DRAWER HTML  — renderDrawer(), accordion builders
+ *   §9   SAVE HANDLERS         — profile, goal, API key, export, model save fns
+ *   §10  TOAST                 — showToast(), showUndoToastFor()
+ *   §11  PROFILE / TDEE MATH   — calcTDEE, calcRecommendedGoal, macroLimits
+ *   §12  SCORE STORAGE         — loadNutritionScore, saveNutritionScore
+ *   §13  UI HELPERS            — ringHTML, macroBar, weekChartHTML, bmiCategory
+ *   §14  DATA AGGREGATION      — totals(), getWeekData(), calcStreak()
+ *   §15  TAB HTML RENDERERS    — zdravljeTabHTML, historyTabHTML, productsLogHTML
+ *   §16  MAIN RENDER           — render() — assembles full app UI from state
+ *   §17  EVENT HANDLERS        — setTab, setMode, addWater, weight/target fns
+ *   §18  SWIPE TO DELETE       — touch gesture state machine
+ *   §19  HISTORY HELPERS       — product history, undo delete
+ *   §20  ASYNC AI HANDLERS     — handleSubmit, scoreNutrition, handleProductSubmit
+ *   §21  SCHEMA MIGRATION      — migrateSchema(), checkSchemaVersion()
+ *   §22  INIT                  — initial data load, first render, PWA toast
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+// ─── §1 APP CONSTANTS ─────────────────────────────────────────────────────────
 const SCORE_KEY = 'fitlog_score_';
 const MEAL_SCORE_KEY = 'fitlog_meal_scores_';
 // Base URL for Gemini API — model and key appended at call time
@@ -514,8 +572,13 @@ const LS_VERSION = 1;
 const KCAL_PER_KG_FAT      = 7700;   // approximate kcal needed to burn 1 kg of body fat
 const WATER_ML_PER_KG      = 30;     // recommended daily water intake in ml per kg bodyweight
 const DEFAULT_WATER_GOAL_ML = 2000;  // fallback water goal when weight is unknown
+// localStorage size thresholds (bytes). Browser limit is typically 5MB (5 * 1024 * 1024).
+// Each JS string character occupies 2 bytes (UTF-16).
+const LS_WARN_BYTES     = 3.5 * 1024 * 1024; // show yellow warning
+const LS_CRITICAL_BYTES = 4.5 * 1024 * 1024; // show red critical warning
+const LS_MAX_BYTES      = 5   * 1024 * 1024; // estimated browser hard limit
 
-// ─── GEMINI PROMPT SCHEMAS ───────────────────────────────────────────────────
+// ─── §2 GEMINI SCHEMAS ────────────────────────────────────────────────────────
 // JSON output format strings shared across prompt functions — single source of truth
 const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}';
 const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
@@ -535,7 +598,7 @@ function saveMealScores(date, scores) {
   localStorage.setItem(MEAL_SCORE_KEY + date, JSON.stringify(scores));
 }
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
+// ─── §3 STATE ─────────────────────────────────────────────────────────────────
 
 const state = {
   apiKey: localStorage.getItem('fitlog_apikey') || '',
@@ -589,7 +652,11 @@ const state = {
   // Fitness goal: 'lose' | 'maintain' | 'gain'
   fitnessGoal: localStorage.getItem('fitlog_fitness_goal') || 'lose',
   waterGoal: initWaterGoal(),
+  installPromptEvent: null, // deferred beforeinstallprompt event — null when unavailable
+  appInstalled: false,      // flips to true after successful PWA install
 };
+
+// ─── §4 UTILITY FUNCTIONS ─────────────────────────────────────────────────────
 
 // Human-readable activity labels used across tabs and drawer
 const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
@@ -613,7 +680,7 @@ function fmtDate(dateStr) {
   return `${day}.${month}.`;
 }
 
-// ─── STORAGE ─────────────────────────────────────────────────────────────────
+// ─── §5 STORAGE ───────────────────────────────────────────────────────────────
 
 function loadDay(date) {
   try {
@@ -628,6 +695,34 @@ function saveDay(date, data) {
   // mutating the live state.dayData object.
   const payload = { ...data, goalSnapshot: state.calorieGoal };
   localStorage.setItem('fitlog_day_' + date, JSON.stringify(payload));
+  // Warn user if storage is approaching browser limit
+  checkStorageWarning();
+}
+
+// Calculate total bytes used by all fitlog_ keys in localStorage.
+// localStorage is UTF-16 encoded — each character is 2 bytes.
+function calcLocalStorageUsage() {
+  let chars = 0;
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('fitlog_')) {
+      chars += key.length + (localStorage.getItem(key) || '').length;
+    }
+  }
+  return chars * 2; // bytes
+}
+
+// Show a toast warning if localStorage is approaching the 5MB browser limit.
+// Uses a session flag to avoid repeating the toast on every save.
+let _storageWarnedThisSession = false;
+function checkStorageWarning() {
+  const used = calcLocalStorageUsage();
+  if (used >= LS_CRITICAL_BYTES && !_storageWarnedThisSession) {
+    _storageWarnedThisSession = true;
+    showToast('⚠️ Memorija skoro puna! Izvezi podatke odmah.', 'err');
+  } else if (used >= LS_WARN_BYTES && !_storageWarnedThisSession) {
+    _storageWarnedThisSession = true;
+    showToast('💾 Memorija se puni — razmisli o exportu podataka.');
+  }
 }
 
 // Load scanned products for a given date — returns array of product objects
@@ -740,6 +835,43 @@ function parseGeminiJson(raw) {
   }
 }
 
+// ─── GEMINI RESPONSE VALIDATORS ──────────────────────────────────────────────
+// Each validator mirrors its corresponding GEMINI_*_SCHEMA constant.
+// Throws a user-friendly error so the caller's catch block shows a clear toast.
+
+function validateFoodResponse(data) {
+  if (!Array.isArray(data?.items) || data.items.length === 0)
+    throw new Error('Nije prepoznata hrana — pokušaj preciznije');
+  if (typeof data.total_calories !== 'number')
+    throw new Error('Neispravan format odgovora — pokušaj ponovo');
+}
+
+function validateExerciseResponse(data) {
+  if (!Array.isArray(data?.items) || data.items.length === 0)
+    throw new Error('Nije prepoznata aktivnost — pokušaj preciznije');
+  if (typeof data.total_burned !== 'number')
+    throw new Error('Neispravan format odgovora — pokušaj ponovo');
+}
+
+function validateProductResponse(data) {
+  if (!data?.name || typeof data.name !== 'string')
+    throw new Error('Nije prepoznat proizvod — pokušaj ponovo');
+  if (!['good', 'moderate', 'avoid'].includes(data.rating))
+    throw new Error('Neispravan format proizvoda — pokušaj ponovo');
+}
+
+function validateScoreResponse(data) {
+  if (typeof data?.score !== 'number' || data.score < 1 || data.score > 10)
+    throw new Error('Neispravan skor — pokušaj ponovo');
+}
+
+function validateMealScoreResponse(data) {
+  if (typeof data?.score !== 'number' || data.score < 1 || data.score > 10)
+    throw new Error('Neispravan skor obroka — pokušaj ponovo');
+  if (typeof data?.comment !== 'string')
+    throw new Error('Neispravan komentar — pokušaj ponovo');
+}
+
 // ─── API STATS ────────────────────────────────────────────────────────────────
 
 function loadApiStats() {
@@ -774,6 +906,7 @@ function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
   saveApiStats(s);
 }
 
+// ─── §5b RENDER UTILITIES ─────────────────────────────────────────────────────
 // Generic debounce — returns a debounced wrapper that delays fn execution by ms
 // after the last call, encapsulating the timer so callers stay clean.
 function debounce(fn, ms) {
@@ -816,7 +949,7 @@ function scheduleRender() {
 let _renderCache = {};
 function clearRenderCache() { _renderCache = {}; }
 
-// ─── PROMPT HELPERS ──────────────────────────────────────────────────────────
+// ─── §6 PROMPT HELPERS ────────────────────────────────────────────────────────
 
 // Returns a consistent user profile string injected into every AI prompt.
 // Includes BMR (Mifflin-St Jeor) and calorie goal so every prompt has full context.
@@ -841,7 +974,7 @@ function buildUserProfile() {
   return `Korisnik: ${gender}, ${age} god, ${weight}kg${heightStr}, nivo aktivnosti: ${act}. Kalorijski cilj: ${state.calorieGoal} kcal, cilj: ${goalLabel}.${bmrStr}`;
 }
 
-// ─── GEMINI API ───────────────────────────────────────────────────────────────
+// ─── §7 GEMINI API ────────────────────────────────────────────────────────────
 
 // Low-level Gemini call — accepts a `parts` array so callers can pass text-only
 // or multimodal (text + image) content without duplicating fetch/error logic.
@@ -893,7 +1026,9 @@ Napomena: sugar je dodati i prirodni šećer u gramima.
 Unos korisnika: ${text}`;
 
   const raw = await callGemini([{ text: prompt }]);
-  return parseGeminiJson(raw);
+  const result = parseGeminiJson(raw);
+  validateFoodResponse(result);
+  return result;
 }
 
 async function parseExercise(text) {
@@ -909,7 +1044,9 @@ Format: ${GEMINI_EXERCISE_SCHEMA}
 Unos korisnika: ${text}`;
 
   const raw = await callGemini([{ text: prompt }]);
-  return parseGeminiJson(raw);
+  const result = parseGeminiJson(raw);
+  validateExerciseResponse(result);
+  return result;
 }
 
 // Generate a short motivational weekly summary using Gemini.
@@ -966,7 +1103,9 @@ Format: ${GEMINI_FOOD_SCHEMA}`;
     { text: prompt },
     { inline_data: { mime_type: mimeType, data: base64 } }
   ]);
-  return parseGeminiJson(raw);
+  const result = parseGeminiJson(raw);
+  validateFoodResponse(result);
+  return result;
 }
 
 // Analyze a food product (label/packaging) — returns structured nutritional data + AI rating.
@@ -1014,10 +1153,12 @@ Format: ${GEMINI_PRODUCT_SCHEMA}`;
   if (base64) parts.push({ inline_data: { mime_type: mimeType, data: base64 } });
 
   const raw = await callGemini(parts, 0.1);
-  return parseGeminiJson(raw);
+  const result = parseGeminiJson(raw);
+  validateProductResponse(result);
+  return result;
 }
 
-// ─── SETTINGS DRAWER ─────────────────────────────────────────────────────────
+// ─── §8 SETTINGS DRAWER HTML ──────────────────────────────────────────────────
 
 function openDrawer() {
   state.drawerOpen = true;
@@ -1200,20 +1341,54 @@ function settingsDrawerHTML() {
     </div>` : `<div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center">Nema grešaka ✓</div>`}
     <button onclick="clearApiStats()" class="drawer-btn danger" style="margin-top:10px;font-size:12px">↺ Resetuj statistiku</button>`;
 
-  const podaciBody = `
+  const podaciBody = (() => {
+    const usedBytes  = calcLocalStorageUsage();
+    const usedMB     = (usedBytes / (1024 * 1024)).toFixed(2);
+    const pct        = Math.min(100, Math.round((usedBytes / LS_MAX_BYTES) * 100));
+    const barColor   = usedBytes >= LS_CRITICAL_BYTES ? 'var(--red)'
+                     : usedBytes >= LS_WARN_BYTES     ? 'var(--orange)'
+                     : 'var(--green)';
+    const statusText = usedBytes >= LS_CRITICAL_BYTES ? '⚠️ Kritično — izvezi odmah'
+                     : usedBytes >= LS_WARN_BYTES     ? '⚠️ Blizu limita'
+                     : '✓ U redu';
+    const statusColor = usedBytes >= LS_WARN_BYTES ? barColor : 'var(--muted)';
+
+    return `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.8px;text-transform:uppercase">Lokalna memorija</span>
+        <span style="font-size:11px;color:${statusColor};font-weight:700">${statusText}</span>
+      </div>
+      <div style="height:6px;background:var(--s4);border-radius:3px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.4s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono)">
+        <span>${usedMB} MB korišćeno</span>
+        <span>${pct}% od ~5 MB</span>
+      </div>
+    </div>
     <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>`;
+  })();
 
   return `
     <div class="drawer-header">
       <span class="drawer-title">⚙ Podešavanja</span>
       <button class="drawer-close" onclick="closeDrawer()">✕</button>
     </div>
+    ${state.installPromptEvent && !state.appInstalled ? `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--s3)">
+      <button onclick="triggerInstall()" style="width:100%;background:var(--green);color:#0a0a0a;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--sans)">
+        📲 Instaliraj app na telefon
+      </button>
+    </div>` : ''}
     ${acc('api',    'Gemini API',       apiBody)}
     ${acc('profil', 'Profil',           profilBody)}
     ${acc('goal',   'Kalorijski cilj',  goalBody)}
     ${acc('usage',  'API Usage',        usageBody)}
     ${acc('data',   'Podaci',           podaciBody)}`;
 }
+
+// ─── §9 SAVE HANDLERS ─────────────────────────────────────────────────────────
 
 function saveDrawerApiKey() {
   const val = document.getElementById('drawerApiInput')?.value.trim();
@@ -1337,7 +1512,7 @@ function exportData() {
   showToast('Podaci izvezeni ✓');
 }
 
-// ─── TOAST ───────────────────────────────────────────────────────────────────
+// ─── §10 TOAST ────────────────────────────────────────────────────────────────
 
 let toastTimer = null;
 function showToast(msg, type = 'ok') {
@@ -1352,7 +1527,7 @@ function showToast(msg, type = 'ok') {
   }, 3000);
 }
 
-// ─── TDEE / PROFILE HELPERS ───────────────────────────────────────────────────
+// ─── §11 PROFILE / TDEE MATH ──────────────────────────────────────────────────
 
 function calcTDEE(w, h, age, gender, activity) {
   if (!w || !h) return null;
@@ -1410,6 +1585,8 @@ function macroLimits() {
   };
 }
 
+// ─── §12 SCORE STORAGE ────────────────────────────────────────────────────────
+
 function loadNutritionScore(date) {
   const cacheKey = 'ns_' + date;
   if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
@@ -1428,7 +1605,7 @@ function saveNutritionScore(date, score) {
   localStorage.setItem(SCORE_KEY + date, JSON.stringify(score));
 }
 
-// ─── RING SVG ─────────────────────────────────────────────────────────────────
+// ─── §13 UI HELPERS ───────────────────────────────────────────────────────────
 
 function ringHTML(consumed, burned, goal) {
   const net = consumed - burned;
@@ -1456,7 +1633,7 @@ function ringHTML(consumed, burned, goal) {
     </div>`;
 }
 
-// ─── CALCULATIONS ─────────────────────────────────────────────────────────────
+// ─── §14 DATA AGGREGATION ─────────────────────────────────────────────────────
 
 function totals() {
   const d = state.dayData;
@@ -1500,7 +1677,7 @@ function macroBar(label, value, min, max, color, unit) {
     </div>`;
 }
 
-// ─── WEEK DATA & STREAK ───────────────────────────────────────────────────────
+// ─── §14b WEEK DATA & STREAK ──────────────────────────────────────────────────
 
 // Returns current week Mon–Sun (future days shown as empty)
 function getWeekData(offset = 0) {
@@ -1661,6 +1838,8 @@ function bmiCategory(bmi) {
 }
 
 
+
+// ─── §15 TAB HTML RENDERERS ───────────────────────────────────────────────────
 
 function getHistoryData(maxDays = 90) {
   const cacheKey = 'historyData_' + maxDays;
@@ -3096,9 +3275,29 @@ function zdravljeTabHTML() {
     </div>`;
 }
 
-// ─── RENDER ───────────────────────────────────────────────────────────────────
+// ─── §16 MAIN RENDER ──────────────────────────────────────────────────────────
 
 function render() {
+  try {
+    _renderInner();
+  } catch (err) {
+    // Surface render errors instead of leaving the user on a blank screen
+    console.error('[FitLog] render() crashed:', err);
+    const app = document.getElementById('app');
+    if (app) app.innerHTML = `
+      <div style="padding:40px 20px;text-align:center">
+        <div style="font-size:40px;margin-bottom:16px">⚠️</div>
+        <div style="color:var(--red);font-weight:700;font-size:15px;margin-bottom:8px">Greška pri učitavanju</div>
+        <div style="color:var(--muted);font-size:12px;font-family:var(--mono);margin-bottom:20px;word-break:break-all;padding:0 10px">${err.message || 'Nepoznata greška'}</div>
+        <button onclick="location.reload()"
+          style="background:var(--green);border:none;border-radius:10px;color:#0a0a0a;padding:13px 28px;font-weight:800;font-size:14px;cursor:pointer;font-family:var(--sans)">
+          Restart app
+        </button>
+      </div>`;
+  }
+}
+
+function _renderInner() {
   // Clear per-render memoization cache on every new render cycle
   clearRenderCache();
   const app = document.getElementById('app');
@@ -3575,6 +3774,19 @@ function render() {
     const ta = document.getElementById('msgInput');
     if (ta) ta.value = draftValue;
   }
+} // end _renderInner
+
+// ─── §17 EVENT HANDLERS ───────────────────────────────────────────────────────
+
+// Trigger the native PWA install prompt — only works if beforeinstallprompt fired
+async function triggerInstall() {
+  if (!state.installPromptEvent) return;
+  state.installPromptEvent.prompt();
+  const { outcome } = await state.installPromptEvent.userChoice;
+  if (outcome === 'accepted') {
+    state.installPromptEvent = null;
+    renderDrawer();
+  }
 }
 
 function addWater(ml) {
@@ -3630,7 +3842,7 @@ function clearTargetWeight() {
   document.getElementById('twInput')?.focus();
 }
 
-// ─── SWIPE TO DELETE ──────────────────────────────────────────────────────────
+// ─── §18 SWIPE TO DELETE ──────────────────────────────────────────────────────
 const _swipe = {};
 function swipeCancel(id) {
   if (!_swipe[id]) return;
@@ -3681,7 +3893,7 @@ function swipeEnd(e, id, type) {
   delete _swipe[id];
 }
 
-// ─── HISTORY PRODUCT HELPERS ──────────────────────────────────────────────────
+// ─── §19 HISTORY & PRODUCT HELPERS ───────────────────────────────────────────
 
 // Returns all products from the last 90 days as a flat array
 function getAllHistoryProducts() {
@@ -3755,7 +3967,7 @@ function showUndoToast(msg) {
   showUndoToastFor(msg, undoDeleteHistoryProduct);
 }
 
-// ─── BODY FAT ESTIMATE ────────────────────────────────────────────────────────
+// ─── §19b MISC HELPERS ────────────────────────────────────────────────────────
 function estimateBodyFat(bmi, age, gender) {
   // Deurenberg formula
   const factor = gender === 'male' ? 1 : 0;
@@ -3932,7 +4144,7 @@ function handleImageSelect(input) {
   reader.readAsDataURL(file);
 }
 
-// ── existing actions below ──
+// §17 continued — API key, weight, navigation, meal/exercise CRUD actions
 
 function saveApiKey() {
   const val = document.getElementById('apiInput').value.trim();
@@ -4050,6 +4262,7 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
 
     const raw = await callGemini([{ text: prompt }], 0.3);
     const score = parseGeminiJson(raw);
+    validateScoreResponse(score);
     state.nutritionScore = score;
     saveNutritionScore(state.date, score);
 
@@ -4206,6 +4419,7 @@ PRAVILA:
 Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     const raw = await callGemini([{ text: prompt }], 0.2);
     const result = parseGeminiJson(raw);
+    validateMealScoreResponse(result);
     state.mealScores[mealId] = result;
     saveMealScores(state.date, state.mealScores);
 
@@ -4435,6 +4649,8 @@ function undoDeleteEx() {
   showToast('Vraćeno ✓');
 }
 
+// ─── §20 ASYNC AI HANDLERS ────────────────────────────────────────────────────
+
 async function handleSubmit() {
   const input = document.getElementById('msgInput')?.value.trim();
   // Require text OR image (image only valid in food mode)
@@ -4502,7 +4718,7 @@ async function handleSubmit() {
   }
 }
 
-// ─── SCHEMA MIGRATION ────────────────────────────────────────────────────────
+// ─── §21 SCHEMA MIGRATION ─────────────────────────────────────────────────────
 
 // Run all pending migrations from `from` up to `to`.
 // Add a new `if (from < N)` block here whenever LS_VERSION is bumped.
@@ -4524,7 +4740,7 @@ function checkSchemaVersion() {
   }
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── §22 INIT ─────────────────────────────────────────────────────────────────
 
 state.dayData = loadDay(state.date);
 state.weightInput = state.weight || '';
@@ -4545,6 +4761,22 @@ toastEl.setAttribute('aria-live', 'assertive');
 toastEl.setAttribute('aria-atomic', 'true');
 toastEl.style.display = 'none';
 document.body.appendChild(toastEl);
+
+// Capture deferred install prompt — prevent default browser banner,
+// store event so we can show our own install button in the drawer.
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  state.installPromptEvent = e;
+  if (state.drawerOpen) renderDrawer(); // refresh drawer if already open
+});
+
+// After successful install — hide the install button
+window.addEventListener('appinstalled', () => {
+  state.installPromptEvent = null;
+  state.appInstalled = true;
+  showToast('FitLog instaliran ✓');
+  if (state.drawerOpen) renderDrawer();
+});
 </script>
 
 <script>
@@ -4576,6 +4808,12 @@ document.body.appendChild(toastEl);
   const blob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
   const url = URL.createObjectURL(blob);
   document.getElementById("pwa-manifest").setAttribute("href", url);
+
+  // Inject favicon and apple-touch-icon from the icons array above.
+  // This keeps all base64 data in one place (JS) instead of bloating the HTML parser.
+  const icon192 = icons[0].src; // 192x192 — suitable for both favicon and touch icon
+  document.getElementById("favicon").setAttribute("href", icon192);
+  document.getElementById("apple-touch-icon").setAttribute("href", icon192);
 })();
 </script>
 </body>
