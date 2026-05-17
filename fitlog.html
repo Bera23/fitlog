@@ -2262,11 +2262,12 @@ function getWeekData(offset = 0) {
       const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
       const carbs   = day.meals?.reduce((s, m) => s + (m.carbs   || 0), 0) || 0;
       const fat     = day.meals?.reduce((s, m) => s + (m.fat     || 0), 0) || 0;
+      const sugar   = day.meals?.reduce((s, m) => s + (m.sugar   || 0), 0) || 0;
       // Use snapshotted goal from the day it was logged; fall back to current goal
       const goal    = day.goalSnapshot || state.calorieGoal;
-      result.push({ date: dateStr, consumed, burned, net: consumed - burned, protein, carbs, fat, goal, hasData: consumed > 0, future: false });
+      result.push({ date: dateStr, consumed, burned, net: consumed - burned, protein, carbs, fat, sugar, goal, hasData: consumed > 0, future: false });
     } else {
-      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, goal: state.calorieGoal, hasData: false, future: false });
+      result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, sugar: 0, goal: state.calorieGoal, hasData: false, future: false });
     }
   }
   return result;
@@ -2839,12 +2840,15 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
 
   return `
     <div class="product-card${isExp ? ' expanded' : ''}${isDuplicate ? ' product-card-duplicate' : ''}" ${dataAttr}="${p.id}">
-      <!-- Header: date | name (truncated) | badge | chevron — mirrors meal-header layout -->
+      <!-- Header: date | name (truncated) | badge | + add | chevron — mirrors meal-header layout -->
       <div class="product-card-header" onclick="${toggleFn}(${p.id})">
         ${(showDate && dateStr) ? `<span class="meal-time-badge">${dateStr}</span>` : ''}
         <span class="meal-summary">${p.name}</span>
         ${badge}
-        <span class="meal-chevron${isExp ? ' open' : ''}">▾</span>
+        <button onclick="event.stopPropagation();addProductToMeal(${p.id}, '${p.date}')"
+                style="background:rgba(143,212,46,0.15);border:1px solid rgba(143,212,46,0.3);
+                       border-radius:8px;color:var(--green);padding:8px 13px;font-size:16px;
+                       font-weight:700;cursor:pointer;flex-shrink:0;min-height:36px;line-height:1">+</button>
       </div>
       <!-- Collapsed pills — hidden when .expanded -->
       <div class="product-collapsed">
@@ -2870,13 +2874,6 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
         ${p.summary ? `<div style="font-size:13px;color:var(--muted);line-height:1.6">${p.summary}</div>` : ''}
         ${deleteOnClick ? `
         <button onclick="${deleteOnClick}" style="margin-top:10px;background:none;border:1px solid var(--s6);border-radius:8px;color:var(--red);padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)">🗑 Obriši proizvod</button>` : ''}
-        <!-- "Add to meal" shown only when card is expanded — reduces clutter in collapsed list -->
-        <div style="margin-top:10px">
-          <button onclick="event.stopPropagation(); addProductToMeal(${p.id}, '${p.date}')"
-            style="background:rgba(143,212,46,0.12);border:1px solid rgba(143,212,46,0.3);border-radius:8px;color:var(--green);padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);width:100%">
-            + Ubaci u obrok
-          </button>
-        </div>
       </div>
     </div>`;
 }
@@ -3212,6 +3209,7 @@ function weeklyReportHTML(weekData) {
   const avgProtein = Math.round(daysWithData.reduce((s, d) => s + (d.protein || 0), 0) / daysWithData.length);
   const avgCarbs   = Math.round(daysWithData.reduce((s, d) => s + (d.carbs   || 0), 0) / daysWithData.length);
   const avgFat     = Math.round(daysWithData.reduce((s, d) => s + (d.fat     || 0), 0) / daysWithData.length);
+  const avgSugar   = Math.round(daysWithData.reduce((s, d) => s + (d.sugar   || 0), 0) / daysWithData.length);
 
   // Grade
   const deficitRatio = onTargetDays / daysWithData.length;
@@ -3326,7 +3324,7 @@ function weeklyReportHTML(weekData) {
       <!-- Average weekly macros -->
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--s3)">
         <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">Prosečni dnevni makroi</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
           <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
             <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--green)">${avgProtein}g</div>
             <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Proteini</div>
@@ -3338,6 +3336,10 @@ function weeklyReportHTML(weekData) {
           <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
             <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--orange)">${avgFat}g</div>
             <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Masti</div>
+          </div>
+          <div style="text-align:center;padding:10px 6px;background:var(--s3);border-radius:10px">
+            <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--pink)">${avgSugar}g</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Šećeri</div>
           </div>
         </div>
       </div>
@@ -3409,13 +3411,27 @@ function weightChartHTML(log) {
     : (slope < -0.01 ? 'var(--green)' : slope > 0.01 ? 'var(--red)' : 'var(--muted)');
   const trendLabel = slope < -0.01 ? '↘ trend pada' : slope > 0.01 ? '↗ trend raste' : '→ stabilan';
 
-  const diff = entries[entries.length-1].weight - entries[0].weight;
+  const startW = entries[0].weight;
+  const endW = entries[entries.length - 1].weight;
+  const diff = endW - startW;
   // For gain mode: weight increase is positive (green); for lose: decrease is positive (green)
   const diffColor = state.fitnessGoal === 'gain'
     ? (diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--muted)')
     : (diff < 0 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--muted)');
+  // Number of days between first and last measurement
+  const dayCount = Math.round((new Date(entries[entries.length - 1].date) - new Date(entries[0].date)) / 86400000);
   return `
     <div class="weight-chart-wrap">
+      <!-- Header row: start → end weight on left, period + delta on right -->
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--text)">
+          ${startW.toFixed(1)} <span style="color:var(--muted)">→</span> ${endW.toFixed(1)} kg
+        </span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:var(--muted)">${dayCount} dana</span>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:${diffColor}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
+        </span>
+      </div>
       <svg class="weight-chart-svg" viewBox="-10 -10 ${W+20} ${H+20}" height="90">
         <defs>
           <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
@@ -3425,16 +3441,28 @@ function weightChartHTML(log) {
         </defs>
         <!-- Gradient fill under line -->
         <path d="${areaPath}" fill="url(#chartFill)"/>
-        <!-- Trend line -->
+        <!-- Trend line (dashed) -->
         <line x1="0" y1="${trendY0}" x2="${W}" y2="${trendY1}" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
-        <!-- Data line -->
+        <!-- Actual weight line (solid) -->
         <polyline points="${points}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         ${dots}
       </svg>
+      <!-- X-axis: start date, trend label, end date -->
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
         <span>${fmtDate(entries[0].date)}</span>
         <span style="color:${trendColor};font-weight:700">${trendLabel}</span>
-        <span style="color:${diffColor};font-weight:700">${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
+        <span>${fmtDate(entries[entries.length - 1].date)}</span>
+      </div>
+      <!-- Legend: solid line = actual measurements, dashed = regression trend -->
+      <div style="display:flex;gap:14px;margin-top:6px">
+        <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
+          <svg width="18" height="6" style="flex-shrink:0"><line x1="0" y1="3" x2="18" y2="3" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round"/></svg>
+          merenja
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
+          <svg width="18" height="6" style="flex-shrink:0"><line x1="0" y1="3" x2="18" y2="3" stroke="${trendColor}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/></svg>
+          trend
+        </span>
       </div>
     </div>`;
 }
@@ -3600,10 +3628,8 @@ function zdravljeTabHTML() {
     const colFade = diff < 0 ? 'rgba(143,212,46,0.45)' : diff > 0 ? 'rgba(255,79,79,0.45)' : 'rgba(153,153,153,0.45)';
     // Calculate days between the two measurements for temporal context
     const dayDiff = Math.round((new Date(current.date) - new Date(prev.date)) / 86400000);
-    const whenLabel = dayDiff === 1 ? 'juče' : dayDiff < 7 ? `${dayDiff}d` : `${Math.round(dayDiff / 7)} ned`;
-    diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col};display:inline-flex;align-items:center;gap:4px">
-      <span>${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg</span>
-      <span style="color:${colFade};font-size:10px;font-weight:600">· ${whenLabel}</span>
+    diffHTML = `<span class="weight-log-diff" style="background:${colAlpha};color:${col}">
+      ${diff > 0 ? '+' : ''}${diff.toFixed(1)} kg
     </span>`;
   }
 
@@ -3756,11 +3782,11 @@ function zdravljeTabHTML() {
         <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">${state.age}g · ${state.gender === 'male' ? 'M' : 'Ž'} · ${ACT_LABELS[state.activity] || state.activity}</span>
       </div>
       <div class="zdravlje-stat">
-        <span class="zdravlje-stat-label">Bazalni metabolizam (BMR)</span>
+        <span class="zdravlje-stat-label">Kalorije u mirovanju</span>
         <span class="zdravlje-stat-val">${bmr} kcal</span>
       </div>
       <div class="zdravlje-stat">
-        <span class="zdravlje-stat-label">Dnevna potrošnja (TDEE)</span>
+        <span class="zdravlje-stat-label">Dnevna potrošnja sa aktivnošću</span>
         <span class="zdravlje-stat-val" style="color:var(--blue)">${tdee} kcal</span>
       </div>
       <div class="zdravlje-stat" style="padding-bottom:10px">
@@ -3930,37 +3956,54 @@ function zdravljeTabHTML() {
       ${log.length === 0
         ? `<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Nema unosa — tapni "Upiši merenje" da počneš.</div>`
         : (() => {
-          const shown = log.slice(0, 10);
-          const maxW = Math.max(...shown.map(e => e.weight));
-          const minW = Math.min(...shown.map(e => e.weight));
-          const wRange = maxW - minW || 1;
-          return shown.map((e, i) => {
-            let diffBadge = '';
-            let dotColor = 'var(--s7)';
-            if (i < log.length - 1) {
-              const d = e.weight - log[i + 1].weight;
-              // For gain mode: weight increase (d > 0) is good (green)
-              const isGood = state.fitnessGoal === 'gain' ? d > 0 : d < 0;
-              const c = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
-              const cAlpha = isGood ? 'rgba(143,212,46,0.13)' : d === 0 ? 'rgba(85,85,85,0.13)' : 'rgba(255,79,79,0.13)';
-              diffBadge = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
-              dotColor = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
-            }
-            const barPct = Math.max(10, Math.round(((e.weight - minW) / wRange) * 80) + 20);
-            const isLatest = i === 0;
-            return `<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--s3)${isLatest ? ';background:rgba(143,212,46,0.03)' : ''}">
-              <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
-              <span class="weight-log-date" style="color:${isLatest ? 'var(--green)' : 'var(--text-secondary)'}">${fmtDate(e.date)}</span>
-              <div style="flex:1;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;margin:0 4px">
-                <div style="height:100%;width:${barPct}%;background:${isLatest ? 'rgba(143,212,46,0.45)' : 'var(--s7)'};border-radius:2px"></div>
-              </div>
+          // Baseline = oldest entry (onboarding weight), measurements = everything newer
+          const baseline = log[log.length - 1];
+          const measurements = log.slice(0, -1); // newest-first, excludes baseline
+          const shownMeasurements = measurements.slice(0, 10);
+
+          // Render actual measurement rows (no bar)
+          const measurementRows = shownMeasurements.length === 0
+            ? `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">Nema merenja još — tapni "Upiši merenje".</div>`
+            : shownMeasurements.map((e, i) => {
+                let diffBadge = '';
+                let dotColor = 'var(--s7)';
+                // Compare to next older entry in log (may be baseline for last measurement)
+                const nextEntry = log[i + 1];
+                const d = e.weight - nextEntry.weight;
+                // For gain mode: weight increase (d > 0) is good (green)
+                const isGood = state.fitnessGoal === 'gain' ? d > 0 : d < 0;
+                const c = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
+                const cAlpha = isGood ? 'rgba(143,212,46,0.13)' : d === 0 ? 'rgba(85,85,85,0.13)' : 'rgba(255,79,79,0.13)';
+                diffBadge = `<span class="weight-log-diff" style="background:${cAlpha};color:${c}">${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+                dotColor = isGood ? 'var(--green)' : d === 0 ? 'var(--muted)' : 'var(--red)';
+                const isLatest = i === 0;
+                return `<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--s3)${isLatest ? ';background:rgba(143,212,46,0.03)' : ''}">
+                  <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
+                  <span class="weight-log-date" style="color:${isLatest ? 'var(--green)' : 'var(--text-secondary)'}">${fmtDate(e.date)}</span>
+                  <div style="flex:1"></div>
+                  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                    ${diffBadge}
+                    <span class="weight-log-val">${e.weight} kg</span>
+                    <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
+                  </div>
+                </div>`;
+              }).join('')
+            + (measurements.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--muted)">... i još ${measurements.length - 10} starijih merenja</div>` : '');
+
+          // Separator + baseline row pinned at the bottom
+          const baselineRow = `
+            <div style="padding:8px 16px;text-align:center;font-size:10px;color:var(--muted)">početna težina</div>
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 16px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--s7);flex-shrink:0"></div>
+              <span class="weight-log-date" style="color:var(--muted)">${fmtDate(baseline.date)}</span>
+              <div style="flex:1"></div>
               <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-                ${diffBadge}
-                <span class="weight-log-val">${e.weight} kg</span>
-                <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
+                <span class="weight-log-val" style="color:var(--muted)">${baseline.weight} kg</span>
+                <button onclick="deleteWeightEntry('${baseline.date}')" style="background:none;border:none;color:var(--s6);cursor:pointer;font-size:16px;padding:4px 6px;min-width:28px;min-height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px">×</button>
               </div>
             </div>`;
-          }).join('') + (log.length > 10 ? `<div style="padding:10px 16px;text-align:center;font-size:12px;color:var(--muted)">... i još ${log.length - 10} starijih merenja</div>` : '');
+
+          return measurementRows + baselineRow;
         })()}
     </div>
 
@@ -4151,7 +4194,7 @@ function _renderInner() {
       </div>
       <!-- Enhanced preostalo footer with distinct background -->
       <div class="kcal-footer">
-        <span class="kcal-footer-label">${state.fitnessGoal === 'gain' ? 'Preostalo do suficita' : 'Preostalo do cilja'}</span>
+        <span class="kcal-footer-label">${state.fitnessGoal === 'gain' ? (t.net >= state.calorieGoal ? 'Suficit ostvaren' : 'Preostalo do suficita') : t.net > state.calorieGoal ? 'Preko cilja' : 'Preostalo do cilja'}</span>
         <span class="kcal-footer-val" style="color:${
           state.fitnessGoal === 'gain'
             ? (t.net >= state.calorieGoal ? 'var(--green)' : 'var(--text-secondary)')
