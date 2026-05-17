@@ -932,6 +932,8 @@ function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
   // Rough token approximation: 4 chars ≈ 1 token
   s.tokensApprox = (s.tokensApprox || 0) + Math.round((promptLen + responseLen) / 4);
   saveApiStats(s);
+  // Keep state in sync so settingsDrawerHTML() doesn't need another LS read
+  state.cachedApiStats = s;
 }
 
 // ─── §5b FAVORITES ────────────────────────────────────────────────────────────
@@ -1543,6 +1545,8 @@ Format: ${GEMINI_PRODUCT_SCHEMA}`;
 
 function openDrawer() {
   state.drawerOpen = true;
+  // Refresh stats cache once on open — avoids localStorage read on every render()
+  state.cachedApiStats = loadApiStats();
   renderDrawer();
 }
 
@@ -1577,7 +1581,8 @@ function renderDrawer() {
 }
 
 function settingsDrawerHTML() {
-  const stats = loadApiStats();
+  // Use stats cached on drawer open — falls back to LS read if cache is missing
+  const stats = state.cachedApiStats || loadApiStats();
   const avgTime = stats.responseTimes.length
     ? Math.round(stats.responseTimes.reduce((s, t) => s + t, 0) / stats.responseTimes.length)
     : 0;
@@ -2111,9 +2116,13 @@ function saveNutritionScore(date, score) {
 // Returns ISO week key YYYY-WNN for a given date — used to key nedeljni pregled
 function weekKey(date) {
   const d = date ? new Date(date + 'T12:00:00') : new Date();
-  const startOfYear = new Date(d.getFullYear(), 0, 1);
-  const week = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  // ISO 8601: week belongs to the year of its Thursday.
+  // Shift to Thursday of the current week, then derive week number from that year.
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);
+  const yearStart = new Date(thursday.getFullYear(), 0, 1);
+  const week = Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
+  return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 // Load a daily AI result — returns null if missing or from a previous day
@@ -2157,6 +2166,26 @@ function loadAiTabState() {
 }
 
 // ─── §13 UI HELPERS ───────────────────────────────────────────────────────────
+
+// Shared skeleton loader card — used while Gemini is processing food, exercise, or product input
+function skeletonCardHTML() {
+  return `
+    <div class="skeleton-card">
+      <div class="skeleton skeleton-time"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
+        <div style="flex:1">
+          <div class="skeleton skeleton-line" style="width:80%"></div>
+          <div class="skeleton skeleton-line" style="width:60%"></div>
+        </div>
+        <div class="skeleton skeleton-kcal"></div>
+      </div>
+      <div class="skeleton-pills">
+        <div class="skeleton skeleton-pill"></div>
+        <div class="skeleton skeleton-pill"></div>
+        <div class="skeleton skeleton-pill"></div>
+      </div>
+    </div>`;
+}
 
 function ringHTML(consumed, burned, goal) {
   const net = consumed - burned;
@@ -2232,6 +2261,10 @@ function macroBar(label, value, min, max, color, unit) {
 
 // Returns current week Mon–Sun (future days shown as empty)
 function getWeekData(offset = 0) {
+  // Cache per offset value — different weeks are keyed separately
+  const cacheKey = 'weekData_' + offset;
+  if (_renderCache[cacheKey] !== undefined) return _renderCache[cacheKey];
+
   const result = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -2270,10 +2303,15 @@ function getWeekData(offset = 0) {
       result.push({ date: dateStr, consumed: 0, burned: 0, net: 0, protein: 0, carbs: 0, fat: 0, sugar: 0, goal: state.calorieGoal, hasData: false, future: false });
     }
   }
+
+  _renderCache[cacheKey] = result;
   return result;
 }
 
 function calcStreak() {
+  // Return cached value if already computed this render cycle
+  if (_renderCache['streak'] !== undefined) return _renderCache['streak'];
+
   let streak = 0;
 
   // Helper: get net calories for a date including workout
@@ -2304,6 +2342,8 @@ function calcStreak() {
     if (onTarget) streak++;
     else break;
   }
+
+  _renderCache['streak'] = streak;
   return streak;
 }
 
@@ -3016,30 +3056,40 @@ function historyTabHTML() {
 
 // Renders the products history sub-tab — grouped by month, collapsible cards per product
 function productsHistoryHTML() {
-  // Collect all dates with products from the last 90 days
-  const byMonth = {};
-  const allProducts = [];
-  for (let i = 0; i < 90; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = localDateStr(d);
-    const products = loadProducts(dateStr);
-    if (!products.length) continue;
-    const month = dateStr.slice(0, 7);
-    if (!byMonth[month]) byMonth[month] = [];
-    byMonth[month].push({ date: dateStr, products });
-    products.forEach(p => allProducts.push(p));
-  }
+  // Cache the expensive data-loading part (90 LS reads) separately from HTML generation.
+  // HTML must re-render on every call (depends on expandedHistoryProductIds + search query),
+  // but the underlying product data doesn't change between renders.
+  let byMonth, allProducts, duplicateNames;
+  if (_renderCache['productsData']) {
+    ({ byMonth, allProducts, duplicateNames } = _renderCache['productsData']);
+  } else {
+    // Collect all dates with products from the last 90 days
+    byMonth = {};
+    allProducts = [];
+    for (let i = 0; i < 90; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = localDateStr(d);
+      const products = loadProducts(dateStr);
+      if (!products.length) continue;
+      const month = dateStr.slice(0, 7);
+      if (!byMonth[month]) byMonth[month] = [];
+      byMonth[month].push({ date: dateStr, products });
+      products.forEach(p => allProducts.push(p));
+    }
 
-  // Build a set of normalized names that appear more than once across all history
-  const nameCounts = {};
-  allProducts.forEach(p => {
-    const key = p.name?.trim().toLowerCase();
-    if (key) nameCounts[key] = (nameCounts[key] || 0) + 1;
-  });
-  const duplicateNames = new Set(
-    Object.entries(nameCounts).filter(([, count]) => count > 1).map(([name]) => name)
-  );
+    // Build a set of normalized names that appear more than once across all history
+    const nameCounts = {};
+    allProducts.forEach(p => {
+      const key = p.name?.trim().toLowerCase();
+      if (key) nameCounts[key] = (nameCounts[key] || 0) + 1;
+    });
+    duplicateNames = new Set(
+      Object.entries(nameCounts).filter(([, count]) => count > 1).map(([name]) => name)
+    );
+
+    _renderCache['productsData'] = { byMonth, allProducts, duplicateNames };
+  }
 
   const months = Object.keys(byMonth).sort().reverse();
   if (!months.length) {
@@ -4480,40 +4530,10 @@ function _renderInner() {
       </div>
 
       ${state.mode === 'product' ? `
-        ${state.productLoading ? `
-        <div class="skeleton-card">
-          <div class="skeleton skeleton-time"></div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
-            <div style="flex:1">
-              <div class="skeleton skeleton-line" style="width:75%"></div>
-              <div class="skeleton skeleton-line" style="width:55%"></div>
-            </div>
-            <div class="skeleton skeleton-kcal"></div>
-          </div>
-          <div class="skeleton-pills">
-            <div class="skeleton skeleton-pill"></div>
-            <div class="skeleton skeleton-pill"></div>
-            <div class="skeleton skeleton-pill"></div>
-          </div>
-        </div>` : ''}
+        ${state.productLoading ? skeletonCardHTML() : ''}
         ${productsLogHTML()}
       ` : `
-        ${state.loading ? `
-          <div class="skeleton-card">
-            <div class="skeleton skeleton-time"></div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:26px">
-              <div style="flex:1">
-                <div class="skeleton skeleton-line" style="width:80%"></div>
-                <div class="skeleton skeleton-line" style="width:60%"></div>
-              </div>
-              <div class="skeleton skeleton-kcal"></div>
-            </div>
-            <div class="skeleton-pills">
-              <div class="skeleton skeleton-pill"></div>
-              <div class="skeleton skeleton-pill"></div>
-              <div class="skeleton skeleton-pill"></div>
-            </div>
-          </div>` : ''}
+        ${state.loading ? skeletonCardHTML() : ''}
         ${state.mode === 'food' ? mealsHTML : ''}
         ${state.mode === 'exercise' ? exHTML : ''}
         ${emptyHTML}
@@ -4647,8 +4667,9 @@ function updateWaterGoal(val) {
 function startEditTargetWeight() {
   state.editTargetWeight = true;
   state.targetWeightInput = state.targetWeight || '';
-  render();
-  document.getElementById('twInput')?.focus();
+  scheduleRender();
+  // Focus after render completes — input doesn't exist in DOM until render runs
+  requestAnimationFrame(() => document.getElementById('twInput')?.focus());
 }
 
 function saveTargetWeight() {
@@ -4665,8 +4686,9 @@ function saveTargetWeight() {
 function clearTargetWeight() {
   state.editTargetWeight = true;
   state.targetWeightInput = state.targetWeight || '';
-  render();
-  document.getElementById('twInput')?.focus();
+  scheduleRender();
+  // Focus after render completes — input doesn't exist in DOM until render runs
+  requestAnimationFrame(() => document.getElementById('twInput')?.focus());
 }
 
 // ─── §18 SWIPE TO DELETE ──────────────────────────────────────────────────────
