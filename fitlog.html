@@ -418,12 +418,12 @@
   .meal-chevron.open { transform: rotate(180deg); color: var(--green); }
   /* Pills row — shown when collapsed, hidden when expanded */
   .meal-pills-row { padding: 0 16px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
-  .meal-details { padding: 10px 16px 14px; border-top: 1px solid var(--s3); display: none; }
+  .meal-details { padding: 14px 16px 14px; border-top: 1px solid var(--s5); display: none; }
   /* Expanded state — flip visibility without any re-render */
   .log-item.expanded .meal-pills-row { display: none; }
   .log-item.expanded .meal-details { display: block; }
   .meal-item { font-size: 13px; color: var(--muted); padding: 4px 0; }
-  .meal-item-name { color: var(--text-secondary); font-weight: 600; }
+  .meal-item-name { color: var(--muted); font-weight: 500; }
 
   /* SWIPE TO DELETE */
   .log-item { position: relative; overflow: hidden; }
@@ -443,6 +443,9 @@
   .score-btn:active { background: var(--s4); }
   .meal-score-btn { background: none; border: 1px solid var(--s6); border-radius: 8px; color: var(--muted); font-size: 11px; padding: 12px 16px; cursor: pointer; font-family: var(--sans); transition: background 0.15s; margin-top: 8px; min-height: 44px; }
   .meal-score-btn:active { background: var(--s4); }
+  .meal-hdr-icon { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px 2px; flex-shrink: 0; line-height: 1; }
+  .meal-score-pill { display: inline-flex; align-items: center; gap: 3px; background: var(--s3); border: 1px solid var(--s5); border-radius: 20px; padding: 3px 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+  .meal-score-detail { margin-top: 10px; padding: 10px 12px; background: var(--s3); border-radius: 10px; font-size: 12px; line-height: 1.5; }
   .meal-score-inline { margin-top: 8px; padding: 10px 12px; background: var(--s3); border-radius: 10px; font-size: 13px; color: var(--muted); display: flex; align-items: flex-start; gap: 10px; }
   .meal-score-num { font-family: var(--mono); font-weight: 800; font-size: 20px; line-height: 1; flex-shrink: 0; }
   .score-num { font-size: 48px; font-weight: 800; font-family: var(--mono); line-height: 1; }
@@ -625,6 +628,7 @@ const state = {
   mealScoreLoading: null,
   expandedHistoryMealIds: new Set(),
   expandedMealIds: new Set(),
+  expandedScoreIds: new Set(),
   expandedExIds: new Set(),
   expandedProductIds: new Set(),       // product cards expanded on today's log
   expandedHistoryProductIds: new Set(), // product cards expanded in history view
@@ -662,6 +666,7 @@ const state = {
   pendingDelete: false,     // true when user has initiated delete-all flow
   favoritesExpanded: false, // true = show full swipeable management list
   renamingFavId: null,      // id of favorite currently being renamed inline
+  renamingMealId: null,     // id of meal currently being renamed inline
   expandedFavIds: new Set(), // ids of favorites currently expanded to show items
 };
 
@@ -925,12 +930,17 @@ function saveFavorites(favs) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
 }
 
-// Returns true if a meal already exists in favorites — checked by item fingerprint.
-// Used at render time to pre-style the ★ button without relying on m.fromFavorite.
+// Returns true if a meal exists in favorites.
+// Checks meal.fromFavorite (specific fav id) first — avoids false positives when
+// multiple identical meals are logged on the same day.
 function isMealFavorited(meal) {
   if (!meal?.items?.length) return false;
+  const favs = loadFavorites();
+  // Prefer ID-based check — set by saveMealAsFavorite when meal was saved
+  if (meal.fromFavorite) return favs.some(f => f.id === meal.fromFavorite);
+  // Fallback: fingerprint (e.g. history meals that predate fromFavorite)
   const fingerprint = meal.items.map(i => i.name.trim().toLowerCase() + i.amount).join('|');
-  return loadFavorites().some(f => f.fingerprint === fingerprint);
+  return favs.some(f => f.fingerprint === fingerprint);
 }
 
 // Save a logged meal as a favorite — deduplicates by item fingerprint.
@@ -948,8 +958,20 @@ function saveMealAsFavorite(mealId, date) {
 
   // Fingerprint: item names + amounts, order-sensitive
   const fingerprint = meal.items.map(i => i.name.trim().toLowerCase() + i.amount).join('|');
-  if (favs.find(f => f.fingerprint === fingerprint)) {
-    showToast('Već postoji u omiljenim ★');
+  // ID-based check first — avoids removing wrong entry when identical meals exist
+  const existingById = meal.fromFavorite ? favs.find(f => f.id === meal.fromFavorite) : null;
+  const existing = existingById || favs.find(f => f.fingerprint === fingerprint);
+
+  // Toggle — if already favorited, remove it
+  if (existing) {
+    saveFavorites(favs.filter(f => f.id !== existing.id));
+    // Clear the link on the meal object so star updates immediately
+    if (meal.fromFavorite) {
+      delete meal.fromFavorite;
+      if (sourceDate === state.date) saveDay(state.date, state.dayData);
+    }
+    showToast('Uklonjeno iz omiljenih');
+    scheduleRender();
     return;
   }
 
@@ -982,16 +1004,7 @@ function saveMealAsFavorite(mealId, date) {
     saveDay(state.date, state.dayData);
   }
 
-  // Direct DOM update — flip whichever star button triggered this call.
-  // Today's button: saveMealAsFavorite('id') — history button: saveMealAsFavorite('id', 'date')
-  // Both contain the mealId so a partial match on the id is sufficient.
-  const btn = document.querySelector(`button[onclick*="saveMealAsFavorite('${mealId}'"]`);
-  if (btn) {
-    btn.textContent = '★ Sačuvano u omiljene';
-    btn.style.background = 'rgba(255,179,71,0.12)';
-    btn.style.borderColor = 'rgba(255,179,71,0.3)';
-    btn.style.color = 'var(--orange)';
-  }
+  scheduleRender();
 
   showToast('Sačuvano u omiljene ★');
 }
@@ -1018,6 +1031,7 @@ function addFavoriteToDay(favId) {
     sugar:    fav.sugar || 0,
     note:     '',
     fromFavorite: favId,
+    customName: fav.name,  // carry the favorite's current name (may have been renamed)
   };
 
   state.dayData.meals.push(meal);
@@ -1060,7 +1074,13 @@ function startRenameFavorite(favId) {
   state.renamingFavId = favId;
   scheduleRender();
   // Focus the input after render
-  requestAnimationFrame(() => document.getElementById('fav-rename-' + favId)?.focus());
+  requestAnimationFrame(() => {
+    const input = document.getElementById('fav-rename-' + favId);
+    if (!input) return;
+    input.focus();
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  });
 }
 
 function toggleFavoriteExpand(favId) {
@@ -1076,7 +1096,32 @@ function saveRenameFavorite(favId) {
   if (!newName) { state.renamingFavId = null; scheduleRender(); return; }
   const favs = loadFavorites();
   const fav  = favs.find(f => f.id === favId);
-  if (fav) { fav.name = newName; saveFavorites(favs); }
+  if (fav) {
+    fav.name = newName;
+    saveFavorites(favs);
+    // Sync customName on every logged meal that was saved from this favorite
+    // Scan all fitlog_day_* keys in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key.startsWith('fitlog_day_')) continue;
+      try {
+        const dayData = JSON.parse(localStorage.getItem(key));
+        if (!dayData?.meals) continue;
+        let changed = false;
+        dayData.meals.forEach(m => {
+          if (m.fromFavorite === favId) {
+            m.customName = newName;
+            changed = true;
+          }
+        });
+        if (changed) localStorage.setItem(key, JSON.stringify(dayData));
+      } catch { /* skip malformed entries */ }
+    }
+    // Sync live state for today if any meal is affected
+    state.dayData.meals.forEach(m => {
+      if (m.fromFavorite === favId) m.customName = newName;
+    });
+  }
   state.renamingFavId = null;
   scheduleRender();
 }
@@ -2223,12 +2268,15 @@ function favoritesRowHTML(f, index, total) {
             ` : `
               <div style="font-size:14px;font-weight:700;color:var(--text);
                           white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>`}
+            ${!isRenaming ? `
             <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
               <span style="font-size:12px;color:var(--green);font-family:var(--mono);font-weight:700">${Math.round(f.calories)} kcal</span>
-              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(143,212,46,0.1);color:var(--green)">P ${Math.round(f.protein)}g</span>
-              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(71,200,255,0.1);color:var(--blue)">UH ${Math.round(f.carbs)}g</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(f.protein)}g</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(f.carbs)}g</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(f.fat||0)}g</span>
+              ${(f.sugar||0) > 0 ? `<span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(f.sugar)}g</span>` : ''}
               ${f.useCount ? `<span style="font-size:10px;color:var(--muted)">${f.useCount}× korišćeno</span>` : ''}
-            </div>
+            </div>` : ''}
           </div>
 
           <!-- Rename / Confirm — then + quick-add -->
@@ -2348,43 +2396,53 @@ function historyDayDetailHTML(date) {
       </div>`;
     })() : '';
 
+    const histDisplayName = m.customName || (m.items?.[0] ? m.items[0].name : (m.desc || 'Obrok'));
+    const histExtraCount = m.customName ? '' : (m.items?.length > 1 ? ` +${m.items.length - 1}` : '');
+    const isFavHist = isMealFavorited(m);
+    const histScoreVal = ms?.score != null ? ms.score : null;
+    const histScorePill = ms
+      ? (() => {
+          const c = histScoreVal >= 7 ? 'var(--green)' : histScoreVal >= 5 ? 'var(--orange)' : 'var(--red)';
+          return `<span class="meal-score-pill" style="color:${c};border-color:${c}33">${histScoreVal != null ? histScoreVal : '?'}/10</span>`;
+        })()
+      : '';
+
     return `
     <div class="hist-meal-item${isExp ? ' expanded' : ''}" data-hist-meal-id="${m.id}" style="border-top:1px solid var(--s3)">
-      <div onclick="toggleHistoryMeal('${m.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer">
-        <div>
-          <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green)">${m.time}</div>
-          <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">${m.items?.[0] ? m.items[0].name + (m.items.length > 1 ? ` +${m.items.length-1}` : '') : (m.desc||'Obrok')}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          ${ms ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${ms.score>=7?'var(--green)':ms.score>=5?'var(--orange)':'var(--red)'}">${ms.score}/10</span>` : ''}
-          <span style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--green)">${Math.round(m.calories)}</span>
-          <span class="meal-chevron${isExp ? ' open' : ''}">▼</span>
-        </div>
+      <!-- Header row — same layout as diary meal card -->
+      <div class="meal-header" onclick="toggleHistoryMeal('${m.id}')" style="padding:10px 0">
+        <span class="meal-time-badge">${m.time}</span>
+        <span class="meal-summary">${histDisplayName}${histExtraCount}</span>
+        <!-- Favorite star icon — no edit/AI in history -->
+        <button class="meal-hdr-icon" title="${isFavHist ? 'Ukloni iz omiljenih' : 'Sačuvaj u omiljene'}"
+                onclick="event.stopPropagation();saveMealAsFavorite('${m.id}', '${date}')"
+                style="color:${isFavHist ? 'var(--orange)' : 'var(--s7)'}">
+          ${isFavHist ? '★' : '☆'}
+        </button>
+        ${histScorePill}
+        <span class="meal-chevron${isExp ? ' open' : ''}">▼</span>
       </div>
-      <!-- Collapsed view: macro pills — hidden when .expanded -->
-      <div class="hist-meal-collapsed" style="padding:0 0 10px;gap:5px;flex-wrap:wrap">
-        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
-        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
-        <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
-        ${(m.sugar||0) > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+      <!-- Collapsed: kcal + macro pills -->
+      <div class="hist-meal-collapsed" style="padding:0 0 10px;gap:5px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:13px;font-family:var(--mono);font-weight:800;color:var(--green);margin-right:2px">${Math.round(m.calories)} kcal</span>
+        <span style="color:var(--s6);font-size:12px;margin:0 6px;font-weight:300">|</span>
+        <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein||0)}g</span>
+        <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs||0)}g</span>
+        <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat||0)}g</span>
+        ${(m.sugar||0) > 0 ? `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
       </div>
-      <!-- Expanded view: item details — shown when .expanded -->
-      <div class="hist-meal-expanded" style="padding-bottom:12px">
-        ${m.items?.map(it => `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">${it.amount} ${it.name} <span style="color:var(--muted)">· ${it.calories} kcal</span></div>`).join('') || ''}
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <!-- Expanded: item list + kcal/macros + score -->
+      <div class="hist-meal-expanded" style="padding-bottom:12px;border-top:1px solid var(--s5);padding-top:14px">
+        ${m.items?.map(it => `
+          <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.amount} · ${it.calories} kcal</div>`).join('') || ''}
+        <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:13px;font-family:var(--mono);font-weight:800;color:var(--green);margin-right:2px">${Math.round(m.calories)} kcal</span>
+          <span style="color:var(--s6);font-size:12px;margin:0 6px;font-weight:300">|</span>
           <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein||0)}g</span>
           <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs||0)}g</span>
           <span class="pill" style="background:rgba(255,179,71,0.13);color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
           ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
         </div>
-        <button onclick="saveMealAsFavorite('${m.id}', '${date}')"
-                style="margin-top:10px;background:${isMealFavorited(m) ? 'rgba(255,179,71,0.12)' : 'var(--s3)'};
-                       border:1px solid ${isMealFavorited(m) ? 'rgba(255,179,71,0.3)' : 'var(--s6)'};
-                       border-radius:8px;color:${isMealFavorited(m) ? 'var(--orange)' : 'var(--muted)'};
-                       padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);
-                       min-height:36px;width:100%;text-align:left;transition:all 0.15s">
-          ${isMealFavorited(m) ? '★ Sačuvano u omiljene' : '☆ Sačuvaj u omiljene'}
-        </button>
         ${msHTML}
       </div>
     </div>`;
@@ -3938,61 +3996,100 @@ function _renderInner() {
         const mainName = m.items[0]?.name || 'Obrok';
         const extraCount = m.items.length > 1 ? ` +${m.items.length - 1}` : '';
         const ms = state.mealScores[m.id];
-        const scoreHTML = state.mealScoreLoading === m.id
-          ? `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`
+        const isFav = isMealFavorited(m);
+        const isLoading = state.mealScoreLoading === m.id;
+        const isRenamingMeal = state.renamingMealId === m.id;
+        // customName overrides auto-generated name from first item
+        const displayName = m.customName || mainName;
+        // Don't append +2 when user has set a custom name for the meal
+        const displayExtra = m.customName ? '' : extraCount;
+        // Null-safe score — API error may return score:null
+        const scoreVal = ms?.score != null ? ms.score : null;
+
+        // Header score element: spinner | static pill | bot-icon
+        const scoreHdrHTML = isLoading
+          ? `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">🤖…</span>`
           : ms
             ? (() => {
-                const c = ms.score >= 7 ? 'var(--green)' : ms.score >= 5 ? 'var(--orange)' : 'var(--red)';
-                // Render suggestion only when present
-                const suggHTML = ms.suggestion
-                  ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.4">💡 ${ms.suggestion}</div>`
-                  : '';
-                return `<div class="meal-score-inline" style="flex-direction:column;align-items:flex-start;gap:4px">
-                  <div style="display:flex;align-items:center;gap:8px;width:100%">
-                    <span class="meal-score-num" style="color:${c}">${ms.score}/10</span>
-                    <span style="flex:1;font-size:12px;line-height:1.4">${ms.comment}</span>
-                    <button onclick="clearMealScore('${m.id}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
-                  </div>
-                  ${suggHTML}
-                </div>`; })()
-            : `<button class="meal-score-btn" onclick="scoreMeal('${m.id}')">🤖 Oceni obrok</button>`;
+                const c = scoreVal >= 7 ? 'var(--green)' : scoreVal >= 5 ? 'var(--orange)' : 'var(--red)';
+                return `<span class="meal-score-pill" style="color:${c};border-color:${c}33">${scoreVal != null ? scoreVal : '?'}/10</span>`;
+              })()
+            : `<button class="meal-hdr-icon" title="Oceni obrok"
+                       onclick="event.stopPropagation();scoreMeal('${m.id}')">🤖</button>`;
+
+        // Score detail — always shown when card is expanded and score exists
+        const scoreDetailHTML = ms
+          ? (() => {
+              const c = scoreVal >= 7 ? 'var(--green)' : scoreVal >= 5 ? 'var(--orange)' : 'var(--red)';
+              const suggHTML = ms.suggestion
+                ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--s4);color:var(--text-secondary)">💡 ${ms.suggestion}</div>`
+                : '';
+              return `<div class="meal-score-detail">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="font-family:var(--mono);font-weight:800;font-size:18px;color:${c};flex-shrink:0;line-height:1.2">${scoreVal != null ? scoreVal : '?'}/10</span>
+                  <span style="flex:1;color:var(--text-secondary)">${ms.comment || ''}</span>
+                  <button onclick="clearMealScore('${m.id}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0;padding:0">×</button>
+                </div>
+                ${suggHTML}
+              </div>`;
+            })()
+          : '';
+
         return `
           <div class="log-item${isOpen ? ' expanded' : ''}" data-id="${m.id}" ontouchstart="swipeStart(event,'${m.id}','meal')" ontouchmove="swipeMove(event,'${m.id}')" ontouchend="swipeEnd(event,'${m.id}','meal')" ontouchcancel="swipeCancel('${m.id}')">
             <div class="swipe-delete-bg">🗑</div>
             <div class="log-item-inner" id="swipe-meal-${m.id}" style="background:var(--card)">
-              <div class="meal-header" onclick="toggleMeal('${m.id}')">
+              <div class="meal-header" onclick="${isRenamingMeal ? '' : `toggleMeal('${m.id}')`}">
                 <span class="meal-time-badge">${m.time}</span>
-                <span class="meal-summary">${mainName}${extraCount}</span>
-                <span class="meal-kcal-badge">${Math.round(m.calories)} kcal</span>
+                ${isRenamingMeal ? `
+                  <input id="meal-rename-${m.id}"
+                         value="${displayName.replace(/"/g, '&quot;')}"
+                         style="flex:1;background:var(--s3);border:1px solid var(--green);border-radius:6px;
+                                color:var(--text);padding:4px 8px;font-size:13px;font-weight:600;
+                                font-family:var(--sans);outline:none;min-width:0"
+                         onclick="event.stopPropagation()"
+                         onkeydown="if(event.key==='Enter')saveRenameMeal('${m.id}');
+                                    if(event.key==='Escape'){state.renamingMealId=null;scheduleRender();}">
+                  <button onclick="event.stopPropagation();saveRenameMeal('${m.id}')"
+                          style="background:var(--green);color:var(--bg);border:none;border-radius:6px;
+                                 padding:5px 10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0">✓</button>
+                ` : `
+                  <span class="meal-summary">${displayName}${displayExtra}</span>
+                  <!-- Edit pencil icon — always visible, triggers inline rename in header -->
+                  <button class="meal-hdr-icon" title="Izmeni naziv"
+                          onclick="event.stopPropagation();startRenameMeal('${m.id}')"
+                          style="color:var(--text-secondary);font-size:13px">✏</button>
+                  <button class="meal-hdr-icon" title="${isFav ? 'Ukloni iz omiljenih' : 'Sačuvaj u omiljene'}"
+                          onclick="event.stopPropagation();saveMealAsFavorite('${m.id}')"
+                          style="color:${isFav ? 'var(--orange)' : 'var(--s7)'}">${isFav ? '★' : '☆'}</button>
+                  ${scoreHdrHTML}
+                `}
                 <span class="meal-chevron${isOpen ? ' open' : ''}">▾</span>
               </div>
-              <div class="meal-pills-row">
-                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
-                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
-                <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
-                ${m.sugar > 0 ? `<span style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
+              <!-- Collapsed pills row: kcal prominent + macro chips -->
+              <div class="meal-pills-row" style="align-items:center">
+                <span style="font-size:13px;font-family:var(--mono);font-weight:800;color:var(--green);margin-right:2px">${Math.round(m.calories)} kcal</span>
+                <span style="color:var(--s6);font-size:12px;margin:0 6px;font-weight:300">|</span>
+                <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(143,212,46,0.1);color:var(--green);font-weight:600">P ${Math.round(m.protein)}g</span>
+                <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(71,200,255,0.1);color:var(--blue);font-weight:600">UH ${Math.round(m.carbs)}g</span>
+                <span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,179,71,0.1);color:var(--orange);font-weight:600">M ${Math.round(m.fat)}g</span>
+                ${m.sugar > 0 ? `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,107,157,0.1);color:var(--pink);font-weight:600">Š ${Math.round(m.sugar)}g</span>` : ''}
               </div>
               <div class="meal-details">
                 ${m.items.map(it => `
                   <div class="meal-item"><span class="meal-item-name">${it.name}</span> · ${it.amount} · ${it.calories} kcal</div>`).join('')}
-                <div class="pills" style="margin-top:8px">
+                <div class="pills" style="margin-top:8px;align-items:center">
+                  <span style="font-size:13px;font-family:var(--mono);font-weight:800;color:var(--green);margin-right:2px">${Math.round(m.calories)} kcal</span>
+                  <span style="color:var(--s6);font-size:12px;margin:0 6px;font-weight:300">|</span>
                   <span class="pill" style="background:rgba(143,212,46,0.13);color:var(--green)">P ${Math.round(m.protein)}g</span>
                   <span class="pill" style="background:rgba(71,200,255,0.13);color:var(--blue)">UH ${Math.round(m.carbs)}g</span>
                   <span class="pill" style="background:rgba(255,179,71,0.13);color:var(--orange)">M ${Math.round(m.fat)}g</span>
                   ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
                 </div>
                 ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
-                <button onclick="saveMealAsFavorite('${m.id}')"
-                        style="margin-top:10px;background:${isMealFavorited(m) ? 'rgba(255,179,71,0.12)' : 'var(--s3)'};
-                               border:1px solid ${isMealFavorited(m) ? 'rgba(255,179,71,0.3)' : 'var(--s6)'};
-                               border-radius:8px;color:${isMealFavorited(m) ? 'var(--orange)' : 'var(--muted)'};
-                               padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;
-                               font-family:var(--sans);min-height:36px;width:100%;text-align:left;
-                               transition:all 0.15s">
-                  ${isMealFavorited(m) ? '★ Sačuvano u omiljene' : '☆ Sačuvaj u omiljene'}
-                </button>
+                <!-- Score detail always visible when expanded + scored -->
                 <div class="meal-score-area">
-                ${scoreHTML}
+                ${scoreDetailHTML}
                 </div>
               </div>
             </div>
@@ -4841,6 +4938,53 @@ function saveOnboarding() {
   scheduleRender();
 }
 
+function toggleMealScore(mealId) {
+  if (state.expandedScoreIds.has(mealId)) state.expandedScoreIds.delete(mealId);
+  else state.expandedScoreIds.add(mealId);
+  scheduleRender();
+}
+
+function startRenameMeal(mealId) {
+  state.renamingMealId = mealId;
+  scheduleRender();
+  requestAnimationFrame(() => {
+    const input = document.getElementById('meal-rename-' + mealId);
+    if (!input) return;
+    input.focus();
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  });
+}
+
+function saveRenameMeal(mealId, date) {
+  const input = document.getElementById('meal-rename-' + mealId);
+  const newName = input?.value.trim();
+  state.renamingMealId = null;
+  if (!newName) { scheduleRender(); return; }
+  const targetDate = date || state.date;
+  const dayData = loadDay(targetDate);
+  const meal = dayData.meals.find(m => m.id === mealId);
+  if (meal) {
+    meal.customName = newName;
+    saveDay(targetDate, dayData);
+    // Sync live state if editing today's meal
+    if (targetDate === state.date) {
+      const liveMeal = state.dayData.meals.find(m => m.id === mealId);
+      if (liveMeal) liveMeal.customName = newName;
+    }
+    // If this meal is linked to a favorite, update the favorite's name too
+    if (meal.fromFavorite) {
+      const favs = loadFavorites();
+      const fav = favs.find(f => f.id === meal.fromFavorite);
+      if (fav) {
+        fav.name = newName;
+        saveFavorites(favs);
+      }
+    }
+  }
+  scheduleRender();
+}
+
 function toggleMeal(id) {
   // Direct DOM toggle — no render() call, no flash
   const item = document.querySelector(`.log-item[data-id="${id}"]`);
@@ -4868,12 +5012,8 @@ async function scoreMeal(mealId) {
   if (!meal) return;
 
   // Helper — always re-query to guard against stale ref if render() fires during async
-  const getArea = () => document.querySelector(`.log-item[data-id="${mealId}"] .meal-score-area`);
-
-  if (getArea()) {
-    getArea().innerHTML = `<div class="meal-score-inline"><span style="font-size:11px;color:var(--muted)">🤖 Ocenjujem...</span></div>`;
-  }
   state.mealScoreLoading = mealId;
+  scheduleRender();
 
   try {
     const items = meal.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ');
@@ -4914,44 +5054,21 @@ Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
     state.mealScores[mealId] = result;
     saveMealScores(state.date, state.mealScores);
 
-    // Re-query after await — element may have been replaced if render() fired during loading
-    const resultArea = getArea();
-    if (resultArea) {
-      const c = result.score >= 7 ? 'var(--green)' : result.score >= 5 ? 'var(--orange)' : 'var(--red)';
-      // Render suggestion block only when AI returned a non-null value
-      const suggHTML = result.suggestion
-        ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.4">💡 ${result.suggestion}</div>`
-        : '';
-      resultArea.innerHTML = `
-        <div class="meal-score-inline" style="flex-direction:column;align-items:flex-start;gap:4px">
-          <div style="display:flex;align-items:center;gap:8px;width:100%">
-            <span class="meal-score-num" style="color:${c}">${result.score}/10</span>
-            <span style="flex:1;font-size:12px;line-height:1.4">${result.comment}</span>
-            <button onclick="clearMealScore('${mealId}')" style="background:none;border:none;color:var(--s8);cursor:pointer;font-size:15px;flex-shrink:0">×</button>
-          </div>
-          ${suggHTML}
-        </div>`;
-    }
+    state.expandedMealIds.add(mealId);
+    scheduleRender();
   } catch(e) {
     state.mealScores[mealId] = { score: null, comment: 'Greška pri analizi.' };
-    const errArea = getArea();
-    if (errArea) {
-      errArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal('${mealId}')">🤖 Oceni ponovo</button>`;
-    }
+    scheduleRender();
   } finally {
     state.mealScoreLoading = null;
-    // No render() — DOM already updated above
+    scheduleRender();
   }
 }
 
 function clearMealScore(mealId) {
   delete state.mealScores[mealId];
   saveMealScores(state.date, state.mealScores);
-  // Restore score button in place without full render
-  const scoreArea = document.querySelector(`.log-item[data-id="${mealId}"] .meal-score-area`);
-  if (scoreArea) {
-    scoreArea.innerHTML = `<button class="meal-score-btn" onclick="scoreMeal('${mealId}')">🤖 Oceni obrok</button>`;
-  }
+  scheduleRender();
 }
 
 function clearNutritionScore() {
@@ -5026,6 +5143,7 @@ function setTab(tab) {
   state.imageBase64 = null;
   state.imageMime = null;
   state.expandedMealIds = new Set();
+  state.expandedScoreIds = new Set();
   state.expandedExIds = new Set();
   state.expandedHistoryMealIds = new Set();
   state.expandedScoreDate = null;
