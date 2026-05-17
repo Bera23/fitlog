@@ -1283,28 +1283,60 @@ Unos korisnika: ${text}`;
   return result;
 }
 
-// Generate a short motivational weekly summary using Gemini.
-// Accepts aggregated weekly stats object and returns a plain text comment.
-async function generateWeeklySummary(stats) {
-  const profile = buildUserProfile();
-  const weekLabel = stats.weekLabel || 'ova nedelja';
-
-  // Build best/worst day context if available — gives AI concrete anchors to reference
+// Shared helper — builds common per-day and best/worst strings for weekly prompts
+function _weekStatsBlock(stats) {
   const bestDayStr  = stats.bestDay  ? `\n- Najbolji dan: ${stats.bestDay.date} (${stats.bestDay.net} kcal neto)` : '';
   const worstDayStr = stats.worstDay ? `\n- Najgori dan:  ${stats.worstDay.date} (${stats.worstDay.net} kcal neto)` : '';
-
-  // Build per-day breakdown if available — allows AI to spot patterns per day, not just averages
-  const daysDetail = stats.days?.map(d =>
+  const daysDetail  = stats.days?.map(d =>
     `  ${d.date}: ${d.consumed} kcal uneseno, ${d.net} kcal neto, P${d.protein}g UH${d.carbs}g M${d.fat}g`
   ).join('\n') || '';
+  return { bestDayStr, worstDayStr, daysDetail };
+}
 
-  // JSON schema returned by the model — parsed by parseGeminiJson() on the caller side
-  const schema = `{"grade":"A"|"B"|"C"|"D","good":["string"],"improve":["string"],"advice":["string","string","string"]}`;
+const _WEEKLY_SCHEMA = '{"grade":"A"|"B"|"C"|"D","good":["string"],"improve":["string"],"advice":["string","string","string"]}';
 
-  const prompt = `Ti si nutricionistički analitičar. Analiziraj nedeljne podatke ishrane i vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
+// Oceni nedelju — current week still in progress; advice targets rest of THIS week
+async function generateOceniNedelju(stats) {
+  const profile = buildUserProfile();
+  const weekLabel = stats.weekLabel || 'ova nedelja';
+  const { bestDayStr, worstDayStr, daysDetail } = _weekStatsBlock(stats);
+
+  const prompt = `Ti si nutricionistički analitičar. Analiziraj podatke tekuće nedelje koja JOŠ TRAJE i vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
 ${profile}
 Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
-Nedelja: ${weekLabel}
+Tekuća nedelja (još traje): ${weekLabel}
+${daysDetail ? `\nPodaci po danima:\n${daysDetail}` : ''}
+Agregati do sada:
+- Dana sa podacima: ${stats.daysWithData} od 7
+- Dana ${state.fitnessGoal === 'gain' ? 'u suficitu' : 'ispod cilja'}: ${stats.deficitDays} od ${stats.daysWithData}
+- Prosečan unos: ${stats.avgConsumed} kcal | Prosečno sagoreno: ${stats.avgBurned} kcal | Prosečan neto: ${stats.avgNet} kcal
+- Prosečni proteini: ${stats.avgProtein}g | Ugljeni hidrati: ${stats.avgCarbs}g | Masti: ${stats.avgFat}g
+- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak' : 'gubitak'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
+
+PRAVILA:
+- "grade": ocena dosadašnjeg dela nedelje — A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
+- "good": 2–3 konkretne stavke šta je išlo dobro do sada
+- "improve": 1–2 konkretne stavke — fokus na OSTATAK OVE nedelje
+- "advice": tačno 3 akciona saveta za OSTATAK OVE nedelje, ne za sledeću
+- Zabranjene fraze: "nastavi ovako", "odličan si", "samo nastavi napred", "odličan posao"
+- Jezik: srpski, direktan ton bez uvoda
+
+Format: ${_WEEKLY_SCHEMA}`;
+
+  const raw = await callGemini([{ text: prompt }], 0.4);
+  return parseGeminiJson(raw);
+}
+
+// Nedeljni pregled — previous week completed; advice targets NEXT week
+async function generateNedeljniPregled(stats) {
+  const profile = buildUserProfile();
+  const weekLabel = stats.weekLabel || 'prošla nedelja';
+  const { bestDayStr, worstDayStr, daysDetail } = _weekStatsBlock(stats);
+
+  const prompt = `Ti si nutricionistički analitičar. Analiziraj podatke ZAVRŠENE prošle nedelje i vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
+${profile}
+Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
+Završena nedelja: ${weekLabel}
 ${daysDetail ? `\nPodaci po danima:\n${daysDetail}` : ''}
 Nedeljni agregati:
 - Dana sa podacima: ${stats.daysWithData} od 7
@@ -1314,18 +1346,19 @@ Nedeljni agregati:
 - Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak' : 'gubitak'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
 
 PRAVILA:
-- "grade": A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
-- "good": 2–3 konkretne stavke šta je išlo dobro — pomeni specifične dane ili brojeve, ne generalizuj
-- "improve": 1–2 konkretne stavke gde ima prostora — pomeni specifične dane ili obrasce, ne generalizuj
-- "advice": tačno 3 akciona saveta za sledeću nedelju — svaki počinje glagolom (Dodaj / Smanji / Izbegaj / Rasporedi / Uključi), konkretni i merljivi
+- "grade": ocena završene nedelje — A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
+- "good": 2–3 konkretne stavke šta je išlo dobro — pomeni specifične dane ili brojeve
+- "improve": 1–2 konkretne stavke gde ima prostora za napredak
+- "advice": tačno 3 akciona saveta za SLEDEĆU nedelju — zasnovani na obrascima iz prošle nedelje
 - Zabranjene fraze: "nastavi ovako", "odličan si", "samo nastavi napred", "odličan posao"
 - Jezik: srpski, direktan ton bez uvoda
 
-Format: ${schema}`;
+Format: ${_WEEKLY_SCHEMA}`;
 
   const raw = await callGemini([{ text: prompt }], 0.4);
   return parseGeminiJson(raw);
 }
+
 
 // Generate situational day status — plain text, 1-2 sentences
 async function generateStatusDana() {
@@ -5321,7 +5354,7 @@ function setTab(tab) {
   if (tab === 'ai') {
     loadAiTabState();
     // Auto-generate nedeljni pregled if not yet available for this week
-    if (!state.aiNedeljniPregled) setTimeout(() => handleAiNedeljniPregled(), 0);
+    if (!state.aiNedeljniPregled) setTimeout(() => handleAiNedeljniPregled(), 800);
   }
   scheduleRender();
 }
@@ -5588,13 +5621,13 @@ async function handleAiPredlogObroka() {
 
 async function handleAiOceniNedelju() {
   if (state.aiLoadingOceniNedelju) return;
-  const stats = buildWeekStatsForAI(state.weekOffset || 0);
+  const stats = buildWeekStatsForAI(0); // always current week
   if (!stats) { showToast('Nema dovoljno podataka za ovu nedelju.', 'err'); return; }
   state.aiLoadingOceniNedelju = true;
   state.aiOceniNedelju = null;
   scheduleRender();
   try {
-    const result = await generateWeeklySummary(stats);
+    const result = await generateOceniNedelju(stats);
     state.aiOceniNedelju = result;
     saveAiDaily('ocenindelju', result);
   } catch (e) {
@@ -5613,7 +5646,7 @@ async function handleAiNedeljniPregled() {
   state.aiNedeljniPregled = null;
   scheduleRender();
   try {
-    const result = await generateWeeklySummary(stats);
+    const result = await generateNedeljniPregled(stats);
     state.aiNedeljniPregled = result;
     saveWeeklyReview(result);
   } catch (e) {
