@@ -5255,16 +5255,20 @@ document.body.appendChild(toastEl);
 
 // Register Service Worker — enables PWA install prompt and offline support
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/fitlog/sw.js', { scope: '/fitlog/' })
+  navigator.serviceWorker.register('/fitlog/sw.js', {
+    scope: '/fitlog/',
+    updateViaCache: 'none'   // always fetch sw.js fresh, bypass HTTP cache
+  })
     .then(reg => {
-      // When a new SW is waiting, it means an update is ready.
-      // skipWaiting() is already called inside sw.js, so once the new
-      // SW becomes the controller, we reload to serve fresh content.
+      // Force an update check every time the page becomes visible
+      // (covers Android Chrome which rarely checks in background)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
-          // New SW installed and activated — page is still showing old cache.
-          // Reload only if there was already a controller (i.e. not first install).
           if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
             showToast('Nova verzija dostupna — osvežavanje...', 'ok');
             setTimeout(() => window.location.reload(), 1200);
@@ -5274,7 +5278,6 @@ if ('serviceWorker' in navigator) {
     })
     .catch(err => console.warn('[FitLog] SW registration failed:', err));
 
-  // Safety net: if controller changes (skipWaiting fired from another tab), reload.
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!refreshing) {
