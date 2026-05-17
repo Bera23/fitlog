@@ -1,45 +1,67 @@
-const CACHE_NAME = 'fitlog-v1';
-const ASSETS = [
-  '/fitlog/fitlog.html',
-];
+// Cache name is derived at install time from the actual content of fitlog.html.
+// This means the cache auto-invalidates whenever fitlog.html changes —
+// no manual version bumping needed on every deploy.
 
-// Install — cache the app shell
+const SHELL = '/fitlog/fitlog.html';
+
+async function getContentHash(url) {
+  try {
+    const res  = await fetch(url, { cache: 'no-store' });
+    const text = await res.text();
+    // Simple hash — sum of char codes mod 1M, converted to base-36
+    let h = 0;
+    for (let i = 0; i < text.length; i++) h = (h + text.charCodeAt(i)) % 1_000_000;
+    return 'fitlog-' + h.toString(36);
+  } catch {
+    return 'fitlog-fallback';
+  }
+}
+
+// Install — fetch fitlog.html, derive cache name from its content, store it
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const cacheName = await getContentHash(SHELL);
+    const cache     = await caches.open(cacheName);
+    await cache.add(SHELL);
+    // Store cache name so activate event can clean up old ones
+    await caches.open('fitlog-meta').then(m => m.put('cache-name',
+      new Response(cacheName)));
+    await self.skipWaiting();
+  })());
 });
 
-// Activate — clean up old caches
+// Activate — delete any old fitlog-* caches except the current one
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const meta      = await caches.open('fitlog-meta');
+    const res       = await meta.match('cache-name');
+    const current   = res ? await res.text() : null;
+    const keys      = await caches.keys();
+    await Promise.all(
+      keys.filter(k => k.startsWith('fitlog-') && k !== 'fitlog-meta' && k !== current)
+          .map(k  => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
 });
 
-// Fetch — cache-first for app shell, network-first for everything else
+// Fetch — serve fitlog.html from cache, everything else from network
 self.addEventListener('fetch', e => {
-  // Only handle same-origin requests
   if (!e.request.url.startsWith(self.location.origin)) return;
 
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        // Cache successful GET responses for app assets
-        if (response.ok && e.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      });
-    }).catch(() => {
-      // Offline fallback — return cached app if available
-      return caches.match('/fitlog/fitlog.html');
-    })
-  );
+  e.respondWith((async () => {
+    const meta      = await caches.open('fitlog-meta');
+    const res       = await meta.match('cache-name');
+    const cacheName = res ? await res.text() : 'fitlog-fallback';
+    const cache     = await caches.open(cacheName);
+    const cached    = await cache.match(e.request);
+
+    if (cached) return cached;
+
+    const response = await fetch(e.request);
+    if (response.ok && e.request.method === 'GET') {
+      cache.put(e.request, response.clone());
+    }
+    return response;
+  })().catch(() => caches.match(SHELL)));
 });
