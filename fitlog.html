@@ -558,7 +558,7 @@
  *   §16  MAIN RENDER           — render() — assembles full app UI from state
  *   §17  EVENT HANDLERS        — setTab, setMode, addWater, weight/target fns
  *   §18  SWIPE TO DELETE       — touch gesture state machine
- *   §19  HISTORY HELPERS       — product history, undo delete
+ *   §19  HISTORY & PRODUCT HELPERS — product history, undo delete
  *   §20  ASYNC AI HANDLERS     — handleSubmit, scoreNutrition, handleProductSubmit
  *   §21  SCHEMA MIGRATION      — migrateSchema(), checkSchemaVersion()
  *   §22  INIT                  — initial data load, first render, PWA toast
@@ -936,7 +936,7 @@ function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
   state.cachedApiStats = s;
 }
 
-// ─── §5b FAVORITES ────────────────────────────────────────────────────────────
+// ─── §5 cont. FAVORITES ───────────────────────────────────────────────────────
 
 function loadFavorites() {
   return safeParseLS(FAVORITES_KEY) || [];
@@ -1117,9 +1117,7 @@ function saveRenameFavorite(favId) {
     saveFavorites(favs);
     // Sync customName on every logged meal that was saved from this favorite
     // Scan all fitlog_day_* keys in localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key.startsWith('fitlog_day_')) continue;
+    for (const key of Object.keys(localStorage).filter(k => k.startsWith('fitlog_day_'))) {
       try {
         const dayData = JSON.parse(localStorage.getItem(key));
         if (!dayData?.meals) continue;
@@ -1142,7 +1140,7 @@ function saveRenameFavorite(favId) {
   scheduleRender();
 }
 
-// ─── §5c RENDER UTILITIES ─────────────────────────────────────────────────────
+// ─── §5 cont. RENDER UTILITIES ────────────────────────────────────────────────
 // Generic debounce — returns a debounced wrapper that delays fn execution by ms
 // after the last call, encapsulating the timer so callers stay clean.
 function debounce(fn, ms) {
@@ -2257,7 +2255,7 @@ function macroBar(label, value, min, max, color, unit) {
     </div>`;
 }
 
-// ─── §14b WEEK DATA & STREAK ──────────────────────────────────────────────────
+// ─── §14 cont. WEEK DATA & STREAK ────────────────────────────────────────────
 
 // Returns current week Mon–Sun (future days shown as empty)
 function getWeekData(offset = 0) {
@@ -4818,7 +4816,7 @@ function showUndoToast(msg) {
   showUndoToastFor(msg, undoDeleteHistoryProduct);
 }
 
-// ─── §19b MISC HELPERS ────────────────────────────────────────────────────────
+// ─── §19 cont. MISC HELPERS ───────────────────────────────────────────────────
 function estimateBodyFat(bmi, age, gender) {
   // Deurenberg formula
   const factor = gender === 'male' ? 1 : 0;
@@ -4860,6 +4858,9 @@ async function handleProductSubmit() {
   if (!input && !state.productImageBase64) return;
 
   state.productLoading = true;
+  // render() directly — loading state must be visible before the async call.
+  // scheduleRender() would defer to the next RAF, leaving the button active
+  // during the await and risking a double-submit.
   render();
 
   try {
@@ -4942,7 +4943,9 @@ function addProductToMeal(productId, productDate) {
   const macroTag = `[P:${p.protein_per_100g||0}g/100g UH:${p.carbs_per_100g||0}g/100g M:${p.fat_per_100g||0}g/100g ${p.calories_per_100g||0}kcal/100g]`;
   const line = `${p.name} - ${srv}g ${macroTag}`;
 
-  // Switch to log tab in food mode if needed — product mode has no msgInput in DOM
+  // Switch to log tab in food mode if needed — product mode has no msgInput in DOM.
+  // render() directly (not scheduleRender) because getElementById('msgInput') is
+  // called immediately after — the element must exist in DOM before we continue.
   if (state.activeTab !== 'log' || state.mode !== 'food') {
     state.activeTab = 'log';
     state.mode = 'food';
@@ -4995,7 +4998,7 @@ function handleImageSelect(input) {
   reader.readAsDataURL(file);
 }
 
-// §17 continued — API key, weight, navigation, meal/exercise CRUD actions
+// ─── §17 cont. API key, weight, navigation, meal/exercise CRUD actions ────────
 
 function saveApiKey() {
   const val = document.getElementById('apiInput').value.trim();
@@ -5424,7 +5427,7 @@ function setTab(tab) {
   scheduleRender();
 }
 
-// ─── §AI TAB RENDERER ─────────────────────────────────────────────────────────
+// ─── §20 cont. AI TAB RENDERER ────────────────────────────────────────────────
 
 // Toggle expand/collapse for a single AI card by id
 function toggleAiCard(id) {
@@ -5549,10 +5552,10 @@ function setMode(mode) {
   state.imageMime   = null;
   state.productImageBase64 = null;
   state.productImageMime   = null;
-  render();
-  // Note: intentionally no .focus() here — auto-focusing the textarea
-  // would trigger the mobile keyboard on every tab switch, which is unwanted.
-  // The user should tap the textarea explicitly to open the keyboard.
+  // scheduleRender() is sufficient here — no immediate DOM access follows this call.
+  // Note: intentionally no .focus() — auto-focusing the textarea would trigger
+  // the mobile keyboard on every mode switch, which is unwanted.
+  scheduleRender();
 }
 
 function resetGoalToAuto() {
@@ -5572,7 +5575,7 @@ function shiftWeek(delta) {
 
 // Trigger AI weekly summary generation — called from onclick in weeklyReportHTML
 
-// ─── §AI TAB HANDLERS ────────────────────────────────────────────────────────
+// ─── §20 cont. AI TAB HANDLERS ────────────────────────────────────────────────
 
 // Builds loading body HTML — reused across all AI cards
 function aiLoadingHTML() {
@@ -5805,6 +5808,9 @@ async function handleSubmit() {
   // but this guards against any future race conditions
   const modeAtSubmit = state.mode;
   state.loading = true;
+  // render() directly — loading state must be visible before the async call.
+  // scheduleRender() would defer to the next RAF, leaving the button active
+  // during the await and risking a double-submit.
   render();
 
   try {
