@@ -300,9 +300,9 @@
     to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
   }
   .toast {
-    position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(82px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
     padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 13px;
-    z-index: 999; white-space: nowrap;
+    z-index: 999; white-space: normal; text-align: center; max-width: calc(100vw - 40px);
     box-shadow: 0 4px 24px rgba(0,0,0,0.5);
     transition: opacity 0.25s, transform 0.25s;
     font-family: var(--sans);
@@ -1362,7 +1362,6 @@ Napomena: prirodno masni proizvodi (sir, orasi, maslinovo ulje) mogu imati crven
 ali to ne znači nužno da su nezdravi — naznači to u "summary" ako je relevantno.
 
 Ako etiketa nije potpuno čitljiva, oceni na osnovu vidljivog dela i naznači to u "summary".
-Ako nutritivne vrednosti nisu vidljive na slici (npr. fotografisana je prednja strana), ali prepoznaješ proizvod po brendu i nazivu, koristi svoje poznavanje tog proizvoda i naznači u "summary" da vrednosti potiču iz baze znanja, ne sa etikete.
 Za serving_size_g: koristi vrednost sa etikete ako postoji (npr. "1 kesica 30g" → 30), inače null.
 Ako postoji zdravija alternativa ovom proizvodu, kratko je pomeni na kraju polja "summary".
 
