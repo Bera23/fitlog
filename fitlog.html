@@ -590,6 +590,8 @@ const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na sr
 const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
 // localStorage key prefix for scanned products
 const PRODUCT_KEY = 'fitlog_products_';
+// localStorage key for saved favorite meals
+const FAVORITES_KEY = 'fitlog_favorites';
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -658,6 +660,9 @@ const state = {
   appInstalled: false,      // flips to true after successful PWA install
   pendingImport: null,      // holds parsed backup data awaiting user confirmation
   pendingDelete: false,     // true when user has initiated delete-all flow
+  favoritesExpanded: false, // true = show full swipeable management list
+  renamingFavId: null,      // id of favorite currently being renamed inline
+  expandedFavIds: new Set(), // ids of favorites currently expanded to show items
 };
 
 // ─── §4 UTILITY FUNCTIONS ─────────────────────────────────────────────────────
@@ -910,7 +915,173 @@ function trackApiCall({ success, errorType, ms, promptLen, responseLen }) {
   saveApiStats(s);
 }
 
-// ─── §5b RENDER UTILITIES ─────────────────────────────────────────────────────
+// ─── §5b FAVORITES ────────────────────────────────────────────────────────────
+
+function loadFavorites() {
+  return safeParseLS(FAVORITES_KEY) || [];
+}
+
+function saveFavorites(favs) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+}
+
+// Returns true if a meal already exists in favorites — checked by item fingerprint.
+// Used at render time to pre-style the ★ button without relying on m.fromFavorite.
+function isMealFavorited(meal) {
+  if (!meal?.items?.length) return false;
+  const fingerprint = meal.items.map(i => i.name.trim().toLowerCase() + i.amount).join('|');
+  return loadFavorites().some(f => f.fingerprint === fingerprint);
+}
+
+// Save a logged meal as a favorite — deduplicates by item fingerprint.
+// Accepts optional date so history meals (not in state.dayData) can be saved too.
+function saveMealAsFavorite(mealId, date) {
+  // Load meal from the correct day — today's state or a historical day
+  const sourceDate = date || state.date;
+  const meal = sourceDate === state.date
+    ? state.dayData.meals.find(m => m.id === mealId)
+    : loadDay(sourceDate).meals?.find(m => m.id === mealId);
+
+  if (!meal) return;
+
+  const favs = loadFavorites();
+
+  // Fingerprint: item names + amounts, order-sensitive
+  const fingerprint = meal.items.map(i => i.name.trim().toLowerCase() + i.amount).join('|');
+  if (favs.find(f => f.fingerprint === fingerprint)) {
+    showToast('Već postoji u omiljenim ★');
+    return;
+  }
+
+  // Auto-name: first item + count of remaining
+  const autoName = meal.items.length > 1
+    ? `${meal.items[0].name} +${meal.items.length - 1}`
+    : meal.items[0]?.name || 'Sačuvani obrok';
+
+  const fav = {
+    id: crypto.randomUUID(),
+    name: autoName,
+    savedAt: Date.now(),
+    useCount: 0,
+    fingerprint,
+    items:    meal.items,
+    calories: meal.calories,
+    protein:  meal.protein,
+    carbs:    meal.carbs,
+    fat:      meal.fat,
+    sugar:    meal.sugar || 0,
+  };
+
+  favs.push(fav);
+  saveFavorites(favs);
+
+  // Mark the source meal so the ★ button flips to filled state —
+  // only possible for today's meals which live in state.dayData
+  if (sourceDate === state.date) {
+    meal.fromFavorite = fav.id;
+    saveDay(state.date, state.dayData);
+  }
+
+  // Direct DOM update — flip whichever star button triggered this call.
+  // Today's button: saveMealAsFavorite('id') — history button: saveMealAsFavorite('id', 'date')
+  // Both contain the mealId so a partial match on the id is sufficient.
+  const btn = document.querySelector(`button[onclick*="saveMealAsFavorite('${mealId}'"]`);
+  if (btn) {
+    btn.textContent = '★ Sačuvano u omiljene';
+    btn.style.background = 'rgba(255,179,71,0.12)';
+    btn.style.borderColor = 'rgba(255,179,71,0.3)';
+    btn.style.color = 'var(--orange)';
+  }
+
+  showToast('Sačuvano u omiljene ★');
+}
+
+// Instantly log a favorite as a new meal entry for the current day.
+function addFavoriteToDay(favId) {
+  const favs = loadFavorites();
+  const fav = favs.find(f => f.id === favId);
+  if (!fav) return;
+
+  // Bump use counter for frequency-based sort in the strip
+  fav.useCount = (fav.useCount || 0) + 1;
+  saveFavorites(favs);
+
+  const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+  const meal = {
+    id: crypto.randomUUID(),
+    time: now,
+    items:    fav.items,
+    calories: fav.calories,
+    protein:  fav.protein,
+    carbs:    fav.carbs,
+    fat:      fav.fat,
+    sugar:    fav.sugar || 0,
+    note:     '',
+    fromFavorite: favId,
+  };
+
+  state.dayData.meals.push(meal);
+  saveDay(state.date, state.dayData);
+  showToast(`+${Math.round(meal.calories)} kcal dodato ★`);
+  scheduleRender();
+}
+
+// Pending undo state for swipe-deleted favorites
+let _favUndoPending = null;
+let _favUndoTimer   = null;
+
+function deleteFavoriteWithUndo(favId) {
+  const favs = loadFavorites();
+  const fav  = favs.find(f => f.id === favId);
+  if (!fav) return;
+
+  _favUndoPending = fav;
+  saveFavorites(favs.filter(f => f.id !== favId));
+  scheduleRender();
+
+  showUndoToastFor(`"${fav.name}" obrisano`, undoDeleteFavorite);
+  clearTimeout(_favUndoTimer);
+  _favUndoTimer = setTimeout(() => { _favUndoPending = null; }, 4500);
+}
+
+function undoDeleteFavorite() {
+  if (!_favUndoPending) return;
+  clearTimeout(_favUndoTimer);
+  const fav = _favUndoPending;
+  _favUndoPending = null;
+  const favs = loadFavorites();
+  favs.push(fav);
+  saveFavorites(favs);
+  scheduleRender();
+  showToast('Vraćeno ✓');
+}
+
+function startRenameFavorite(favId) {
+  state.renamingFavId = favId;
+  scheduleRender();
+  // Focus the input after render
+  requestAnimationFrame(() => document.getElementById('fav-rename-' + favId)?.focus());
+}
+
+function toggleFavoriteExpand(favId) {
+  if (!state.expandedFavIds) state.expandedFavIds = new Set();
+  if (state.expandedFavIds.has(favId)) state.expandedFavIds.delete(favId);
+  else state.expandedFavIds.add(favId);
+  scheduleRender();
+}
+
+function saveRenameFavorite(favId) {
+  const input = document.getElementById('fav-rename-' + favId);
+  const newName = input?.value.trim();
+  if (!newName) { state.renamingFavId = null; scheduleRender(); return; }
+  const favs = loadFavorites();
+  const fav  = favs.find(f => f.id === favId);
+  if (fav) { fav.name = newName; saveFavorites(favs); }
+  state.renamingFavId = null;
+  scheduleRender();
+}
+
+// ─── §5c RENDER UTILITIES ─────────────────────────────────────────────────────
 // Generic debounce — returns a debounced wrapper that delays fn execution by ms
 // after the last call, encapsulating the timer so callers stay clean.
 function debounce(fn, ms) {
@@ -1955,6 +2126,142 @@ function weekChartHTML(weekData) {
     </div>`;
 }
 
+// ─── FAVORITES STRIP + FULL LIST ─────────────────────────────────────────────
+
+// Chip strip shown in the log tab food mode when favorites exist.
+// Collapsed: top-3 chips by frequency. Expanded: full swipeable management list.
+function favoritesStripHTML() {
+  const favs = loadFavorites();
+  if (!favs.length) return '';
+
+  // Sort by use frequency desc, then recency desc
+  const sorted = [...favs].sort((a, b) =>
+    (b.useCount || 0) - (a.useCount || 0) || b.savedAt - a.savedAt
+  );
+
+  if (state.favoritesExpanded) {
+    return `
+      <div style="margin:10px 16px 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase">★ Omiljeni</span>
+          <button onclick="state.favoritesExpanded=false;scheduleRender()"
+                  style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:var(--sans);padding:2px 0">
+            Zatvori
+          </button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;margin:0">
+          ${sorted.map((f, i) => favoritesRowHTML(f, i, sorted.length)).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Collapsed — top 3 chips + toggle link
+  const chips = sorted.slice(0, 3).map(f => `
+    <button onclick="addFavoriteToDay('${f.id}')"
+            style="display:inline-flex;flex-direction:column;align-items:flex-start;
+                   background:var(--s3);border:1px solid var(--s5);border-radius:10px;
+                   padding:8px 12px;cursor:pointer;text-align:left;flex-shrink:0;
+                   min-width:90px;max-width:140px;transition:background 0.15s"
+            ontouchstart="this.style.background='var(--s5)'"
+            ontouchend="this.style.background='var(--s3)'"
+            onmousedown="this.style.background='var(--s5)'"
+            onmouseup="this.style.background='var(--s3)'">
+      <span style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;
+                   overflow:hidden;text-overflow:ellipsis;max-width:116px;display:block">${f.name}</span>
+      <span style="font-size:11px;color:var(--green);font-family:var(--mono);
+                   font-weight:700;margin-top:2px">${Math.round(f.calories)} kcal</span>
+    </button>`).join('');
+
+  return `
+    <div style="margin:10px 16px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase">★ Omiljeni</span>
+        <button onclick="state.favoritesExpanded=true;scheduleRender()"
+                style="background:none;border:none;color:var(--muted);font-size:12px;
+                       cursor:pointer;font-family:var(--sans);padding:2px 0">
+          ${favs.length > 3 ? `Svi (${favs.length})` : 'Uredi'}
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch">
+        ${chips}
+      </div>
+    </div>`;
+}
+
+// Single row in the expanded favorites list — expand/collapse to see items,
+// swipe-to-delete, inline rename, and a + quick-add button.
+function favoritesRowHTML(f, index, total) {
+  const isLast     = index === total - 1;
+  const isRenaming = state.renamingFavId === f.id;
+  const isExpanded = state.expandedFavIds?.has(f.id);
+
+  return `
+    <div class="log-item"
+         style="border-bottom:${isLast ? 'none' : '1px solid var(--s3)'}"
+         ontouchstart="swipeStart(event,'${f.id}','favorite')"
+         ontouchmove="swipeMove(event,'${f.id}')"
+         ontouchend="swipeEnd(event,'${f.id}','favorite')"
+         ontouchcancel="swipeCancel('${f.id}')">
+      <div class="swipe-delete-bg">🗑</div>
+      <div class="log-item-inner" id="swipe-fav-${f.id}" style="background:var(--card)">
+
+        <!-- Collapsed row — always visible -->
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 14px">
+
+          <!-- Tap left side to expand/collapse -->
+          <div style="flex:1;min-width:0;cursor:pointer"
+               onclick="toggleFavoriteExpand('${f.id}')">
+            ${isRenaming ? `
+              <input id="fav-rename-${f.id}"
+                     value="${f.name.replace(/"/g, '&quot;')}"
+                     style="background:var(--s3);border:1px solid var(--green);border-radius:6px;
+                            color:var(--text);padding:4px 8px;font-size:14px;font-family:var(--sans);
+                            width:100%;outline:none;font-weight:700"
+                     onclick="event.stopPropagation()"
+                     onkeydown="if(event.key==='Enter')saveRenameFavorite('${f.id}');
+                                if(event.key==='Escape'){state.renamingFavId=null;scheduleRender();}">
+            ` : `
+              <div style="font-size:14px;font-weight:700;color:var(--text);
+                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>`}
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+              <span style="font-size:12px;color:var(--green);font-family:var(--mono);font-weight:700">${Math.round(f.calories)} kcal</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(143,212,46,0.1);color:var(--green)">P ${Math.round(f.protein)}g</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(71,200,255,0.1);color:var(--blue)">UH ${Math.round(f.carbs)}g</span>
+              ${f.useCount ? `<span style="font-size:10px;color:var(--muted)">${f.useCount}× korišćeno</span>` : ''}
+            </div>
+          </div>
+
+          <!-- Rename / Confirm — then + quick-add -->
+          ${isRenaming ? `
+            <button onclick="saveRenameFavorite('${f.id}')"
+                    style="background:var(--green);color:var(--bg);border:none;border-radius:8px;
+                           padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;
+                           flex-shrink:0;min-height:36px">✓</button>` : `
+            <button onclick="event.stopPropagation();startRenameFavorite('${f.id}')"
+                    style="background:var(--s3);border:1px solid var(--s6);border-radius:8px;
+                           color:var(--muted);padding:8px 12px;font-size:13px;cursor:pointer;
+                           flex-shrink:0;min-height:36px">✏</button>
+            <button onclick="event.stopPropagation();addFavoriteToDay('${f.id}')"
+                    style="background:rgba(143,212,46,0.15);border:1px solid rgba(143,212,46,0.3);
+                           border-radius:8px;color:var(--green);padding:8px 13px;font-size:16px;
+                           font-weight:700;cursor:pointer;flex-shrink:0;min-height:36px;line-height:1">+</button>`}
+        </div>
+
+        <!-- Expanded detail — items list -->
+        ${isExpanded ? `
+        <div style="padding:0 14px 14px;border-top:1px solid var(--s3)">
+          <div style="padding-top:10px">
+            ${f.items.map(it => `
+              <div style="font-size:13px;color:var(--text-secondary);padding:3px 0">
+                ${it.amount} ${it.name} <span style="color:var(--muted)">· ${it.calories} kcal</span>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+      </div>
+    </div>`;
+}
+
 function bmiCategory(bmi) {
   if (bmi < 18.5) return { label: 'Pothranjenost', color: 'var(--blue)' };
   if (bmi < 25)   return { label: 'Normalna težina', color: 'var(--green)' };
@@ -2070,6 +2377,14 @@ function historyDayDetailHTML(date) {
           <span class="pill" style="background:rgba(255,179,71,0.13);color:var(--orange)">M ${Math.round(m.fat||0)}g</span>
           ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
         </div>
+        <button onclick="saveMealAsFavorite('${m.id}', '${date}')"
+                style="margin-top:10px;background:${isMealFavorited(m) ? 'rgba(255,179,71,0.12)' : 'var(--s3)'};
+                       border:1px solid ${isMealFavorited(m) ? 'rgba(255,179,71,0.3)' : 'var(--s6)'};
+                       border-radius:8px;color:${isMealFavorited(m) ? 'var(--orange)' : 'var(--muted)'};
+                       padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);
+                       min-height:36px;width:100%;text-align:left;transition:all 0.15s">
+          ${isMealFavorited(m) ? '★ Sačuvano u omiljene' : '☆ Sačuvaj u omiljene'}
+        </button>
         ${msHTML}
       </div>
     </div>`;
@@ -2306,15 +2621,20 @@ function historyTabHTML() {
     return historyDayDetailHTML(state.selectedHistoryDate);
   }
 
-  // Sub-tab switcher — Obroci | Proizvodi
+  // Sub-tab switcher — Obroci | Proizvodi | Omiljeni
   const subTabBar = `
     <div class="sub-tabs">
       <button class="sub-tab ${state.historySubTab === 'obroci' ? 'active' : 'inactive'}" onclick="setHistoryTab('obroci')">🍽 Obroci</button>
       <button class="sub-tab ${state.historySubTab === 'proizvodi' ? 'active' : 'inactive'}" onclick="setHistoryTab('proizvodi')">📦 Proizvodi</button>
+      <button class="sub-tab ${state.historySubTab === 'omiljeni' ? 'active' : 'inactive'}" onclick="setHistoryTab('omiljeni')">★ Omiljeni</button>
     </div>`;
 
   if (state.historySubTab === 'proizvodi') {
     return subTabBar + productsHistoryHTML();
+  }
+
+  if (state.historySubTab === 'omiljeni') {
+    return subTabBar + favoritesHistoryHTML();
   }
 
   // ── OBROCI sub-tab — paginated by month ──────────────────────────────────────
@@ -2527,6 +2847,39 @@ function productsHistoryHTML() {
       ${dayBlocks}
     </div>`;
   }).join('');
+}
+
+// Renders the Omiljeni sub-tab in Istorija — full management view with swipe-to-delete and rename.
+function favoritesHistoryHTML() {
+  const favs = loadFavorites();
+
+  if (!favs.length) {
+    return `
+      <div class="card">
+        <div class="empty" style="padding:32px 16px">
+          <span class="empty-icon">★</span>
+          <div class="empty-title">Nema sačuvanih obroka</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6">
+            Otvori bilo koji obrok u Dnevniku ili Istoriji,<br>razvuci ga i tapni ☆ Sačuvaj u omiljene.
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Sort by frequency desc, then recency desc
+  const sorted = [...favs].sort((a, b) =>
+    (b.useCount || 0) - (a.useCount || 0) || b.savedAt - a.savedAt
+  );
+
+  return `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px 8px;border-bottom:1px solid var(--s3)">
+        <div class="card-label" style="margin:0">
+          ${favs.length} sačuvanih · swipe levo za brisanje
+        </div>
+      </div>
+      ${sorted.map((f, i) => favoritesRowHTML(f, i, sorted.length)).join('')}
+    </div>`;
 }
 
 function weeklyReportHTML(weekData) {
@@ -3629,6 +3982,15 @@ function _renderInner() {
                   ${m.sugar ? `<span class="pill" style="background:rgba(255,107,157,0.13);color:var(--pink)">Š ${Math.round(m.sugar)}g</span>` : ''}
                 </div>
                 ${m.note ? `<div class="log-note" style="margin-top:6px">${m.note}</div>` : ''}
+                <button onclick="saveMealAsFavorite('${m.id}')"
+                        style="margin-top:10px;background:${isMealFavorited(m) ? 'rgba(255,179,71,0.12)' : 'var(--s3)'};
+                               border:1px solid ${isMealFavorited(m) ? 'rgba(255,179,71,0.3)' : 'var(--s6)'};
+                               border-radius:8px;color:${isMealFavorited(m) ? 'var(--orange)' : 'var(--muted)'};
+                               padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;
+                               font-family:var(--sans);min-height:36px;width:100%;text-align:left;
+                               transition:all 0.15s">
+                  ${isMealFavorited(m) ? '★ Sačuvano u omiljene' : '☆ Sačuvaj u omiljene'}
+                </button>
                 <div class="meal-score-area">
                 ${scoreHTML}
                 </div>
@@ -3984,6 +4346,7 @@ function _swipeEl(id) {
   const type = _swipe[id]?.type;
   if (type === 'hist-product') return document.getElementById('swipe-hist-' + id);
   if (type === 'exercise')     return document.getElementById('swipe-ex-' + id);
+  if (type === 'favorite')     return document.getElementById('swipe-fav-' + id);
   return document.getElementById('swipe-meal-' + id);
 }
 function swipeStart(e, id, type, date) {
@@ -4012,6 +4375,7 @@ function swipeEnd(e, id, type) {
       if (meta.type === 'meal') deleteMeal(id);
       else if (meta.type === 'exercise') deleteEx(id);
       else if (meta.type === 'hist-product') deleteHistoryProductWithUndo(meta.date, id);
+      else if (meta.type === 'favorite') deleteFavoriteWithUndo(id);
     }, 200);
   } else {
     if (el) el.style.transform = 'translateX(0)';
