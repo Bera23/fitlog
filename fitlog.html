@@ -591,6 +591,11 @@ const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst i
 const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom, max 12 reči","suggestion":"konkretna preporuka za sledeći obrok ili null"}';
 // Schema for product/label analysis — nutritional data per 100g + serving size + AI rating
 const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
+// Schema for AI predlog obroka — 2-3 meal suggestions with kcal and protein
+const GEMINI_PREDLOG_SCHEMA = '{"predlozi":[{"naziv":"string","opis":"string","kcal":broj,"proteini":broj}]}';
+// Schema for AI uvid u navike — 3-5 concrete pattern observations
+const GEMINI_NAVIKE_SCHEMA  = '{"uvidi":[{"naslov":"string","opis":"string"}]}';
+
 // localStorage key prefix for scanned products
 const PRODUCT_KEY = 'fitlog_products_';
 // localStorage key for saved favorite meals
@@ -645,8 +650,6 @@ const state = {
   editHeight: false,
   selectedHistoryDate: null,
   weekOffset: 0,            // 0 = current week, -1 = last week, etc.
-  weeklySummary: null,      // cached AI summary text for current weekOffset
-  weeklySummaryLoading: false,
   imageBase64: null,
   imageMime: null,
   drawerOpen: false,
@@ -668,6 +671,17 @@ const state = {
   renamingFavId: null,      // id of favorite currently being renamed inline
   renamingMealId: null,     // id of meal currently being renamed inline
   expandedFavIds: new Set(), // ids of favorites currently expanded to show items
+  expandedAiCards: new Set(), // ids of AI tab cards currently expanded
+  aiStatusDana: null,       // cached AI result for status dana (expires midnight)
+  aiPredlogObroka: null,    // cached AI result for predlog obroka (expires midnight)
+  aiOceniNedelju: null,     // cached AI result for oceni nedelju (expires midnight)
+  aiUvidNavike: null,       // cached AI result for uvid u navike (expires midnight)
+  aiNedeljniPregled: null,  // cached AI result for nedeljni pregled (expires next Monday)
+  aiLoadingStatusDana: false,
+  aiLoadingPredlog: false,
+  aiLoadingOceniNedelju: false,
+  aiLoadingNedeljniPregled: false,
+  aiLoadingNavike: false,
 };
 
 // ─── §4 UTILITY FUNCTIONS ─────────────────────────────────────────────────────
@@ -1279,28 +1293,142 @@ async function generateWeeklySummary(stats) {
   const bestDayStr  = stats.bestDay  ? `\n- Najbolji dan: ${stats.bestDay.date} (${stats.bestDay.net} kcal neto)` : '';
   const worstDayStr = stats.worstDay ? `\n- Najgori dan:  ${stats.worstDay.date} (${stats.worstDay.net} kcal neto)` : '';
 
-  const prompt = `Ti si motivišući nutricionistički trener. Analiziraj nedeljne statistike ishrane i daj kratak, konkretan komentar (2-4 rečenice, bez uvoda).
-${profile}
-Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj korisnika: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
-Nedelja: ${weekLabel}
+  // Build per-day breakdown if available — allows AI to spot patterns per day, not just averages
+  const daysDetail = stats.days?.map(d =>
+    `  ${d.date}: ${d.consumed} kcal uneseno, ${d.net} kcal neto, P${d.protein}g UH${d.carbs}g M${d.fat}g`
+  ).join('\n') || '';
 
-Statistike:
+  // JSON schema returned by the model — parsed by parseGeminiJson() on the caller side
+  const schema = `{"grade":"A"|"B"|"C"|"D","good":["string"],"improve":["string"],"advice":["string","string","string"]}`;
+
+  const prompt = `Ti si nutricionistički analitičar. Analiziraj nedeljne podatke ishrane i vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
+${profile}
+Kalorijski cilj: ${state.calorieGoal} kcal/dan. Cilj: ${state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)'}.
+Nedelja: ${weekLabel}
+${daysDetail ? `\nPodaci po danima:\n${daysDetail}` : ''}
+Nedeljni agregati:
 - Dana sa podacima: ${stats.daysWithData} od 7
 - Dana ${state.fitnessGoal === 'gain' ? 'u suficitu' : 'ispod cilja'}: ${stats.deficitDays} od ${stats.daysWithData}
-- Prosečan dnevni unos: ${stats.avgConsumed} kcal
-- Prosečno sagoreno: ${stats.avgBurned} kcal
-- Prosečan neto: ${stats.avgNet} kcal
-- Prosečan ${state.fitnessGoal === 'gain' ? 'suficit' : 'deficit'}: ${stats.avgDeficit} kcal
-- Prosečni proteini: ${stats.avgProtein}g
-- Prosečni ugljeni hidrati: ${stats.avgCarbs}g
-- Prosečne masti: ${stats.avgFat}g
-- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak mase' : 'gubitak masti'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
+- Prosečan unos: ${stats.avgConsumed} kcal | Prosečno sagoreno: ${stats.avgBurned} kcal | Prosečan neto: ${stats.avgNet} kcal
+- Prosečni proteini: ${stats.avgProtein}g | Ugljeni hidrati: ${stats.avgCarbs}g | Masti: ${stats.avgFat}g
+- Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak' : 'gubitak'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
 
-Ako postoje podaci o najboljim/najgorim danima, konkretno ih pomeni u komentaru.
-Zabranjena su generička mesta poput: "nastavi ovako", "odličan si", "samo nastavi napred".
-Budi direktan i specifičan — pohvali konkretno, upozori konkretno. Odgovori na srpskom.`;
+PRAVILA:
+- "grade": A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
+- "good": 2–3 konkretne stavke šta je išlo dobro — pomeni specifične dane ili brojeve, ne generalizuj
+- "improve": 1–2 konkretne stavke gde ima prostora — pomeni specifične dane ili obrasce, ne generalizuj
+- "advice": tačno 3 akciona saveta za sledeću nedelju — svaki počinje glagolom (Dodaj / Smanji / Izbegaj / Rasporedi / Uključi), konkretni i merljivi
+- Zabranjene fraze: "nastavi ovako", "odličan si", "samo nastavi napred", "odličan posao"
+- Jezik: srpski, direktan ton bez uvoda
 
-  return await callGemini([{ text: prompt }], 0.5);
+Format: ${schema}`;
+
+  const raw = await callGemini([{ text: prompt }], 0.4);
+  return parseGeminiJson(raw);
+}
+
+// Generate situational day status — plain text, 1-2 sentences
+async function generateStatusDana() {
+  const profile = buildUserProfile();
+  const t = totals();
+  const ml = macroLimits();
+  const remaining = Math.round(state.calorieGoal - t.net);
+  const hour = new Date().getHours();
+  const timePart = hour < 11 ? 'jutro' : hour < 15 ? 'podne' : hour < 19 ? 'popodne' : 'veče';
+
+  // Last meal time from today's meals
+  const lastMeal = state.dayData.meals.length
+    ? state.dayData.meals[state.dayData.meals.length - 1].time
+    : null;
+
+  const prompt = `Ti si nutricionistički asistent. Daj kratak situacioni komentar (1-2 rečenice, bez uvoda, bez liste).
+${profile}
+Trenutno stanje — ${timePart} (${hour}:00h):
+- Uneseno: ${Math.round(t.consumed)} kcal od ${state.calorieGoal} kcal cilja
+- Sagoreno: ${Math.round(t.burned)} kcal | Neto: ${Math.round(t.net)} kcal
+- Preostalo do cilja: ${remaining} kcal
+- Proteini: ${Math.round(t.protein)}g / ${ml.protMax}g | Masti: ${Math.round(t.fat)}g | UH: ${Math.round(t.carbs)}g
+${lastMeal ? `- Poslednji obrok: ${lastMeal}` : '- Još nema unesenih obroka'}
+
+Ako je sve u redu — reci to direktno. Ne izmišljaj probleme.
+Ako ima konkretnog problema (kasno vreme + malo uneseno, prekoračen cilj, premalo proteina) — upozori konkretno.
+Zabranjena generička mesta. Odgovori na srpskom.`;
+
+  return await callGemini([{ text: prompt }], 0.2);
+}
+
+// Generate meal suggestion based on remaining calories and missing macros
+async function generatePredlogObroka() {
+  const profile = buildUserProfile();
+  const t = totals();
+  const ml = macroLimits();
+  const remaining = Math.round(state.calorieGoal - t.net);
+  const remainingProtein = Math.max(0, Math.round(ml.protMax - t.protein));
+  const hour = new Date().getHours();
+  const mealType = hour < 10 ? 'doručak' : hour < 14 ? 'ručak' : hour < 18 ? 'užina' : 'večera';
+
+  // List of foods already eaten today — context so AI doesn't repeat same items
+  const todayFoods = state.dayData.meals
+    .flatMap(m => m.items?.map(i => i.name) || [m.desc || ''])
+    .filter(Boolean)
+    .join(', ') || 'ništa';
+
+  const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
+${profile}
+Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta.
+Preostalo kalorija: ${remaining} kcal | Proteina nedostaje: ${remainingProtein}g
+Danas već pojeo/la: ${todayFoods}
+Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
+Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
+Format: ${GEMINI_PREDLOG_SCHEMA}`;
+
+  const raw = await callGemini([{ text: prompt }], 0.2);
+  return parseGeminiJson(raw);
+}
+
+// Generate habit insights from last 30 days — finds patterns, not just averages
+async function generateUvidNavike() {
+  const profile = buildUserProfile();
+
+  // Aggregate last 30 days of data
+  const days = [];
+  for (let i = 0; i < 30; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = localDateStr(d);
+    const day = safeParseLS('fitlog_day_' + dateStr);
+    if (!day) continue;
+    const consumed = day.meals?.reduce((s, m) => s + (m.calories || 0), 0) || 0;
+    if (consumed === 0) continue;
+    const protein = day.meals?.reduce((s, m) => s + (m.protein || 0), 0) || 0;
+    const carbs   = day.meals?.reduce((s, m) => s + (m.carbs   || 0), 0) || 0;
+    const fat     = day.meals?.reduce((s, m) => s + (m.fat     || 0), 0) || 0;
+    const burned  = day.exercises?.reduce((s, e) => s + (e.burned || 0), 0) || 0;
+    days.push({ date: dateStr, dow: d.getDay(), consumed, burned, net: consumed - burned, protein, carbs, fat });
+  }
+
+  if (days.length === 0) throw new Error('Nema unesenih podataka za analizu navika.');
+
+  const daysStr = days.map(d =>
+    `  ${d.date} (${['Ne','Po','Ut','Sr','Če','Pe','Su'][d.dow]}): ${d.consumed} kcal, P${d.protein}g UH${d.carbs}g M${d.fat}g`
+  ).join('\n');
+
+  const prompt = `Ti si nutricionistički analitičar. Analiziraj podatke ishrane za poslednjih ${days.length} dana i pronađi konkretne obrasce.
+${profile}
+Kalorijski cilj: ${state.calorieGoal} kcal/dan.
+
+Podaci po danima:
+${daysStr}
+
+Traži OBRASCE, ne proseke. Primeri korisnih uvida:
+- "Petkom si konzistentno iznad cilja" (pomeni koliko petaka od ukupnih)
+- "Proteini su ispod cilja X od Y dana"
+- "Vikendi su tvoj problem — prosek +Z kcal viška"
+Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
+Format: ${GEMINI_NAVIKE_SCHEMA}`;
+
+  const raw = await callGemini([{ text: prompt }], 0.4);
+  return parseGeminiJson(raw);
 }
 
 async function parseFoodFromImage(base64, mimeType, textContext) {
@@ -1698,9 +1826,6 @@ function saveDrawerProfile() {
     state.calorieGoalManual = false;
     localStorage.removeItem('fitlog_goal_manual');
 
-    // Clear stale AI weekly summary — it was generated for the previous mode
-    state.weeklySummary = null;
-
     // Clear today's nutrition score — it was graded against the previous mode's logic
     state.nutritionScore = null;
     localStorage.removeItem(SCORE_KEY + state.date);
@@ -1946,6 +2071,56 @@ function loadNutritionScore(date) {
 
 function saveNutritionScore(date, score) {
   localStorage.setItem(SCORE_KEY + date, JSON.stringify(score));
+}
+
+// ─── AI TAB STORAGE ──────────────────────────────────────────────────────────
+
+// Returns ISO week key YYYY-WNN for a given date — used to key nedeljni pregled
+function weekKey(date) {
+  const d = date ? new Date(date + 'T12:00:00') : new Date();
+  const startOfYear = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+// Load a daily AI result — returns null if missing or from a previous day
+function loadAiDaily(key) {
+  try {
+    const raw = localStorage.getItem('fitlog_ai_' + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Expire if stored on a different day
+    return parsed.date === todayStr() ? parsed.data : null;
+  } catch { return null; }
+}
+
+// Save a daily AI result — tagged with today's date for expiry check
+function saveAiDaily(key, data) {
+  localStorage.setItem('fitlog_ai_' + key, JSON.stringify({ date: todayStr(), data }));
+}
+
+// Load nedeljni pregled — returns null if missing or from a previous week
+function loadWeeklyReview() {
+  try {
+    const raw = localStorage.getItem('fitlog_ai_nedeljnipregled');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed.weekKey === weekKey() ? parsed.data : null;
+  } catch { return null; }
+}
+
+// Save nedeljni pregled — tagged with current week key for expiry check
+function saveWeeklyReview(data) {
+  localStorage.setItem('fitlog_ai_nedeljnipregled', JSON.stringify({ weekKey: weekKey(), data }));
+}
+
+// Load all AI tab results into state — called on AI tab open
+function loadAiTabState() {
+  state.aiStatusDana     = loadAiDaily('statusdana');
+  state.aiPredlogObroka  = loadAiDaily('predlogobroka');
+  state.aiOceniNedelju   = loadAiDaily('ocenindelju');
+  state.aiUvidNavike     = loadAiDaily('uvidnavike');
+  state.aiNedeljniPregled = loadWeeklyReview();
 }
 
 // ─── §13 UI HELPERS ───────────────────────────────────────────────────────────
@@ -3070,43 +3245,10 @@ function weeklyReportHTML(weekData) {
       </div>`;
   }).join('');
 
-  // Best and worst day by net calories vs goal — gives AI concrete data to reference
-  const sortedByDelta = [...daysWithData].sort((a, b) => {
-    const deltaA = Math.abs(a.net - (a.goal || goal));
-    const deltaB = Math.abs(b.net - (b.goal || goal));
-    return deltaA - deltaB; // ascending: closest to goal first = best
-  });
-  const bestDay  = sortedByDelta.length ? { date: fmtDate(sortedByDelta[0].date), net: sortedByDelta[0].net } : null;
-  const worstDay = sortedByDelta.length > 1 ? { date: fmtDate(sortedByDelta[sortedByDelta.length - 1].date), net: sortedByDelta[sortedByDelta.length - 1].net } : null;
-
-  // Stats object passed to AI summary — deficitDays reinterpreted as on-target days per mode
-  const statsForAI = { weekLabel, daysWithData: daysWithData.length, deficitDays: onTargetDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss, bestDay, worstDay };
-  const statsJson = JSON.stringify(statsForAI).replace(/'/g, "\\'");
-
-  // AI summary section — shows button, loading state, or cached result
-  const aiSummaryHTML = state.weeklySummaryLoading
-    ? `<div style="margin-top:12px;padding:12px;background:var(--s3);border-radius:10px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px"><span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> Generišem komentar...</div>`
-    : state.weeklySummary
-      ? `<div style="margin-top:12px;padding:12px;background:var(--s3);border-radius:10px;border-left:3px solid var(--green)">
-           <div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">🤖 AI KOMENTAR</div>
-           <div style="font-size:13px;color:var(--text-secondary);line-height:1.65">${state.weeklySummary}</div>
-           <button onclick="state.weeklySummary=null;scheduleRender()" style="background:none;border:none;color:var(--s8);font-size:11px;cursor:pointer;margin-top:8px;padding:0">↺ Generiši ponovo</button>
-         </div>`
-      : `<button onclick="requestWeeklySummary(${statsJson.replace(/"/g, '&quot;')})" style="width:100%;margin-top:12px;padding:11px;background:var(--s3);border:1px solid var(--s5);border-radius:10px;color:var(--muted);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;text-align:center">🤖 Generiši AI komentar</button>`;
-
   return `
     <div class="card">
       ${navHTML}
-      <div class="report-grade">${grade.emoji}</div>
-      <div class="report-grade-label" style="color:${grade.color}">${grade.label}</div>
-      <div class="report-grade-sub">${isGainMode
-        ? `${surplusDays} od ${daysWithData.length} dana u suficitu`
-        : `${deficitDays} od ${daysWithData.length} dana ispod cilja`}</div>
-      ${aiSummaryHTML}
-    </div>
-
-    <div class="card">
-      <div class="card-label">Statistike nedelje</div>
+      <div class="card-label" style="margin-bottom:0">Statistike nedelje</div>
       <div class="report-stat">
         <span class="report-stat-label">Prosečan dnevni unos</span>
         <span class="report-stat-val" style="color:var(--text)">${avgConsumed} kcal</span>
@@ -4213,6 +4355,7 @@ function _renderInner() {
     ${state.activeTab === 'stats' ? statsContent : ''}
     ${state.activeTab === 'history' ? historyTabHTML() : ''}
     ${state.activeTab === 'zdravlje' ? zdravljeTabHTML() : ''}
+    ${state.activeTab === 'ai' ? aiTabHTML() : ''}
 
     ${state.activeTab === 'log' ? `
       <div class="card">
@@ -4367,6 +4510,10 @@ function _renderInner() {
       <button class="nav-btn ${state.activeTab === 'history' ? 'active' : 'inactive'}" onclick="setTab('history')">
         <span class="nav-icon">📅</span>
         <span class="nav-label">Istorija</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'ai' ? 'active' : 'inactive'}" onclick="setTab('ai')">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label">AI</span>
       </button>
     </div>`;
   // Sync drawer after every render — only rebuild if it's actually open
@@ -5140,6 +5287,7 @@ function toggleHistoryScore(date) {
   if (isExpanded) {
     // Collapse
     state.expandedScoreDate = null;
+  state.expandedAiCards = new Set();
     if (content) content.style.display = 'none';
     if (chevronEl) chevronEl.classList.remove('open');
   } else {
@@ -5165,11 +5313,135 @@ function setTab(tab) {
   state.expandedExIds = new Set();
   state.expandedHistoryMealIds = new Set();
   state.expandedScoreDate = null;
+  state.expandedAiCards = new Set();
   if (tab === 'log') {
     state.nutritionScore = loadNutritionScore(state.date);
     state.mealScores = loadMealScores(state.date);
   }
+  if (tab === 'ai') {
+    loadAiTabState();
+    // Auto-generate nedeljni pregled if not yet available for this week
+    if (!state.aiNedeljniPregled) setTimeout(() => handleAiNedeljniPregled(), 0);
+  }
   scheduleRender();
+}
+
+// ─── §AI TAB RENDERER ─────────────────────────────────────────────────────────
+
+// Toggle expand/collapse for a single AI card by id
+function toggleAiCard(id) {
+  if (state.expandedAiCards.has(id)) state.expandedAiCards.delete(id);
+  else state.expandedAiCards.add(id);
+  scheduleRender();
+}
+
+// Renders a single collapsible AI card.
+// id         — unique string key used in expandedAiCards Set
+// icon       — emoji shown in header
+// title      — card title
+// desc       — subtitle shown in header
+// bodyHTML   — content shown when expanded; null = default empty message
+// footerHTML — optional button row at bottom of expanded card
+// aiAction — onclick JS string for AI call; hasResult — controls which icon shows
+function aiCardHTML(id, icon, title, desc, bodyHTML, aiAction, hasResult) {
+  const isOpen = state.expandedAiCards.has(id);
+  // Show 🤖 when no result yet, ↺ when result exists — both open card + trigger action
+  const aiBtn = aiAction
+    ? `<button class="meal-hdr-icon" title="${hasResult ? 'Regeneriši' : 'Pozovi AI'}"
+         onclick="event.stopPropagation();state.expandedAiCards.add('${id}');${aiAction}"
+         style="font-size:16px;padding:4px 6px;flex-shrink:0">${hasResult ? '↺' : '🤖'}</button>`
+    : '';
+  return `
+    <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
+      <div onclick="toggleAiCard('${id}')"
+           style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer">
+        <span style="font-size:20px;flex-shrink:0">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px">${title}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.4">${desc}</div>
+        </div>
+        ${aiBtn}
+        <span class="meal-chevron${isOpen ? ' open' : ''}" style="flex-shrink:0">▼</span>
+      </div>
+      ${isOpen ? `
+        <div style="border-top:1px solid var(--border);padding:14px 16px">
+          ${bodyHTML || `<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">Pritisni 🤖 da pozoveš AI.</div>`}
+        </div>
+      ` : ''}
+    </div>`;
+}
+
+// Main AI tab renderer — 5 cards, all collapsed by default
+function aiTabHTML() {
+  // Card 1 — Status dana
+  const statusBody = state.aiLoadingStatusDana ? aiLoadingHTML()
+    : state.aiStatusDana ? aiPlainResultHTML(state.aiStatusDana) : null;
+  const statusCard = aiCardHTML(
+    'statusDana', '⚡', 'Status dana',
+    'Situacioni uvid — gde si sada u odnosu na cilj',
+    statusBody,
+    'handleAiStatusDana()',
+    !!state.aiStatusDana
+  );
+
+  // Card 2 — Predlog obroka
+  const predlogBody = state.aiLoadingPredlog ? aiLoadingHTML()
+    : state.aiPredlogObroka ? aiPredlogResultHTML(state.aiPredlogObroka) : null;
+  const predlogCard = aiCardHTML(
+    'predlogObroka', '🍽', 'Predloži obrok',
+    'Predlog na osnovu preostalog kalorija i makroa koji fale',
+    predlogBody,
+    'handleAiPredlogObroka()',
+    !!state.aiPredlogObroka
+  );
+
+  // Card 3 — Oceni nedelju
+  const nedeljaBody = state.aiLoadingOceniNedelju ? aiLoadingHTML()
+    : state.aiOceniNedelju ? aiWeeklyResultHTML(state.aiOceniNedelju) : null;
+  const nedeljaCard = aiCardHTML(
+    'oceniNedelju', '📊', 'Oceni nedelju',
+    'Analiza tekuće ili prethodne nedelje',
+    nedeljaBody,
+    'handleAiOceniNedelju()',
+    !!state.aiOceniNedelju
+  );
+
+  // Card 4 — Nedeljni pregled (no AI button — auto or regenerate only)
+  const pregledBody = state.aiLoadingNedeljniPregled ? aiLoadingHTML()
+    : state.aiNedeljniPregled ? aiWeeklyResultHTML(state.aiNedeljniPregled)
+    : `<div style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">Još nema generisanog pregleda za prošlu nedelju.</div>`;
+  // Show ↺ regenerate button in header only when result exists
+  const pregledAction = state.aiNedeljniPregled ? 'handleAiNedeljniPregled()' : null;
+  const pregledCard = aiCardHTML(
+    'nedeljniPregled', '📋', 'Nedeljni pregled',
+    'Automatska analiza prošle nedelje — generiše se svaki ponedeljak',
+    pregledBody,
+    pregledAction,
+    !!state.aiNedeljniPregled
+  );
+
+  // Card 5 — Uvid u navike
+  const navikeBody = state.aiLoadingNavike ? aiLoadingHTML()
+    : state.aiUvidNavike ? aiNavikeResultHTML(state.aiUvidNavike) : null;
+  const navikeCard = aiCardHTML(
+    'uvidNavike', '🔍', 'Uvid u navike',
+    'Pattern analiza poslednjih 30 dana',
+    navikeBody,
+    'handleAiUvidNavike()',
+    !!state.aiUvidNavike
+  );
+
+  return `
+    <div style="padding:0 16px 16px">
+      <div class="card-label" style="padding-top:16px;margin-bottom:0">Danas</div>
+      ${statusCard}
+      ${predlogCard}
+      <div class="card-label" style="padding-top:16px;margin-bottom:0">Ova nedelja</div>
+      ${nedeljaCard}
+      ${pregledCard}
+      <div class="card-label" style="padding-top:16px;margin-bottom:0">Dugoročno</div>
+      ${navikeCard}
+    </div>`;
 }
 
 function setMode(mode) {
@@ -5197,25 +5469,174 @@ function shiftWeek(delta) {
   // Prevent navigating into the future (offset 0 is current week)
   if (state.weekOffset + delta > 0) return;
   state.weekOffset += delta;
-  // Clear cached AI summary when switching weeks
-  state.weeklySummary = null;
-  state.weeklySummaryLoading = false;
   scheduleRender();
 }
 
 // Trigger AI weekly summary generation — called from onclick in weeklyReportHTML
-async function requestWeeklySummary(stats) {
-  if (state.weeklySummaryLoading) return;
-  state.weeklySummaryLoading = true;
-  state.weeklySummary = null;
+
+// ─── §AI TAB HANDLERS ────────────────────────────────────────────────────────
+
+// Builds loading body HTML — reused across all AI cards
+function aiLoadingHTML() {
+  return `<div style="padding:8px 0;text-align:center;color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px"><span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> AI analizira...</div>`;
+}
+
+// Renders plain-text AI result in a styled callout box
+function aiPlainResultHTML(text) {
+  return `<div style="background:var(--s3);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:10px 12px;font-size:13px;color:var(--text-secondary);line-height:1.6">${text}</div>`;
+}
+
+// Renders weekly summary JSON result (grade + good/improve/advice)
+function aiWeeklyResultHTML(result) {
+  const gradeColor = result.grade === 'A' ? 'var(--green)' : result.grade === 'B' ? 'var(--blue)' : result.grade === 'C' ? 'var(--orange)' : 'var(--red)';
+  const goodItems  = (result.good    || []).map(s => `<div class="score-row"><span>✓ ${s}</span></div>`).join('');
+  const improveItems = (result.improve || []).map(s => `<div class="score-row"><span>! ${s}</span></div>`).join('');
+  const adviceItems  = (result.advice  || []).map((s, i) => `<div class="score-row"><span style="color:var(--blue);font-weight:700;font-family:var(--mono);margin-right:6px">${i+1}.</span><span>${s}</span></div>`).join('');
+  return `
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:12px">
+      <span style="font-family:var(--mono);font-size:32px;font-weight:700;color:${gradeColor};line-height:1">${result.grade}</span>
+      <span style="font-size:11px;color:var(--muted)">ocena nedelje</span>
+    </div>
+    ${goodItems ? `<div class="card-label" style="margin-bottom:4px">Išlo dobro</div>${goodItems}` : ''}
+    ${improveItems ? `<div class="card-label" style="margin-top:10px;margin-bottom:4px">Prostor za napredak</div>${improveItems}` : ''}
+    ${adviceItems ? `<div class="card-label" style="margin-top:10px;margin-bottom:4px">Saveti za sledeću nedelju</div>${adviceItems}` : ''}`;
+}
+
+// Renders predlog obroka JSON result
+function aiPredlogResultHTML(result) {
+  return (result.predlozi || []).map(p => `
+    <div class="meal-score-detail" style="margin-bottom:8px">
+      <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:4px">${p.naziv}</div>
+      <div style="color:var(--muted);font-size:12px;line-height:1.5;margin-bottom:6px">${p.opis}</div>
+      <div style="display:flex;gap:12px">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">~${p.kcal} kcal</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">P ${p.proteini}g</span>
+      </div>
+    </div>`).join('');
+}
+
+// Renders uvid u navike JSON result
+function aiNavikeResultHTML(result) {
+  return (result.uvidi || []).map(u => `
+    <div class="meal-score-detail" style="margin-bottom:8px">
+      <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:4px">${u.naslov}</div>
+      <div style="color:var(--muted);font-size:12px;line-height:1.5">${u.opis}</div>
+    </div>`).join('');
+}
+
+// Builds statsForAI for a given week offset — shared by oceniNedelju and nedeljniPregled
+function buildWeekStatsForAI(offset) {
+  const weekData    = getWeekData(offset);
+  const daysWithData = weekData.filter(d => d.hasData && !d.future);
+  if (!daysWithData.length) return null;
+  const goal        = state.calorieGoal;
+  const avgConsumed = Math.round(daysWithData.reduce((s, d) => s + d.consumed, 0) / daysWithData.length);
+  const avgBurned   = Math.round(daysWithData.reduce((s, d) => s + d.burned,   0) / daysWithData.length);
+  const avgNet      = Math.round(daysWithData.reduce((s, d) => s + d.net,      0) / daysWithData.length);
+  const avgProtein  = Math.round(daysWithData.reduce((s, d) => s + (d.protein||0), 0) / daysWithData.length);
+  const avgCarbs    = Math.round(daysWithData.reduce((s, d) => s + (d.carbs||0),   0) / daysWithData.length);
+  const avgFat      = Math.round(daysWithData.reduce((s, d) => s + (d.fat||0),     0) / daysWithData.length);
+  const isGainMode  = state.fitnessGoal === 'gain';
+  const deficitDays = daysWithData.filter(d => d.net < (d.goal || goal)).length;
+  const surplusDays = daysWithData.length - deficitDays;
+  const onTargetDays = isGainMode ? surplusDays : deficitDays;
+  const avgDeficit  = Math.round(goal - avgNet);
+  const projectedLoss = ((avgDeficit * 7) / 7700).toFixed(2);
+  const sorted      = [...daysWithData].sort((a, b) => Math.abs(a.net - goal) - Math.abs(b.net - goal));
+  const bestDay     = sorted.length ? { date: sorted[0].date, net: sorted[0].net } : null;
+  const worstDay    = sorted.length > 1 ? { date: sorted[sorted.length-1].date, net: sorted[sorted.length-1].net } : null;
+  const weekStart   = weekData[0].date;
+  const weekEnd     = weekData[6].date;
+  const weekLabel   = `${weekStart} – ${weekEnd}`;
+  const daysForAI   = daysWithData.map(d => ({ date: d.date, consumed: d.consumed, net: d.net, protein: Math.round(d.protein||0), carbs: Math.round(d.carbs||0), fat: Math.round(d.fat||0) }));
+  return { weekLabel, daysWithData: daysWithData.length, deficitDays: onTargetDays, avgConsumed, avgBurned, avgNet, avgDeficit, avgProtein, avgCarbs, avgFat, projectedLoss, bestDay, worstDay, days: daysForAI };
+}
+
+async function handleAiStatusDana() {
+  if (state.aiLoadingStatusDana) return;
+  state.aiLoadingStatusDana = true;
+  state.aiStatusDana = null;
   scheduleRender();
   try {
-    const text = await generateWeeklySummary(stats);
-    state.weeklySummary = text.trim();
+    const text = await generateStatusDana();
+    state.aiStatusDana = text.trim();
+    saveAiDaily('statusdana', state.aiStatusDana);
   } catch (e) {
-    state.weeklySummary = '⚠️ Nije moguće generisati komentar — pokušaj ponovo.';
+    showToast('Greška pri analizi statusa — pokušaj ponovo.', 'err');
   } finally {
-    state.weeklySummaryLoading = false;
+    state.aiLoadingStatusDana = false;
+    scheduleRender();
+  }
+}
+
+async function handleAiPredlogObroka() {
+  if (state.aiLoadingPredlog) return;
+  state.aiLoadingPredlog = true;
+  state.aiPredlogObroka = null;
+  scheduleRender();
+  try {
+    const result = await generatePredlogObroka();
+    state.aiPredlogObroka = result;
+    saveAiDaily('predlogobroka', result);
+  } catch (e) {
+    showToast('Greška pri generisanju predloga — pokušaj ponovo.', 'err');
+  } finally {
+    state.aiLoadingPredlog = false;
+    scheduleRender();
+  }
+}
+
+async function handleAiOceniNedelju() {
+  if (state.aiLoadingOceniNedelju) return;
+  const stats = buildWeekStatsForAI(state.weekOffset || 0);
+  if (!stats) { showToast('Nema dovoljno podataka za ovu nedelju.', 'err'); return; }
+  state.aiLoadingOceniNedelju = true;
+  state.aiOceniNedelju = null;
+  scheduleRender();
+  try {
+    const result = await generateWeeklySummary(stats);
+    state.aiOceniNedelju = result;
+    saveAiDaily('ocenindelju', result);
+  } catch (e) {
+    showToast('Greška pri ocenjivanju nedelje — pokušaj ponovo.', 'err');
+  } finally {
+    state.aiLoadingOceniNedelju = false;
+    scheduleRender();
+  }
+}
+
+async function handleAiNedeljniPregled() {
+  if (state.aiLoadingNedeljniPregled) return;
+  const stats = buildWeekStatsForAI(-1); // always previous week
+  if (!stats) { showToast('Nema podataka za prošlu nedelju.', 'err'); return; }
+  state.aiLoadingNedeljniPregled = true;
+  state.aiNedeljniPregled = null;
+  scheduleRender();
+  try {
+    const result = await generateWeeklySummary(stats);
+    state.aiNedeljniPregled = result;
+    saveWeeklyReview(result);
+  } catch (e) {
+    showToast('Greška pri generisanju pregleda — pokušaj ponovo.', 'err');
+  } finally {
+    state.aiLoadingNedeljniPregled = false;
+    scheduleRender();
+  }
+}
+
+async function handleAiUvidNavike() {
+  if (state.aiLoadingNavike) return;
+  state.aiLoadingNavike = true;
+  state.aiUvidNavike = null;
+  scheduleRender();
+  try {
+    const result = await generateUvidNavike();
+    state.aiUvidNavike = result;
+    saveAiDaily('uvidnavike', result);
+  } catch (e) {
+    showToast(e.message || 'Greška pri analizi navika — pokušaj ponovo.', 'err');
+  } finally {
+    state.aiLoadingNavike = false;
     scheduleRender();
   }
 }
