@@ -531,6 +531,8 @@
 <body>
 
 <div id="app"></div>
+<!-- Hidden file input for JSON backup import — triggered programmatically -->
+<input type="file" id="importFileInput" accept=".json" style="display:none" onchange="handleImportFile(this)">
 
 <script>
 /*
@@ -654,6 +656,8 @@ const state = {
   waterGoal: initWaterGoal(),
   installPromptEvent: null, // deferred beforeinstallprompt event — null when unavailable
   appInstalled: false,      // flips to true after successful PWA install
+  pendingImport: null,      // holds parsed backup data awaiting user confirmation
+  pendingDelete: false,     // true when user has initiated delete-all flow
 };
 
 // ─── §4 UTILITY FUNCTIONS ─────────────────────────────────────────────────────
@@ -1367,7 +1371,41 @@ function settingsDrawerHTML() {
         <span>${pct}% od ~5 MB</span>
       </div>
     </div>
-    <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>`;
+    <button onclick="exportData()" class="drawer-btn">📤 Izvezi sve podatke (JSON)</button>
+    ${state.pendingImport
+      ? `<div style="border:1px solid rgba(255,79,79,0.35);border-radius:10px;padding:12px;margin-top:8px;background:rgba(255,79,79,0.07)">
+           <p style="margin:0 0 10px;font-size:12px;color:var(--red);font-weight:700;line-height:1.4">
+             ⚠️ Ovo će zameniti sve postojeće podatke (${state.pendingImport._keyCount} ključeva).
+             Akcija je nepovratna.
+           </p>
+           <div style="display:flex;gap:8px">
+             <button onclick="confirmImport()" class="drawer-btn danger" style="margin:0;flex:1;text-align:center;font-weight:800">
+               Zameni podatke
+             </button>
+             <button onclick="cancelImport()" class="drawer-btn" style="margin:0;flex:1;text-align:center">
+               Otkaži
+             </button>
+           </div>
+         </div>`
+      : `<button onclick="importData()" class="drawer-btn">📥 Uvezi podatke (JSON)</button>`
+    }
+    ${state.pendingDelete
+      ? `<div style="border:1px solid rgba(255,79,79,0.35);border-radius:10px;padding:12px;margin-top:8px;background:rgba(255,79,79,0.07)">
+           <p style="margin:0 0 10px;font-size:12px;color:var(--red);font-weight:700;line-height:1.4">
+             ⚠️ Ovo će trajno obrisati SVE podatke — dnevnik, treninge, težinu, istoriju, profil.
+             Akcija je nepovratna.
+           </p>
+           <div style="display:flex;gap:8px">
+             <button onclick="confirmDeleteAll()" class="drawer-btn danger" style="margin:0;flex:1;text-align:center;font-weight:800">
+               Obriši sve
+             </button>
+             <button onclick="cancelDeleteAll()" class="drawer-btn" style="margin:0;flex:1;text-align:center">
+               Otkaži
+             </button>
+           </div>
+         </div>`
+      : `<button onclick="initDeleteAll()" class="drawer-btn danger" style="margin-top:8px">🗑 Obriši sve podatke</button>`
+    }`;
   })();
 
   return `
@@ -1510,6 +1548,95 @@ function exportData() {
   // Revoke after a tick — immediate revoke can race with the browser download trigger
   setTimeout(() => URL.revokeObjectURL(url), 100);
   showToast('Podaci izvezeni ✓');
+}
+
+function importData() {
+  // Trigger the hidden file picker
+  const input = document.getElementById('importFileInput');
+  if (input) { input.value = ''; input.click(); }
+}
+
+function handleImportFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(e.target.result);
+    } catch {
+      showToast('Fajl nije validan JSON', 'err');
+      return;
+    }
+
+    // Validate: must contain at least one fitlog_ key
+    const fitlogKeys = Object.keys(parsed).filter(k => k.startsWith('fitlog_'));
+    if (fitlogKeys.length === 0) {
+      showToast('Fajl ne sadrži FitLog podatke', 'err');
+      return;
+    }
+
+    // Store parsed data + key count in state, then re-render drawer to show confirm UI
+    state.pendingImport = { ...parsed, _keyCount: fitlogKeys.length };
+    renderDrawer();
+  };
+  reader.onerror = () => showToast('Greška pri čitanju fajla', 'err');
+  reader.readAsText(file);
+}
+
+function confirmImport() {
+  const data = state.pendingImport;
+  if (!data) return;
+
+  // Remove all existing fitlog_ keys before writing backup data
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('fitlog_'))
+    .forEach(k => localStorage.removeItem(k));
+
+  // Write all fitlog_ keys from backup; skip internal meta fields
+  const metaKeys = new Set(['_exportedAt', '_keyCount']);
+  Object.entries(data).forEach(([key, value]) => {
+    if (metaKeys.has(key)) return;
+    if (!key.startsWith('fitlog_')) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // If a single key fails (e.g. quota), continue with the rest
+      console.warn('[import] Failed to write key:', key);
+    }
+  });
+
+  state.pendingImport = null;
+  showToast('Podaci uvezeni ✓ — restartovanje...');
+  // Short delay so toast is visible before reload
+  setTimeout(() => location.reload(), 1200);
+}
+
+function cancelImport() {
+  state.pendingImport = null;
+  renderDrawer();
+}
+
+function initDeleteAll() {
+  // First click — show confirm UI
+  state.pendingDelete = true;
+  renderDrawer();
+}
+
+function confirmDeleteAll() {
+  // Remove every fitlog_ key from localStorage, then reload clean
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('fitlog_'))
+    .forEach(k => localStorage.removeItem(k));
+  state.pendingDelete = false;
+  showToast('Svi podaci obrisani — restartovanje...');
+  setTimeout(() => location.reload(), 1200);
+}
+
+function cancelDeleteAll() {
+  state.pendingDelete = false;
+  renderDrawer();
 }
 
 // ─── §10 TOAST ────────────────────────────────────────────────────────────────
