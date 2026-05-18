@@ -5142,7 +5142,7 @@ async function scoreNutrition() {
 ${profile}
 Cilj korisnika: ${goalMode}.
 
-EVALUACIJA DANA (već izračunato — ne interpretuj brojeve, koristi gotove statuse):
+EVALUACIJA DANA (već izračunato — ne interpretuj ponovo):
 - Kalorije: ${calStatus}
 - Proteini: ${protStatus}
 - Masti: ${fatStatus}
@@ -5152,8 +5152,15 @@ EVALUACIJA DANA (već izračunato — ne interpretuj brojeve, koristi gotove sta
 Trenutno vreme: ${timeOfDay}
 Obroci (sa vremenom unosa): ${mealsSummary}
 
+MAPIRANJE statusa na JSON polja (obavezno):
+- "calories" ← status Kalorije — parafraziraj u jednu rečenicu na srpskom
+- "protein"  ← status Proteini — parafraziraj u jednu rečenicu na srpskom
+- "fat"      ← status Masti — parafraziraj u jednu rečenicu na srpskom
+- "carbs"    ← status Ugljeni hidrati — parafraziraj u jednu rečenicu na srpskom
+- "sugar"    ← status Šećer — parafraziraj u jednu rečenicu na srpskom
+Svako polje mora početi sa ✅, ⚠️ ili ❌ (preuzmi iz statusa) i sadržati kratak komentar.
+
 PRAVILA:
-- Koristi statuse iz EVALUACIJA DANA direktno za odgovarajuća polja — ne računaj ponovo.
 - Score sidra: 8-10 = svi statusi ✅; 5-7 = jedan ⚠️ ili ❌; 1-4 = više ⚠️/❌.
 - Score dodatno uzima u obzir raznovrsnost obroka i raspored tokom dana (vidljiv iz vremena).
 - "tip" mora početi sa jednim od: Dodaj / Smanji / Izbegaj / Uključi / Zameni
