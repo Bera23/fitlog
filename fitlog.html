@@ -1423,7 +1423,7 @@ Danas već pojeo/la: ${todayFoods}
 Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
 Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PREDLOG_SCHEMA}`;
-  const raw = await callGemini([{ text: prompt }], 0.2);
+  const raw = await callGemini([{ text: prompt }], 0.7);
   return parseGeminiJson(raw);
 }
 
