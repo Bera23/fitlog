@@ -1314,7 +1314,7 @@ Agregati do sada:
 - Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak' : 'gubitak'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
 
 PRAVILA:
-- "grade": ocena dosadašnjeg dela nedelje — A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
+- "grade": ocena dosadašnjeg dela nedelje — za mršavljenje: A = 80%+ dana u deficitu, B = 50–79%, C = 30–49%, D = <30%; za gojenje: A = 80%+ dana u suficitu, B = 50–79%, C = 30–49%, D = <30%
 - "good": 2–3 konkretne stavke šta je išlo dobro do sada
 - "improve": 1–2 konkretne stavke — fokus na OSTATAK OVE nedelje
 - "advice": tačno 3 akciona saveta za OSTATAK OVE nedelje, ne za sledeću
@@ -1346,7 +1346,7 @@ Nedeljni agregati:
 - Procenjen ${state.fitnessGoal === 'gain' ? 'dobitak' : 'gubitak'}: ${stats.projectedLoss} kg${bestDayStr}${worstDayStr}
 
 PRAVILA:
-- "grade": ocena završene nedelje — A = odlično (80%+ dana na cilju), B = solidno (50–79%), C = loše (30–49%), D = vrlo loše (<30%)
+- "grade": ocena završene nedelje — za mršavljenje: A = 80%+ dana u deficitu, B = 50–79%, C = 30–49%, D = <30%; za gojenje: A = 80%+ dana u suficitu, B = 50–79%, C = 30–49%, D = <30%
 - "good": 2–3 konkretne stavke šta je išlo dobro — pomeni specifične dane ili brojeve
 - "improve": 1–2 konkretne stavke gde ima prostora za napredak
 - "advice": tačno 3 akciona saveta za SLEDEĆU nedelju — zasnovani na obrascima iz prošle nedelje
@@ -1364,10 +1364,12 @@ Format: ${_WEEKLY_SCHEMA}`;
 async function generateStatusDana() {
   const profile = buildUserProfile();
   const t = totals();
-  const ml = macroLimits();
   const remaining = Math.round(state.calorieGoal - t.net);
   const hour = new Date().getHours();
   const timePart = hour < 11 ? 'jutro' : hour < 15 ? 'podne' : hour < 19 ? 'popodne' : 'veče';
+
+  // Use target weight for protein minimum — same logic as scoreNutrition
+  const protMinAI = Math.round((state.targetWeight || state.weight || 80) * 1.6);
 
   // Last meal time from today's meals
   const lastMeal = state.dayData.meals.length
@@ -1380,7 +1382,7 @@ Trenutno stanje — ${timePart} (${hour}:00h):
 - Uneseno: ${Math.round(t.consumed)} kcal od ${state.calorieGoal} kcal cilja
 - Sagoreno: ${Math.round(t.burned)} kcal | Neto: ${Math.round(t.net)} kcal
 - Preostalo do cilja: ${remaining} kcal
-- Proteini: ${Math.round(t.protein)}g / ${ml.protMax}g | Masti: ${Math.round(t.fat)}g | UH: ${Math.round(t.carbs)}g
+- Proteini: ${Math.round(t.protein)}g / ${protMinAI}g minimuma | Masti: ${Math.round(t.fat)}g | UH: ${Math.round(t.carbs)}g
 ${lastMeal ? `- Poslednji obrok: ${lastMeal}` : '- Još nema unesenih obroka'}
 
 Ako je sve u redu — reci to direktno. Ne izmišljaj probleme.
@@ -1396,9 +1398,12 @@ async function generatePredlogObroka() {
   const t = totals();
   const ml = macroLimits();
   const remaining = Math.round(state.calorieGoal - t.net);
-  const remainingProtein = Math.max(0, Math.round(ml.protMax - t.protein));
   const hour = new Date().getHours();
   const mealType = hour < 10 ? 'doručak' : hour < 14 ? 'ručak' : hour < 18 ? 'užina' : 'večera';
+
+  // Use target weight for protein minimum — same logic as scoreNutrition and statusDana
+  const protMinAI = Math.round((state.targetWeight || state.weight || 80) * 1.6);
+  const remainingProtein = Math.max(0, Math.round(protMinAI - t.protein));
 
   // List of foods already eaten today — context so AI doesn't repeat same items
   const todayFoods = state.dayData.meals
@@ -1408,8 +1413,8 @@ async function generatePredlogObroka() {
 
   const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
 ${profile}
-Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta.
-Preostalo kalorija: ${remaining} kcal | Proteina nedostaje: ${remainingProtein}g
+Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta, a zatim dodaj još jedan sladak predlog (voće, jogurt sa medom, tamna čokolada i sl.) koji se uklapa u preostali budžet.
+Preostalo kalorija: ${remaining} kcal | Proteina nedostaje do minimuma: ${remainingProtein}g
 Danas već pojeo/la: ${todayFoods}
 Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
 Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
@@ -1418,6 +1423,7 @@ Format: ${GEMINI_PREDLOG_SCHEMA}`;
   const raw = await callGemini([{ text: prompt }], 0.2);
   return parseGeminiJson(raw);
 }
+
 
 // Generate habit insights from last 30 days — finds patterns, not just averages
 async function generateUvidNavike() {
@@ -1502,7 +1508,7 @@ Format: ${GEMINI_FOOD_SCHEMA}`;
 async function analyzeProduct(text, base64, mimeType) {
   const contextNote = text ? `\nDodatni opis od korisnika: "${text}"` : '';
   const imageNote   = base64
-    ? 'Analiziraj deklaraciju/etiketu na slici.'
+    ? 'Analiziraj deklaraciju/etiketu na slici. Ako deklaracija nije vidljiva, identifikuj brend i naziv proizvoda sa slike i koristi poznate nutritivne vrednosti.'
     : 'Korisnik je opisao proizvod tekstom, analiziraj na osnovu toga.';
 
   // FSA (UK Food Standards Agency) traffic light thresholds per 100g — authoritative source.
