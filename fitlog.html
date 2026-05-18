@@ -1376,8 +1376,10 @@ async function generateStatusDana() {
     ? state.dayData.meals[state.dayData.meals.length - 1].time
     : null;
 
+  const goalMode = state.fitnessGoal === 'gain' ? 'gojenje (suficit)' : 'mršavljenje (deficit)';
   const prompt = `Ti si nutricionistički asistent. Daj kratak situacioni komentar (1-2 rečenice, bez uvoda, bez liste).
 ${profile}
+Cilj korisnika: ${goalMode}.
 Trenutno stanje — ${timePart} (${hour}:00h):
 - Uneseno: ${Math.round(t.consumed)} kcal od ${state.calorieGoal} kcal cilja
 - Sagoreno: ${Math.round(t.burned)} kcal | Neto: ${Math.round(t.net)} kcal
@@ -1413,9 +1415,11 @@ async function generatePredlogObroka() {
 
   const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
 ${profile}
+  const goalModePredlog = state.fitnessGoal === 'gain' ? 'gojenje — predloži kalorijski gušće obroke' : 'mršavljenje — predloži zasitne obroke sa manje kalorija';
 Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta, a zatim dodaj još jedan sladak predlog (voće, jogurt sa medom, tamna čokolada i sl.) koji se uklapa u preostali budžet.
 Preostalo kalorija: ${remaining} kcal | Proteina nedostaje do minimuma: ${remainingProtein}g
 Danas već pojeo/la: ${todayFoods}
+Cilj korisnika: ${goalModePredlog}.
 Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
 Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PREDLOG_SCHEMA}`;
