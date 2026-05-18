@@ -587,7 +587,7 @@ const LS_MAX_BYTES      = 5   * 1024 * 1024; // estimated browser hard limit
 // JSON output format strings shared across prompt functions — single source of truth
 const GEMINI_FOOD_SCHEMA      = '{"items":[{"name":"naziv","amount":"kolicina","calories":broj,"protein":broj,"carbs":broj,"fat":broj,"sugar":broj}],"total_calories":broj,"total_protein":broj,"total_carbs":broj,"total_fat":broj,"total_sugar":broj,"note":"napomena ili prazan string"}';
 const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"trajanje/broj","calories_burned":broj}],"total_burned":broj,"note":"napomena ili prazan string"}';
-const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan kratak savet za sutra"}';
+const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","carbs":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan konkretan savet za danas ili sutra"}';
 const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom, max 12 reči","suggestion":"konkretna preporuka za sledeći obrok ili null"}';
 // Schema for product/label analysis — nutritional data per 100g + serving size + AI rating
 const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
@@ -2861,13 +2861,22 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
     ? `${p.date.slice(8)}.${p.date.slice(5,7)}.`
     : '';
 
-  // Helper: one macro cell with total value (large) + per-100g label (small)
-  const macroCell = (totalVal, per100Val, label, color) => `
+  // Helper: one macro cell with total value (large) + per-100g label (small).
+  // When serving size exists — show total as main value, per-100g as small reference below.
+  // When no serving size — promote per-100g to main value and append /100g to label.
+  const macroCell = (totalVal, per100Val, label, color) => {
+    const mainVal = totalVal !== null ? totalVal + 'g' : per100Val + 'g';
+    const lbl     = totalVal !== null ? label : label + ' /100g';
+    const ref     = totalVal !== null && per100Val !== null
+      ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${per100Val}g/100g</div>`
+      : '';
+    return `
     <div class="product-macro-cell">
-      <div class="product-macro-val" style="color:${color}">${totalVal !== null ? totalVal + 'g' : '–'}</div>
-      <div class="product-macro-lbl">${label}</div>
-      ${per100Val !== null ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${per100Val}g/100g</div>` : ''}
+      <div class="product-macro-val" style="color:${color}">${mainVal}</div>
+      <div class="product-macro-lbl">${lbl}</div>
+      ${ref}
     </div>`;
+  };
 
   const calCell = `
     <div class="product-macro-cell">
@@ -5079,37 +5088,76 @@ async function scoreNutrition() {
   try {
     const t = totals();
     const ml = macroLimits();
+    // Include meal time so AI can detect late-night eating or uneven distribution
     const mealsSummary = d.meals.map(m =>
-      m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
+      `[${m.time || '?'}] ` + m.items.map(i => `${i.amount} ${i.name} (${i.calories} kcal)`).join(', ')
     ).join(' | ');
-    const profile      = buildUserProfile();
-    const overVerb = state.gender === 'female' ? 'Prešla' : 'Prešao';
-    // Status message adapts to the user's fitness goal (lose / gain)
-    const goalMode = state.fitnessGoal === 'gain' ? 'gojenje (kalorijski suficit)'
-      : 'mršavljenje (kalorijski deficit)';
-    const deficitStatus = t.consumed < state.calorieGoal
-      ? state.fitnessGoal === 'gain'
-        ? `Ispod kalorijskog cilja za gojenje ⚠ (${state.calorieGoal - Math.round(t.consumed)} kcal nedostaje do suficita).`
-        : `U kalorijskom deficitu ✓ (${state.calorieGoal - Math.round(t.consumed)} kcal ispod cilja).`
-      : state.fitnessGoal === 'gain'
-        ? `Kalorijski suficit ✓ za gojenje (+${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`
-        : `${overVerb} kalorijski cilj (${Math.round(t.consumed) - state.calorieGoal} kcal iznad cilja).`;
+    const profile  = buildUserProfile();
+    const currentHour = new Date().getHours();
+    const timeOfDay   = `${currentHour}:${String(new Date().getMinutes()).padStart(2,'0')}h`;
+    const isGain   = state.fitnessGoal === 'gain';
+    const goalMode = isGain ? 'gojenje (kalorijski suficit)' : 'mršavljenje (kalorijski deficit)';
+
+    // JS evaluates all statuses — AI only formats text, makes no numeric decisions
+    // Calories: compare consumed vs goal, not vs BMR
+    const calDiff = Math.round(t.consumed) - state.calorieGoal;
+    const calStatus = (() => {
+      if (isGain) {
+        if (calDiff >= 0)   return `✅ Suficit postignut (+${calDiff} kcal iznad cilja)`;
+        if (calDiff > -400) return `⚠️ Blizu cilja, ${Math.abs(calDiff)} kcal nedostaje do suficita`;
+        return `❌ Značajno ispod cilja za gojenje (${Math.abs(calDiff)} kcal nedostaje)`;
+      } else {
+        if (calDiff <= 0 && calDiff > -600) return `✅ Zdrav deficit (${Math.abs(calDiff)} kcal ispod cilja)`;
+        if (calDiff < -600) return `⚠️ Previše ispod cilja — ${Math.abs(calDiff)} kcal nedostaje, rizik od gubitka mišića`;
+        return `❌ Prekoračen kalorijski cilj (+${calDiff} kcal)`;
+      }
+    })();
+
+    // Protein: compare vs protMin threshold
+    const protDiff   = Math.round(t.protein) - ml.protMin;
+    const protStatus = protDiff >= 0
+      ? `✅ ${Math.round(t.protein)}g — iznad minimuma od ${ml.protMin}g`
+      : protDiff > -30
+        ? `⚠️ ${Math.round(t.protein)}g — ${Math.abs(protDiff)}g ispod minimuma od ${ml.protMin}g`
+        : `❌ ${Math.round(t.protein)}g — kritično ispod minimuma od ${ml.protMin}g`;
+
+    // Fat: warn only if over macroLimits max
+    const fatMax    = ml.fatMax || 999;
+    const fatStatus = t.fat > fatMax
+      ? `⚠️ ${Math.round(t.fat)}g — iznad preporučenog maksimuma od ${fatMax}g`
+      : `✅ ${Math.round(t.fat)}g`;
+
+    // Carbs: warn only if over macroLimits max
+    const carbMax    = ml.carbMax || 999;
+    const carbStatus = t.carbs > carbMax
+      ? `⚠️ ${Math.round(t.carbs)}g — iznad preporučenog maksimuma od ${carbMax}g`
+      : `✅ ${Math.round(t.carbs)}g`;
+
+    // Sugar: warn above 50g (WHO daily limit)
+    const sugarStatus = t.sugar > 50
+      ? `⚠️ ${Math.round(t.sugar)}g — iznad preporučenog dnevnog limita od 50g`
+      : `✅ ${Math.round(t.sugar)}g`;
 
     const prompt = `Ti si nutricionistički asistent. Oceni kvalitet ishrane za danas.
 ${profile}
-Kalorijski cilj: ${state.calorieGoal} kcal. Proteinski minimum: ${ml.protMin}g. Cilj korisnika: ${goalMode}.
-Status danas: ${deficitStatus}
-Obroci: ${mealsSummary}
-Ukupno: ${Math.round(t.consumed)} kcal, ${Math.round(t.protein)}g proteina, ${Math.round(t.carbs)}g UH, ${Math.round(t.fat)}g masti, ${Math.round(t.sugar)}g šećera.
+Cilj korisnika: ${goalMode}.
 
-PRAVILA ZA OCENJIVANJE:
-- Ocena (score) reflektuje ISKLJUČIVO kvalitet odabira hrane: nutritivnu gustinu, makro balans, raznovrsnost i zdrave navike.
-- Kalorijski deficit za mršavljenje je pozitivan ishod i NE umanjuje ocenu.
-- Ako je unos ispod bazalnog metabolizma, označi to sa ⚠️ u polju "calories" kao informaciju — to NE utiče na score.
-- Polje "calories" koristi ✅ za zdrav deficit pri mršavljenju, ⚠️ za unos ispod BMR-a, ❌ samo za značajno prekoračenje kalorijskog cilja.
-- Ako je korisnik prekoračio kalorijski cilj za mršavljenje, to može negativno uticati na score.
+EVALUACIJA DANA (već izračunato — ne interpretuj brojeve, koristi gotove statuse):
+- Kalorije: ${calStatus}
+- Proteini: ${protStatus}
+- Masti: ${fatStatus}
+- Ugljeni hidrati: ${carbStatus}
+- Šećer: ${sugarStatus}
+
+Trenutno vreme: ${timeOfDay}
+Obroci (sa vremenom unosa): ${mealsSummary}
+
+PRAVILA:
+- Koristi statuse iz EVALUACIJA DANA direktno za odgovarajuća polja — ne računaj ponovo.
+- Score sidra: 8-10 = svi statusi ✅; 5-7 = jedan ⚠️ ili ❌; 1-4 = više ⚠️/❌.
+- Score dodatno uzima u obzir raznovrsnost obroka i raspored tokom dana (vidljiv iz vremena).
 - "tip" mora početi sa jednim od: Dodaj / Smanji / Izbegaj / Uključi / Zameni
-- "tip" mora biti specifičan za današnji unos, ne generički (ne "pij više vode" nego npr. "Dodaj proteine u večeru — danas si 30g ispod cilja")
+- "tip" mora biti konkretan i akcionabilan za danas ili sutra, ne generički
 - "tip" max 15 reči, direktan, bez uvoda
 
 Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
