@@ -5219,12 +5219,7 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
           <span class="score-chevron-btn meal-chevron open" style="margin-left:10px">▼</span>
         </div>
         <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
-          <!-- section label divider -->
-          <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
-            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Detalji</span>
-            <div style="flex:1;height:1px;background:var(--s4)"></div>
-          </div>
-          <div class="score-row"><span>${score.calories}</span></div>
+          <div style="margin-top:12px" class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
           <div class="score-row"><span>${score.fat}</span></div>
           <div class="score-row"><span>${score.carbs}</span></div>
