@@ -1413,17 +1413,16 @@ async function generatePredlogObroka() {
     .filter(Boolean)
     .join(', ') || 'ništa';
 
+  const goalModePredlog = state.fitnessGoal === 'gain' ? 'gojenje — predloži kalorijski gušće obroke' : 'mršavljenje — predloži zasitne obroke sa manje kalorija';
   const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
 ${profile}
-  const goalModePredlog = state.fitnessGoal === 'gain' ? 'gojenje — predloži kalorijski gušće obroke' : 'mršavljenje — predloži zasitne obroke sa manje kalorija';
+Cilj korisnika: ${goalModePredlog}.
 Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta, a zatim dodaj još jedan sladak predlog (voće, jogurt sa medom, tamna čokolada i sl.) koji se uklapa u preostali budžet.
 Preostalo kalorija: ${remaining} kcal | Proteina nedostaje do minimuma: ${remainingProtein}g
 Danas već pojeo/la: ${todayFoods}
-Cilj korisnika: ${goalModePredlog}.
 Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
 Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PREDLOG_SCHEMA}`;
-
   const raw = await callGemini([{ text: prompt }], 0.2);
   return parseGeminiJson(raw);
 }
@@ -5219,7 +5218,12 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
           <span class="score-chevron-btn meal-chevron open" style="margin-left:10px">▼</span>
         </div>
         <div class="score-body" style="padding:0 16px 16px;border-top:1px solid var(--s3)">
-          <div style="margin-top:12px" class="score-row"><span>${score.calories}</span></div>
+          <!-- section label divider -->
+          <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
+            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Detalji</span>
+            <div style="flex:1;height:1px;background:var(--s4)"></div>
+          </div>
+          <div class="score-row"><span>${score.calories}</span></div>
           <div class="score-row"><span>${score.protein}</span></div>
           <div class="score-row"><span>${score.fat}</span></div>
           <div class="score-row"><span>${score.carbs}</span></div>
