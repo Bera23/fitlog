@@ -1391,7 +1391,7 @@ Ako je sve u redu — reci to direktno. Ne izmišljaj probleme.
 Ako ima konkretnog problema (kasno vreme + malo uneseno, prekoračen cilj, premalo proteina) — upozori konkretno.
 Zabranjena generička mesta. Odgovori na srpskom.`;
 
-  return await callGemini([{ text: prompt }], 0.2);
+  return await callGemini([{ text: prompt }], 0.4);
 }
 
 // Generate meal suggestion based on remaining calories and missing macros
@@ -5391,7 +5391,7 @@ PRAVILA:
 - "suggestion" mora početi sa jednim od: Dodaj / Smanji / Izbegaj / Uključi / Zameni, i biti specifičan za ovaj obrok i ostatak dana (ne "jedi više povrća" nego npr. "Dodaj proteine u večeru — danas si ispod cilja") ili null ako nema smislene preporuke
 - Ton: direktan, bez uvoda, bez pohvala tipa "Odličan izbor!"
 Vrati SAMO JSON bez markdown: ${GEMINI_MEAL_SCORE_SCHEMA}`;
-    const raw = await callGemini([{ text: prompt }], 0.2);
+    const raw = await callGemini([{ text: prompt }], 0.3);
     const result = parseGeminiJson(raw);
     validateMealScoreResponse(result);
     state.mealScores[mealId] = result;
