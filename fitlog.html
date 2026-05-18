@@ -1395,6 +1395,7 @@ Zabranjena generička mesta. Odgovori na srpskom.`;
 }
 
 // Generate meal suggestion based on remaining calories and missing macros
+// Generate meal suggestion based on remaining calories and missing macros
 async function generatePredlogObroka() {
   const profile = buildUserProfile();
   const t = totals();
@@ -1413,6 +1414,13 @@ async function generatePredlogObroka() {
     .filter(Boolean)
     .join(', ') || 'ništa';
 
+  // Load today's suggestion history — prevents AI from repeating same meals
+  const historyKey = 'fitlog_predlog_history_' + state.date;
+  const prevSuggestions = JSON.parse(localStorage.getItem(historyKey) || '[]');
+  const historyNote = prevSuggestions.length
+    ? `Ne predlažaj ove obroke koje si već predložio danas: ${prevSuggestions.join(', ')}.`
+    : '';
+
   const goalModePredlog = state.fitnessGoal === 'gain' ? 'gojenje — predloži kalorijski gušće obroke' : 'mršavljenje — predloži zasitne obroke sa manje kalorija';
   const prompt = `Ti si nutricionistički asistent specijalizovan za srpsku i balkansku kuhinju.
 ${profile}
@@ -1420,12 +1428,21 @@ Cilj korisnika: ${goalModePredlog}.
 Predloži 2-3 obroka za ${mealType} na osnovu preostalog budžeta, a zatim dodaj još jedan sladak predlog (voće, jogurt sa medom, tamna čokolada i sl.) koji se uklapa u preostali budžet.
 Preostalo kalorija: ${remaining} kcal | Proteina nedostaje do minimuma: ${remainingProtein}g
 Danas već pojeo/la: ${todayFoods}
+${historyNote}
 Ne ponavljaj namirnice koje je korisnik već jeo danas. Koristi realne, lako dostupne namirnice.
 Vrati SAMO validan JSON, bez teksta pre ili posle, bez markdown oznaka.
 Format: ${GEMINI_PREDLOG_SCHEMA}`;
+
   const raw = await callGemini([{ text: prompt }], 0.7);
-  return parseGeminiJson(raw);
+  const result = parseGeminiJson(raw);
+
+  // Save suggestion names for this session — AI will avoid them on next call today
+  const names = (result.predlozi || []).map(p => p.naziv).filter(Boolean);
+  if (names.length) localStorage.setItem(historyKey, JSON.stringify(names));
+
+  return result;
 }
+
 
 
 // Generate habit insights from last 30 days — finds patterns, not just averages
@@ -5033,7 +5050,12 @@ function saveApiKey() {
   if (!val) { showToast('Unesi API ključ', 'err'); return; }
   state.apiKey = val;
   localStorage.setItem('fitlog_apikey', val);
-  state.dayData = loadDay(state.date);
+  // Clean up stale predlog history keys from previous days
+Object.keys(localStorage)
+  .filter(k => k.startsWith('fitlog_predlog_history_') && !k.endsWith(state.date))
+  .forEach(k => localStorage.removeItem(k));
+
+state.dayData = loadDay(state.date);
   render();
 }
 
