@@ -5113,13 +5113,15 @@ async function scoreNutrition() {
       }
     })();
 
-    // Protein: compare vs protMin threshold
-    const protDiff   = Math.round(t.protein) - ml.protMin;
+    // Protein: use target weight if set, otherwise current weight (ISSN: 1.6g/kg)
+    // Target weight gives a more realistic minimum for users in a calorie deficit
+    const protMinAI  = Math.round((state.targetWeight || state.weight || 80) * 1.6);
+    const protDiff   = Math.round(t.protein) - protMinAI;
     const protStatus = protDiff >= 0
-      ? `✅ ${Math.round(t.protein)}g — iznad minimuma od ${ml.protMin}g`
+      ? `✅ ${Math.round(t.protein)}g — iznad minimuma od ${protMinAI}g`
       : protDiff > -30
-        ? `⚠️ ${Math.round(t.protein)}g — ${Math.abs(protDiff)}g ispod minimuma od ${ml.protMin}g`
-        : `❌ ${Math.round(t.protein)}g — kritično ispod minimuma od ${ml.protMin}g`;
+        ? `⚠️ ${Math.round(t.protein)}g — ${Math.abs(protDiff)}g ispod minimuma od ${protMinAI}g`
+        : `❌ ${Math.round(t.protein)}g — kritično ispod minimuma od ${protMinAI}g`;
 
     // Fat: warn only if over macroLimits max
     const fatMax    = ml.fatMax || 999;
