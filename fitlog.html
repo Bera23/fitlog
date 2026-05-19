@@ -945,6 +945,15 @@ function loadFavorites() {
   return safeParseLS(FAVORITES_KEY) || [];
 }
 
+// Cached loadFavorites — reads from localStorage once per render cycle.
+// Uses the per-render _renderCache so the cache is automatically cleared on next render().
+function cachedLoadFavorites() {
+  if (_renderCache['favorites'] !== undefined) return _renderCache['favorites'];
+  const result = loadFavorites();
+  _renderCache['favorites'] = result;
+  return result;
+}
+
 function saveFavorites(favs) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
 }
@@ -954,7 +963,7 @@ function saveFavorites(favs) {
 // multiple identical meals are logged on the same day.
 function isMealFavorited(meal) {
   if (!meal?.items?.length) return false;
-  const favs = loadFavorites();
+  const favs = cachedLoadFavorites();
   // Prefer ID-based check — set by saveMealAsFavorite when meal was saved
   if (meal.fromFavorite) return favs.some(f => f.id === meal.fromFavorite);
   // Fallback: fingerprint (e.g. history meals that predate fromFavorite)
@@ -1068,10 +1077,12 @@ let _favUndoTimer   = null;
 
 function deleteFavoriteWithUndo(favId) {
   const favs = loadFavorites();
-  const fav  = favs.find(f => f.id === favId);
-  if (!fav) return;
+  const index = favs.findIndex(f => f.id === favId);
+  if (index === -1) return;
+  const fav = favs[index];
 
-  _favUndoPending = fav;
+  // Save undo state including original index so restore lands in the right position
+  _favUndoPending = { fav, index };
   saveFavorites(favs.filter(f => f.id !== favId));
   scheduleRender();
 
@@ -1083,10 +1094,10 @@ function deleteFavoriteWithUndo(favId) {
 function undoDeleteFavorite() {
   if (!_favUndoPending) return;
   clearTimeout(_favUndoTimer);
-  const fav = _favUndoPending;
+  const { fav, index } = _favUndoPending;
   _favUndoPending = null;
   const favs = loadFavorites();
-  favs.push(fav);
+  favs.splice(index, 0, fav); // restore at original position
   saveFavorites(favs);
   scheduleRender();
   showToast('Vraćeno ✓');
@@ -1242,7 +1253,11 @@ async function callGemini(parts, temperature = 0.1) {
     const code = res.status;
     const errType = code === 429 ? '429 TooManyRequests' : code === 503 ? '503 ServiceUnavailable' : code === 404 ? '404 NotFound' : `${code} Error`;
     trackApiCall({ success: false, errorType: errType, ms: Date.now() - start, promptLen, responseLen: 0 });
-    throw new Error(err.error?.message || 'API greška');
+    // Attach HTTP status to the error so callers can branch on status code
+    // instead of brittle string matching on the message body
+    const apiError = new Error(err.error?.message || 'API greška');
+    apiError.httpStatus = code;
+    throw apiError;
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -4773,6 +4788,9 @@ function clearTargetWeight() {
 }
 
 // ─── §18 SWIPE TO DELETE ──────────────────────────────────────────────────────
+const SWIPE_MAX_TRANSLATE  = 80; // max px element slides before stopping
+const SWIPE_DELETE_TRIGGER = 60; // px threshold to confirm delete on release
+const SWIPE_OPACITY_RANGE  = 60; // px range over which delete bg fades in
 const _swipe = {};
 function swipeCancel(id) {
   if (!_swipe[id]) return;
@@ -4800,8 +4818,8 @@ function swipeMove(e, id) {
   if (dx >= 0) return;
   const el = _swipeEl(id);
   const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
-  if (el) el.style.transform = `translateX(${Math.max(-80, dx)}px)`;
-  if (bg) bg.style.opacity = String(Math.min(1, Math.abs(dx) / 60));
+  if (el) el.style.transform = `translateX(${Math.max(-SWIPE_MAX_TRANSLATE, dx)}px)`;
+  if (bg) bg.style.opacity = String(Math.min(1, Math.abs(dx) / SWIPE_OPACITY_RANGE));
 }
 function swipeEnd(e, id, type) {
   if (!_swipe[id]) return;
@@ -4809,7 +4827,7 @@ function swipeEnd(e, id, type) {
   const meta = { ..._swipe[id] }; // capture before delete
   const el = _swipeEl(id);
   const bg = el?.parentElement?.querySelector('.swipe-delete-bg');
-  if (dx < -60) {
+  if (dx < -SWIPE_DELETE_TRIGGER) {
     if (el) el.style.transform = 'translateX(-100%)';
     if (bg) bg.style.opacity = '0';
     setTimeout(() => {
@@ -4986,9 +5004,10 @@ async function handleProductSubmit() {
       showToast(`${result.name} analiziran ✓`);
     }
   } catch (e) {
-    const msg = e.message?.includes('API_KEY') ? '❌ Neispravan API ključ' :
-                e.message?.includes('RESOURCE_EXHAUSTED') ? '⏳ API limit — sačekaj minut' :
-                e.message?.includes('fetch') ? '📡 Proveri internet konekciju' :
+    const msg = e.httpStatus === 429                                                       ? '⏳ API limit — sačekaj minut' :
+                e.httpStatus === 503                                                       ? '📡 Servis nedostupan — pokušaj ponovo' :
+                e.message?.includes('API_KEY_INVALID') || e.message?.includes('API_KEY') ? '❌ Neispravan API ključ' :
+                e.message?.includes('fetch')                                              ? '📡 Proveri internet konekciju' :
                 `Greška: ${e.message?.slice(0, 55) || 'Pokušaj ponovo'}`;
     showToast(msg, 'err');
   } finally {
@@ -5097,7 +5116,7 @@ Object.keys(localStorage)
   .forEach(k => localStorage.removeItem(k));
 
 state.dayData = loadDay(state.date);
-  render();
+  render(); // direct render — transitions from API key screen to main app, must be synchronous
 }
 
 function clearApiKey() {
@@ -5112,7 +5131,7 @@ function clearApiKey() {
 function startEditWeight() {
   state.editWeight = true;
   state.weightInput = state.weight || '';
-  render();
+  render(); // direct render required — focus() on next line needs the input in DOM immediately
   document.getElementById('wInput')?.focus();
 }
 
@@ -5137,7 +5156,7 @@ function saveWeight() {
 function startEditHeight() {
   state.editHeight = true;
   state.heightInput = state.height || '';
-  render();
+  render(); // direct render required — focus() on next line needs the input in DOM immediately
   document.getElementById('hInput')?.focus();
 }
 
@@ -5325,6 +5344,11 @@ function saveOnboarding() {
   const fitnessGoal = document.getElementById('ob_goal')?.value || 'lose';
 
   if (!w || !h || !age) { showToast('Unesi sve podatke', 'err'); return; }
+
+  // Validate ranges — prevent nonsensical profile data reaching TDEE calculation
+  if (w < 30 || w > 300)     { showToast('Težina mora biti između 30 i 300 kg', 'err'); return; }
+  if (h < 100 || h > 250)    { showToast('Visina mora biti između 100 i 250 cm', 'err'); return; }
+  if (age < 10 || age > 110) { showToast('Godine moraju biti između 10 i 110', 'err'); return; }
 
   state.weight = w; localStorage.setItem('fitlog_weight', w);
   state.height = h; localStorage.setItem('fitlog_height', h);
@@ -5742,6 +5766,8 @@ function resetGoalToAuto() {
 function shiftWeek(delta) {
   // Prevent navigating into the future (offset 0 is current week)
   if (state.weekOffset + delta > 0) return;
+  // Prevent navigating more than 52 weeks (1 year) into the past
+  if (state.weekOffset + delta < -52) return;
   state.weekOffset += delta;
   scheduleRender();
 }
@@ -5836,7 +5862,10 @@ async function handleAiStatusDana() {
     state.aiStatusDana = text.trim();
     saveAiDaily('statusdana', state.aiStatusDana);
   } catch (e) {
-    showToast('Greška pri analizi statusa — pokušaj ponovo.', 'err');
+    const msg = e.httpStatus === 429 ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503 ? '📡 Servis nedostupan — pokušaj ponovo' :
+                'Greška pri analizi statusa — pokušaj ponovo.';
+    showToast(msg, 'err');
   } finally {
     state.aiLoadingStatusDana = false;
     scheduleRender();
@@ -5853,7 +5882,10 @@ async function handleAiPredlogObroka() {
     state.aiPredlogObroka = result;
     saveAiDaily('predlogobroka', result);
   } catch (e) {
-    showToast('Greška pri generisanju predloga — pokušaj ponovo.', 'err');
+    const msg = e.httpStatus === 429 ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503 ? '📡 Servis nedostupan — pokušaj ponovo' :
+                'Greška pri generisanju predloga — pokušaj ponovo.';
+    showToast(msg, 'err');
   } finally {
     state.aiLoadingPredlog = false;
     scheduleRender();
@@ -5872,7 +5904,10 @@ async function handleAiOceniNedelju() {
     state.aiOceniNedelju = result;
     saveAiDaily('ocenindelju', result);
   } catch (e) {
-    showToast('Greška pri ocenjivanju nedelje — pokušaj ponovo.', 'err');
+    const msg = e.httpStatus === 429 ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503 ? '📡 Servis nedostupan — pokušaj ponovo' :
+                'Greška pri ocenjivanju nedelje — pokušaj ponovo.';
+    showToast(msg, 'err');
   } finally {
     state.aiLoadingOceniNedelju = false;
     scheduleRender();
@@ -5891,7 +5926,10 @@ async function handleAiNedeljniPregled() {
     state.aiNedeljniPregled = result;
     saveWeeklyReview(result);
   } catch (e) {
-    showToast('Greška pri generisanju pregleda — pokušaj ponovo.', 'err');
+    const msg = e.httpStatus === 429 ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503 ? '📡 Servis nedostupan — pokušaj ponovo' :
+                'Greška pri generisanju pregleda — pokušaj ponovo.';
+    showToast(msg, 'err');
   } finally {
     state.aiLoadingNedeljniPregled = false;
     scheduleRender();
@@ -5908,7 +5946,10 @@ async function handleAiUvidNavike() {
     state.aiUvidNavike = result;
     saveAiDaily('uvidnavike', result);
   } catch (e) {
-    showToast(e.message || 'Greška pri analizi navika — pokušaj ponovo.', 'err');
+    const msg = e.httpStatus === 429 ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503 ? '📡 Servis nedostupan — pokušaj ponovo' :
+                e.message || 'Greška pri analizi navika — pokušaj ponovo.';
+    showToast(msg, 'err');
   } finally {
     state.aiLoadingNavike = false;
     scheduleRender();
@@ -5920,11 +5961,12 @@ let _mealUndoPending = null, _mealUndoTimer = null;
 let _exUndoPending   = null, _exUndoTimer   = null;
 
 function deleteMeal(id) {
-  const meal = state.dayData.meals.find(m => m.id === id);
-  if (!meal) return;
+  const index = state.dayData.meals.findIndex(m => m.id === id);
+  if (index === -1) return;
+  const meal = state.dayData.meals[index];
 
-  // Save undo state before removing
-  _mealUndoPending = { meal };
+  // Save undo state including original index so restore lands in the right position
+  _mealUndoPending = { meal, index };
   state.dayData.meals = state.dayData.meals.filter(m => m.id !== id);
   saveDay(state.date, state.dayData);
   scheduleRender();
@@ -5936,21 +5978,22 @@ function deleteMeal(id) {
 
 function undoDeleteMeal() {
   if (!_mealUndoPending) return;
-  const { meal } = _mealUndoPending;
+  const { meal, index } = _mealUndoPending;
   clearTimeout(_mealUndoTimer);
   _mealUndoPending = null;
-  state.dayData.meals.unshift(meal);
+  state.dayData.meals.splice(index, 0, meal); // restore at original position
   saveDay(state.date, state.dayData);
   scheduleRender();
   showToast('Vraćeno ✓');
 }
 
 function deleteEx(id) {
-  const ex = state.dayData.exercises.find(e => e.id === id);
-  if (!ex) return;
+  const index = state.dayData.exercises.findIndex(e => e.id === id);
+  if (index === -1) return;
+  const ex = state.dayData.exercises[index];
 
-  // Save undo state before removing
-  _exUndoPending = { ex };
+  // Save undo state including original index so restore lands in the right position
+  _exUndoPending = { ex, index };
   state.dayData.exercises = state.dayData.exercises.filter(e => e.id !== id);
   saveDay(state.date, state.dayData);
   scheduleRender();
@@ -5962,10 +6005,10 @@ function deleteEx(id) {
 
 function undoDeleteEx() {
   if (!_exUndoPending) return;
-  const { ex } = _exUndoPending;
+  const { ex, index } = _exUndoPending;
   clearTimeout(_exUndoTimer);
   _exUndoPending = null;
-  state.dayData.exercises.unshift(ex);
+  state.dayData.exercises.splice(index, 0, ex); // restore at original position
   saveDay(state.date, state.dayData);
   scheduleRender();
   showToast('Vraćeno ✓');
@@ -6035,10 +6078,10 @@ async function handleSubmit() {
       showToast(`-${Math.round(ex.burned)} kcal sagoreno ✓`);
     }
   } catch (e) {
-    const msg = e.message?.includes('API_KEY_INVALID') || e.message?.includes('API_KEY') ? '❌ Neispravan API ključ — proveri u Promeni API ključ' :
-                e.message?.includes('RESOURCE_EXHAUSTED') ? '⏳ API limit — sačekaj minut pa pokušaj' :
-                e.message?.includes('quota') ? '⏳ Dnevni limit dostignut' :
-                e.message?.includes('Failed to fetch') || e.message?.includes('fetch') ? '📡 Proveri internet konekciju' :
+    const msg = e.httpStatus === 429                                                          ? '⏳ API limit — sačekaj minut pa pokušaj' :
+                e.httpStatus === 503                                                          ? '📡 Servis nedostupan — pokušaj ponovo' :
+                e.message?.includes('API_KEY_INVALID') || e.message?.includes('API_KEY')    ? '❌ Neispravan API ključ — proveri u Promeni API ključ' :
+                e.message?.includes('Failed to fetch') || e.message?.includes('fetch')      ? '📡 Proveri internet konekciju' :
                 `Greška: ${e.message?.slice(0, 55) || 'Pokušaj ponovo'}`;
     showToast(msg, 'err');
   } finally {
@@ -6076,6 +6119,11 @@ state.weightInput = state.weight || '';
 state.heightInput = state.height || '';
 state.nutritionScore = loadNutritionScore(state.date);
 state.mealScores = loadMealScores(state.date);
+
+// Clean up stale predlog history keys from previous days — runs on every app start
+Object.keys(localStorage)
+  .filter(k => k.startsWith('fitlog_predlog_history_') && !k.endsWith(state.date))
+  .forEach(k => localStorage.removeItem(k));
 
 // Run any pending localStorage schema migrations before first render
 checkSchemaVersion();
