@@ -682,6 +682,9 @@ const state = {
   aiLoadingOceniNedelju: false,
   aiLoadingNedeljniPregled: false,
   aiLoadingNavike: false,
+  // Yesterday mode — lets user log retroactively for the previous day
+  viewingYesterday: false,
+  yesterdayTimeInput: '20:00', // default time shown in the time picker when logging for yesterday
 };
 
 // ─── §4 UTILITY FUNCTIONS ─────────────────────────────────────────────────────
@@ -991,14 +994,14 @@ function saveMealAsFavorite(mealId, date) {
     return;
   }
 
-  // Auto-name: first item + count of remaining
+  // Use custom name if user renamed the meal, otherwise fall back to auto-generated name
   const autoName = meal.items.length > 1
     ? `${meal.items[0].name} +${meal.items.length - 1}`
     : meal.items[0]?.name || 'Sačuvani obrok';
 
   const fav = {
     id: crypto.randomUUID(),
-    name: autoName,
+    name: meal.customName || autoName,
     savedAt: Date.now(),
     useCount: 0,
     fingerprint,
@@ -1035,7 +1038,10 @@ function addFavoriteToDay(favId) {
   fav.useCount = (fav.useCount || 0) + 1;
   saveFavorites(favs);
 
-  const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+  // Use user-supplied time when logging retroactively for yesterday
+  const now = state.viewingYesterday
+    ? state.yesterdayTimeInput
+    : new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit', hour12: false });
   const meal = {
     id: crypto.randomUUID(),
     time: now,
@@ -4526,6 +4532,22 @@ function _renderInner() {
     ${state.activeTab === 'ai' ? aiTabHTML() : ''}
 
     ${state.activeTab === 'log' ? `
+      <!-- Day toggle reuses existing .sub-tabs / .sub-tab classes -->
+      <div class="sub-tabs">
+        <button class="sub-tab ${!state.viewingYesterday ? 'active' : 'inactive'}"
+                onclick="setViewingYesterday(false)">Danas</button>
+        <button class="sub-tab ${state.viewingYesterday ? 'active' : 'inactive'}"
+                onclick="setViewingYesterday(true)"
+                ${state.viewingYesterday ? 'style="background:var(--orange);color:var(--bg)"' : ''}>Juče</button>
+      </div>
+
+      <!-- Yesterday banner — only visible when viewingYesterday is active -->
+      ${state.viewingYesterday ? `
+      <div style="margin:8px 16px 0;background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.25);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:14px">✏️</span>
+        <span style="font-size:12px;color:var(--orange);font-weight:600">Unosiš za juče · ${fmtDate(state.date)}</span>
+      </div>` : ''}
+
       <div class="card">
         <div class="mode-toggle">
           <button class="mode-btn ${state.mode === 'food' ? 'active' : 'inactive'}" onclick="setMode('food')" ${state.loading || state.productLoading ? 'disabled' : ''}>🍽 Obrok</button>
@@ -4540,6 +4562,14 @@ function _renderInner() {
             <img src="data:${state.productImageMime||'image/jpeg'};base64,${state.productImageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Etiketa priložena — analiziraće se</span>
             <button onclick="state.productImageBase64=null;state.productImageMime=null;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+          </div>` : ''}
+          <!-- Text time input shown only in yesterday mode — type="text" avoids browser AM/PM locale issues -->
+          ${state.viewingYesterday ? `
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">Vreme:</span>
+            <input type="text" class="weight-input" style="width:80px" value="${state.yesterdayTimeInput}"
+                   placeholder="HH:MM" maxlength="5"
+                   oninput="state.yesterdayTimeInput=this.value"/>
           </div>` : ''}
           <!-- Photo + Send in one row: secondary | primary -->
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -4557,6 +4587,14 @@ function _renderInner() {
             <img src="data:${state.imageMime||'image/jpeg'};base64,${state.imageBase64}"/>
             <span style="font-size:12px;color:var(--blue);flex:1">Slika priložena — analiziraće se uz tekst</span>
             <button onclick="state.imageBase64=null;state.imageMime=null;scheduleRender()" style="background:none;border:none;color:var(--s9);cursor:pointer;font-size:18px;padding:4px;line-height:1">×</button>
+          </div>` : ''}
+          <!-- Text time input shown only in yesterday mode — type="text" avoids browser AM/PM locale issues -->
+          ${state.viewingYesterday ? `
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">Vreme:</span>
+            <input type="text" class="weight-input" style="width:80px" value="${state.yesterdayTimeInput}"
+                   placeholder="HH:MM" maxlength="5"
+                   oninput="state.yesterdayTimeInput=this.value"/>
           </div>` : ''}
           <!-- Photo + Send in one row: secondary | primary -->
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -4625,7 +4663,7 @@ function _renderInner() {
                 <button onclick="scoreNutrition()" style="margin-top:12px;background:var(--s3);border:1px solid var(--s6);border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:12px 14px;cursor:pointer;font-family:var(--sans);width:100%;min-height:44px;transition:background 0.15s" onmousedown="this.style.background='var(--s4)'" onmouseup="this.style.background='var(--s3)'" ontouchstart="this.style.background='var(--s4)'" ontouchend="this.style.background='var(--s3)'">↺ Ponovo oceni</button>
               </div>`;
               })()}` : `
-              <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`}
+              <button class="score-btn" onclick="scoreNutrition()">🤖 Oceni ${state.viewingYesterday ? 'juče' : 'današnji'} unos</button>`}
           </div>` : ''}
       `}
     ` : ''}
@@ -4646,13 +4684,13 @@ function _renderInner() {
         <span class="nav-icon">❤️</span>
         <span class="nav-label">Zdravlje</span>
       </button>
-      <button class="nav-btn ${state.activeTab === 'history' ? 'active' : 'inactive'}" onclick="setTab('history')">
-        <span class="nav-icon">📅</span>
-        <span class="nav-label">Istorija</span>
-      </button>
       <button class="nav-btn ${state.activeTab === 'ai' ? 'active' : 'inactive'}" onclick="setTab('ai')">
         <span class="nav-icon">🤖</span>
         <span class="nav-label">AI</span>
+      </button>
+      <button class="nav-btn ${state.activeTab === 'history' ? 'active' : 'inactive'}" onclick="setTab('history')">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Istorija</span>
       </button>
     </div>`;
   // Sync drawer after every render — only rebuild if it's actually open
@@ -4919,7 +4957,10 @@ async function handleProductSubmit() {
     const product = {
       id:   Date.now(),
       date: state.date,  // stored for display in history and log cards
-      time: new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' }),
+      // Use the user-supplied time when logging retroactively for yesterday
+      time: state.viewingYesterday
+        ? state.yesterdayTimeInput
+        : new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit', hour12: false }),
       ...result,
     };
 
@@ -5114,7 +5155,7 @@ function saveHeight() {
 
 async function scoreNutrition() {
   const d = state.dayData;
-  if (!d.meals.length) { showToast('Nema unesenih obroka za danas', 'err'); return; }
+  if (!d.meals.length) { showToast(`Nema unesenih obroka za ${state.viewingYesterday ? 'juče' : 'danas'}`, 'err'); return; }
 
   // Helper — always re-query to guard against stale ref if render() fires during async
   const getCard = () => document.getElementById('nutrition-score-card');
@@ -5135,7 +5176,11 @@ async function scoreNutrition() {
     ).join(' | ');
     const profile  = buildUserProfile();
     const currentHour = new Date().getHours();
-    const timeOfDay   = `${currentHour}:${String(new Date().getMinutes()).padStart(2,'0')}h`;
+    // When scoring yesterday, use end-of-day as context so AI doesn't suggest
+    // adding more meals to a day that has already ended.
+    const timeOfDay = state.viewingYesterday
+      ? '23:59h'
+      : `${currentHour}:${String(new Date().getMinutes()).padStart(2,'0')}h`;
     const isGain   = state.fitnessGoal === 'gain';
     const goalMode = isGain ? 'gojenje (kalorijski suficit)' : 'mršavljenje (kalorijski deficit)';
 
@@ -5262,7 +5307,8 @@ Vrati SAMO validan JSON bez markdown oznaka: ${GEMINI_SCORE_SCHEMA}`;
     showToast('Greška pri oceni ishrane', 'err');
     const errCard = getCard();
     if (errCard) {
-      errCard.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`;
+      const dayLabel = state.viewingYesterday ? 'juče' : 'današnji';
+      errCard.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni ${dayLabel} unos</button>`;
     }
   } finally {
     state.nutritionScoreLoading = false;
@@ -5442,7 +5488,8 @@ function clearNutritionScore() {
   // Restore score button in place without full render
   const card = document.getElementById('nutrition-score-card');
   if (card) {
-    card.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni današnji unos</button>`;
+    const dayLabel = state.viewingYesterday ? 'juče' : 'današnji';
+    card.innerHTML = `<button class="score-btn" onclick="scoreNutrition()">🤖 Oceni ${dayLabel} unos</button>`;
   }
 }
 
@@ -5523,6 +5570,33 @@ function setTab(tab) {
     // Auto-generate nedeljni pregled if not yet available for this week
     if (!state.aiNedeljniPregled) setTimeout(() => handleAiNedeljniPregled(), 800);
   }
+  scheduleRender();
+}
+
+// Switch the log tab between today and yesterday.
+// Reloads all date-dependent state so the full tab reflects the selected day.
+function setViewingYesterday(yesterday) {
+  if (state.viewingYesterday === yesterday) return;
+  state.viewingYesterday = yesterday;
+
+  if (yesterday) {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    state.date = localDateStr(d);
+  } else {
+    state.date = todayStr();
+  }
+
+  // Reload all per-day state for the new date
+  state.dayData        = loadDay(state.date);
+  state.nutritionScore = loadNutritionScore(state.date);
+  state.mealScores     = loadMealScores(state.date);
+
+  // Clear expanded sets to avoid stale IDs from the previous day
+  state.expandedMealIds  = new Set();
+  state.expandedExIds    = new Set();
+  state.expandedScoreIds = new Set();
+
   scheduleRender();
 }
 
@@ -5913,7 +5987,11 @@ async function handleSubmit() {
   render();
 
   try {
-    const now = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+    // Use the user-supplied time when logging retroactively for yesterday,
+    // otherwise fall back to the current wall-clock time.
+    const now = state.viewingYesterday
+      ? state.yesterdayTimeInput
+      : new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit', hour12: false });
 
     if (modeAtSubmit === 'food') {
       let result;
