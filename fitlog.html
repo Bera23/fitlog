@@ -571,7 +571,7 @@ const MEAL_SCORE_KEY = 'fitlog_meal_scores_';
 // Base URL for Gemini API — model and key appended at call time
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 // localStorage schema version — bump when a breaking data migration is needed
-const LS_VERSION = 1;
+const LS_VERSION = 2;
 
 // ─── DOMAIN CONSTANTS ────────────────────────────────────────────────────────
 const KCAL_PER_KG_FAT      = 7700;   // approximate kcal needed to burn 1 kg of body fat
@@ -590,7 +590,7 @@ const GEMINI_EXERCISE_SCHEMA  = '{"items":[{"name":"naziv aktivnosti","detail":"
 const GEMINI_SCORE_SCHEMA     = '{"score":broj_od_1_do_10,"protein":"✅ tekst ili ⚠️ tekst ili ❌ tekst","sugar":"✅ tekst ili ⚠️ tekst ili ❌ tekst","fat":"✅ tekst ili ⚠️ tekst ili ❌ tekst","carbs":"✅ tekst ili ⚠️ tekst ili ❌ tekst","calories":"✅ tekst ili ⚠️ tekst ili ❌ tekst","tip":"💡 jedan konkretan savet za danas ili sutra"}';
 const GEMINI_MEAL_SCORE_SCHEMA = '{"score":broj,"comment":"jedna rečenica na srpskom, max 12 reči","suggestion":"konkretna preporuka za sledeći obrok ili null"}';
 // Schema for product/label analysis — nutritional data per 100g + serving size + AI rating
-const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"brend ili null","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
+const GEMINI_PRODUCT_SCHEMA = '{"name":"naziv proizvoda","brand":"naziv proizvođača ili brenda (ko je napravio proizvod, npr. Nestlé, Vindija) ili null","store":"naziv maloprodajnog lanca gde se prodaje (npr. Lidl, Maxi, Spar) ili null — koristi poznate private label veze","serving_size_g":broj_grama_porcije_ili_pakovanja,"calories_per_100g":broj,"protein_per_100g":broj,"carbs_per_100g":broj,"fat_per_100g":broj,"sugar_per_100g":broj,"fiber_per_100g":broj,"rating":"good|moderate|avoid","rating_reason":"kratko objasnjenje jednom recenicom na srpskom","red_flags":["lista crvenih zastavica, prazna lista ako nema"],"summary":"2-3 recenice opis na srpskom da li je ovaj proizvod zdrav ili ne i zasto"}';
 // Schema for AI predlog obroka — 2-3 meal suggestions with kcal and protein
 const GEMINI_PREDLOG_SCHEMA = '{"predlozi":[{"naziv":"string","opis":"string","kcal":broj,"proteini":broj}]}';
 // Schema for AI uvid u navike — 3-5 concrete pattern observations
@@ -600,6 +600,8 @@ const GEMINI_NAVIKE_SCHEMA  = '{"uvidi":[{"naslov":"string","opis":"string"}]}';
 const PRODUCT_KEY = 'fitlog_products_';
 // localStorage key for saved favorite meals
 const FAVORITES_KEY = 'fitlog_favorites';
+// localStorage key for user-defined store list
+const STORES_KEY = 'fitlog_stores';
 
 function loadMealScores(date) {
   const raw = localStorage.getItem(MEAL_SCORE_KEY + date);
@@ -640,6 +642,9 @@ const state = {
   historySubTab: 'obroci',             // 'obroci' | 'proizvodi'
   historyMonthOffset: 0,               // 0 = current month, 1 = one month back, etc.
   productHistorySearch: '',            // search query for products history
+  historyStoreFilter: null,            // null = all, '__none__' = untagged, string = specific store
+  bulkTagDate: null,                   // date string of the day currently open for bulk store tagging
+  bulkTagStore: '',                    // selected store value in the bulk tag picker
   productLoading: false,               // loading state for product analysis
   productImageBase64: null,            // selected image for product scanner
   productImageMime: null,
@@ -691,6 +696,13 @@ const state = {
 
 // Human-readable activity labels used across tabs and drawer
 const ACT_LABELS = { sedentary: 'Sedentarni', light: 'Lako aktivan', moderate: 'Umeren', active: 'Aktivan' };
+
+// Normalize a string for comparison: lowercase, trim whitespace, remove diacritics.
+// Used for store matching and duplicate detection throughout the app.
+function normalizeStr(str) {
+  if (!str) return '';
+  return str.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 
 function todayStr() {
   // Delegate to localDateStr to avoid duplicating the date-formatting logic
@@ -769,11 +781,62 @@ function saveProducts(date, products) {
   localStorage.setItem(PRODUCT_KEY + date, JSON.stringify(products));
 }
 
+// Load user-defined store list — returns array of store name strings
+function loadStores() {
+  try {
+    const raw = localStorage.getItem(STORES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+// Persist store list
+function saveStores(stores) {
+  localStorage.setItem(STORES_KEY, JSON.stringify(stores));
+}
+
 // Remove a single product by id from a given date
 function deleteProductEntry(date, id) {
   const products = loadProducts(date).filter(p => p.id !== id);
   saveProducts(date, products);
   scheduleRender();
+}
+
+// Update the store field on a single product — used by the inline store picker in product cards.
+// Empty string is treated as null (no store). Invalidates render cache so history reflects change.
+function updateProductStore(id, date, storeName) {
+  if (!date) return;
+  const products = loadProducts(date);
+  const product = products.find(p => p.id === id);
+  if (!product) return;
+  product.store = storeName || null;
+  saveProducts(date, products);
+  delete _renderCache['productsData']; // invalidate so history re-reads updated data
+  // If filter is '__none__' and no untagged products remain, reset filter to avoid empty screen
+  if (state.historyStoreFilter === '__none__') {
+    const stillUntagged = getAllHistoryProducts().some(p => !p.store);
+    if (!stillUntagged) state.historyStoreFilter = null;
+  }
+  scheduleRender();
+}
+
+// Bulk-tag all untagged products on a given date with storeName.
+// Only touches products where store is null/undefined — already tagged products are preserved.
+function bulkTagStoreForDate(date, storeName) {
+  if (!date || !storeName) return;
+  const products = loadProducts(date);
+  let changed = false;
+  products.forEach(p => {
+    if (!p.store) { p.store = storeName; changed = true; }
+  });
+  if (!changed) { showToast('Svi proizvodi već imaju prodavnicu', 'err'); return; }
+  saveProducts(date, products);
+  delete _renderCache['productsData']; // invalidate so history re-reads updated data
+  state.bulkTagDate = null;
+  state.bulkTagStore = '';
+  // If filter was set to 'untagged', reset it — no untagged products remain after bulk tag
+  if (state.historyStoreFilter === '__none__') state.historyStoreFilter = null;
+  scheduleRender();
+  showToast('Prodavnica dodeljena ✓');
 }
 
 // Weight log: [{date, weight}] sorted by date desc
@@ -1549,7 +1612,7 @@ Format: ${GEMINI_FOOD_SCHEMA}`;
 async function analyzeProduct(text, base64, mimeType) {
   const contextNote = text ? `\nDodatni opis od korisnika: "${text}"` : '';
   const imageNote   = base64
-    ? 'Analiziraj deklaraciju/etiketu na slici. Ako deklaracija nije vidljiva, identifikuj brend i naziv proizvoda sa slike i koristi poznate nutritivne vrednosti.'
+    ? 'Analiziraj deklaraciju/etiketu na slici. Ako deklaracija nije vidljiva, identifikuj brend, naziv proizvoda i prodavnicu sa slike i koristi poznate nutritivne vrednosti.'
     : 'Korisnik je opisao proizvod tekstom, analiziraj na osnovu toga.';
 
   // FSA (UK Food Standards Agency) traffic light thresholds per 100g — authoritative source.
@@ -1558,6 +1621,10 @@ async function analyzeProduct(text, base64, mimeType) {
 ${imageNote}${contextNote}
 
 Iz deklaracije izvuci nutritivne vrednosti na 100g.
+
+Polja brand i store: brand je naziv proizvođača ili brenda (ko je napravio proizvod), store je maloprodajni lanac (gde se prodaje). Ovo su dva različita polja — ne ponavljaj isti naziv u oba.
+Poznate private label veze: Pilos/Milbona/Cien/Lovilio/Preferred Selection → Lidl | Naše/K-Classic/Bonito → Kaufland | Zlato Polje/Dobro → Maxi/DIS | Fine Life/Chef Select → Spar.
+Ako ne možeš da odrediš store sa sigurnošću, vrati null za to polje.
 
 Koristi FSA (UK Food Standards Agency) semafor sistem za ocenu na 100g:
 - Ukupne masti:     zeleno ≤3g    | žuto 3.1–17.5g  | crveno >17.5g
@@ -1843,6 +1910,26 @@ function settingsDrawerHTML() {
     }`;
   })();
 
+  const storesBody = (() => {
+    const stores = loadStores();
+    const listHTML = stores.length
+      ? stores.map(s => `
+        <div class="drawer-row">
+          <span class="drawer-row-label" style="color:var(--text)">${s}</span>
+          <button onclick="deleteStore('${s.replace(/'/g, "\\'")}')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px;line-height:1">×</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--muted);padding:6px 0">Nema sačuvanih prodavnica.</div>`;
+    return `
+      ${listHTML}
+      <div class="drawer-field" style="margin-top:10px">
+        <div class="drawer-field-label">Dodaj prodavnicu</div>
+        <div style="display:flex;gap:8px">
+          <input class="drawer-input" id="drawerStoreInput" type="text" placeholder="npr. Lidl" onkeydown="if(event.key==='Enter')addStore()" style="flex:1"/>
+          <button onclick="addStore()" style="background:var(--green);color:var(--bg);border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0">Dodaj</button>
+        </div>
+      </div>`;
+  })();
+
   return `
     <div class="drawer-header">
       <span class="drawer-title">⚙ Podešavanja</span>
@@ -1854,14 +1941,38 @@ function settingsDrawerHTML() {
         📲 Instaliraj app na telefon
       </button>
     </div>` : ''}
-    ${acc('api',    'Gemini API',       apiBody)}
-    ${acc('profil', 'Profil',           profilBody)}
-    ${acc('goal',   'Kalorijski cilj',  goalBody)}
-    ${acc('usage',  'API Usage',        usageBody)}
-    ${acc('data',   'Podaci',           podaciBody)}`;
+    ${acc('api',      'Gemini API',       apiBody)}
+    ${acc('profil',   'Profil',           profilBody)}
+    ${acc('goal',     'Kalorijski cilj',  goalBody)}
+    ${acc('stores',   'Prodavnice',       storesBody)}
+    ${acc('usage',    'API Usage',        usageBody)}
+    ${acc('data',     'Podaci',           podaciBody)}`;
 }
 
 // ─── §9 SAVE HANDLERS ─────────────────────────────────────────────────────────
+
+// Add a new store to fitlog_stores — deduplicates via normalizeStr before saving
+function addStore() {
+  const val = document.getElementById('drawerStoreInput')?.value.trim();
+  if (!val) { showToast('Unesi naziv prodavnice', 'err'); return; }
+  const stores = loadStores();
+  const normalizedNew = normalizeStr(val);
+  if (stores.some(s => normalizeStr(s) === normalizedNew)) {
+    showToast('Prodavnica već postoji', 'err');
+    return;
+  }
+  stores.push(val);
+  saveStores(stores);
+  renderDrawer();
+  showToast(`${val} dodato ✓`);
+}
+
+// Remove a store from fitlog_stores — does not affect existing product store fields
+function deleteStore(name) {
+  const stores = loadStores().filter(s => s !== name);
+  saveStores(stores);
+  renderDrawer();
+}
 
 function saveDrawerApiKey() {
   const val = document.getElementById('drawerApiInput')?.value.trim();
@@ -2959,10 +3070,17 @@ function productCardInnerHTML(p, isExp, toggleFn, deleteOnClick, dataAttr, showD
       </div>
       <!-- Expanded full detail — shown when .expanded -->
       <div class="product-expanded">
-        <!-- Full name + brand + serving size — visible only when expanded -->
+        <!-- Full name + store · brand · serving — visible only when expanded -->
         <div style="padding-bottom:10px;border-bottom:1px solid var(--s3);margin-bottom:10px">
           <div style="font-size:15px;font-weight:700;line-height:1.4">${p.name}</div>
-          ${(p.brand || srv) ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${[p.brand, srv ? srv + 'g' : null].filter(Boolean).join(' · ')}</div>` : ''}
+          ${(p.store || p.brand || srv) ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${[p.store, p.brand, srv ? srv + 'g' : null].filter(Boolean).join(' · ')}</div>` : ''}
+          <!-- Inline store picker — allows retroactive tagging without a separate edit screen -->
+          <div style="margin-top:8px">
+            <select onchange="updateProductStore(${p.id},'${p.date||''}',this.value)" style="width:100%;background:var(--s2);border:1px solid var(--s6);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px;font-family:var(--sans);outline:none;box-sizing:border-box">
+              <option value="" ${!p.store ? 'selected' : ''}>Bez prodavnice</option>
+              ${loadStores().map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${p.store === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="product-macro-grid">
           ${macroCell(tot?.protein ?? null, p.protein_per_100g||0, 'Proteini',       'var(--green)')}
@@ -3144,7 +3262,7 @@ function productsHistoryHTML() {
     // Build a set of normalized names that appear more than once across all history
     const nameCounts = {};
     allProducts.forEach(p => {
-      const key = p.name?.trim().toLowerCase();
+      const key = normalizeStr(p.name);
       if (key) nameCounts[key] = (nameCounts[key] || 0) + 1;
     });
     duplicateNames = new Set(
@@ -3161,7 +3279,30 @@ function productsHistoryHTML() {
 
   // Active search query (trimmed, lowercase for comparison)
   const rawQuery = state.productHistorySearch || '';
-  const query = rawQuery.trim().toLowerCase();
+  const query = normalizeStr(rawQuery);
+
+  // Active store filter — null=all, '__none__'=untagged, string=specific store
+  const storeFilter = state.historyStoreFilter;
+
+  // Helper: apply store filter to a products array
+  const applyStoreFilter = (products) => {
+    if (!storeFilter) return products;
+    if (storeFilter === '__none__') return products.filter(p => !p.store);
+    return products.filter(p => p.store === storeFilter);
+  };
+
+  // Build store filter dropdown — show if any stores exist or any untagged products exist
+  const stores = loadStores();
+  const hasUntagged = allProducts.some(p => !p.store);
+  const storeFilterBar = (stores.length || hasUntagged) ? `
+    <div style="padding:0 16px 8px">
+      <select onchange="state.historyStoreFilter=this.value||null;scheduleRender()"
+        style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:13px;font-family:var(--sans);outline:none;min-height:44px;box-sizing:border-box">
+        <option value="" ${!storeFilter ? 'selected' : ''}>🏪 Sve prodavnice</option>
+        ${stores.map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${storeFilter===s?'selected':''}>${s}</option>`).join('')}
+        ${hasUntagged ? `<option value="__none__" ${storeFilter==='__none__'?'selected':''}>Bez prodavnice</option>` : ''}
+      </select>
+    </div>` : '';
 
   // Search input field — oninput updates state and re-renders
   const searchBar = `
@@ -3181,14 +3322,14 @@ function productsHistoryHTML() {
 
   // When search is active, flatten all products and filter — skip monthly grouping
   if (query) {
-    const matched = allProducts.filter(p => p.name?.toLowerCase().includes(query));
+    const matched = applyStoreFilter(allProducts.filter(p => normalizeStr(p.name).includes(query)));
     if (!matched.length) {
-      return searchBar + `<div class="card"><div class="hist-empty">🔍 Nema rezultata za "<strong>${rawQuery}</strong>".</div></div>`;
+      return searchBar + storeFilterBar + `<div class="card"><div class="hist-empty">🔍 Nema rezultata za "<strong>${rawQuery}</strong>".</div></div>`;
     }
 
     const cards = matched.map(p => {
       const isExp = state.expandedHistoryProductIds.has(p.id);
-      const isDup = duplicateNames.has(p.name?.trim().toLowerCase());
+      const isDup = duplicateNames.has(normalizeStr(p.name));
       const cardHTML = productCardInnerHTML(p, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false, isDup);
       return `
         <div class="hist-swipe-wrap" ontouchstart="swipeStart(event,${p.id},'hist-product','${p.date||''}')" ontouchmove="swipeMove(event,${p.id})" ontouchend="swipeEnd(event,${p.id},'hist-product')" ontouchcancel="swipeCancel(${p.id})">
@@ -3197,23 +3338,26 @@ function productsHistoryHTML() {
         </div>`;
     }).join('');
 
-    return searchBar + `<div class="card">${cards}</div>`;
+    return searchBar + storeFilterBar + `<div class="card">${cards}</div>`;
   }
   // No search active — render full monthly grouping
-  return searchBar + months.map(month => {
+  return searchBar + storeFilterBar + months.map(month => {
     const [yr, mo] = month.split('-');
     const monthLabel = `${mo}.${yr}`;
     const days = byMonth[month];
-    const totalProducts = days.reduce((s, d) => s + d.products.length, 0);
 
     const dayBlocks = days.map(({ date, products }) => {
+      // Apply store filter at the day level
+      const filteredProducts = applyStoreFilter(products);
+      if (!filteredProducts.length) return '';
+
       const dayNum  = date.slice(8).replace(/^0/, '');
       const dayLabel = `${dayNum}.${date.slice(5,7)}.`;
 
-      const cards = products.map(p => {
+      const cards = filteredProducts.map(p => {
         const isExp    = state.expandedHistoryProductIds.has(p.id);
         const pWithDate = p.date ? p : { ...p, date };
-        const isDup    = duplicateNames.has(p.name?.trim().toLowerCase());
+        const isDup    = duplicateNames.has(normalizeStr(p.name));
         // Pass isDup flag so the card gets dimmed visually
         const cardHTML = productCardInnerHTML(pWithDate, isExp, 'toggleHistoryProduct', null, 'data-hist-product-id', false, isDup);
         // Wrap in swipe-to-delete container — passes date so delete knows which key to update
@@ -3226,12 +3370,28 @@ function productsHistoryHTML() {
 
       return `
         <div style="margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3)">
-            ${dayLabel} · ${products.length} ${products.length === 1 ? 'proizvod' : 'proizvoda'}
+          <div style="font-size:13px;font-weight:700;color:var(--muted);font-family:var(--mono);padding:6px 0 2px;border-top:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center">
+            <span>${dayLabel} · ${filteredProducts.length} ${filteredProducts.length === 1 ? 'proizvod' : 'proizvoda'}</span>
+            ${products.some(p => !p.store) ? `
+              <button onclick="state.bulkTagDate=state.bulkTagDate==='${date}'?null:'${date}';state.bulkTagStore='';scheduleRender()" style="background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;padding:2px 4px;font-family:var(--sans)">Taguj sve</button>
+            ` : ''}
           </div>
+          ${state.bulkTagDate === date ? `
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <select onchange="state.bulkTagStore=this.value" style="flex:1;background:var(--s2);border:1px solid var(--s6);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px;font-family:var(--sans);outline:none;box-sizing:border-box">
+              <option value="">Izaberi prodavnicu…</option>
+              ${loadStores().map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${state.bulkTagStore===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+            <button onclick="bulkTagStoreForDate('${date}',state.bulkTagStore)" style="background:var(--green);color:var(--bg);border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">Primeni</button>
+          </div>` : ''}
           ${cards}
         </div>`;
     }).join('');
+
+    // Skip month block entirely if all days filtered out
+    if (!dayBlocks.trim()) return '';
+
+    const totalProducts = days.reduce((s, d) => s + applyStoreFilter(d.products).length, 0);
 
     return `<div class="card">
       <div class="card-label" style="display:flex;justify-content:space-between;align-items:center">
@@ -4858,8 +5018,17 @@ function getAllHistoryProducts() {
 
 // Returns the first history product matching name (case-insensitive, trimmed)
 function findDuplicateInHistory(name) {
-  const normalized = name.trim().toLowerCase();
-  return getAllHistoryProducts().find(p => p.name?.trim().toLowerCase() === normalized) || null;
+  const normalized = normalizeStr(name);
+  return getAllHistoryProducts().find(p => normalizeStr(p.name) === normalized) || null;
+}
+
+// Match AI-returned store string against user's fitlog_stores list.
+// Returns the canonical store name from the list, or null if no match found.
+function matchStore(aiStore) {
+  if (!aiStore) return null;
+  const stores = loadStores();
+  const normalized = normalizeStr(aiStore);
+  return stores.find(s => normalizeStr(s) === normalized) || null;
 }
 
 // Pending undo state for swipe-deleted history products
@@ -4982,6 +5151,10 @@ async function handleProductSubmit() {
       ...result,
     };
 
+    // Normalize AI-returned store against user's store list — keeps canonical names consistent.
+    // Overrides result.store with matched canonical name, or null if no match found.
+    product.store = matchStore(result.store);
+
     // Check for duplicate BEFORE saving — after save the product is in storage
     // and findDuplicateInHistory would always find it (self-match)
     const isDuplicate = !!findDuplicateInHistory(result.name);
@@ -5075,6 +5248,9 @@ function setHistoryTab(tab) {
   state.selectedHistoryDate = null; // clear any open day detail on sub-tab switch
   state.historyMonthOffset = 0;     // reset to current month
   state.productHistorySearch = '';  // clear search query
+  state.historyStoreFilter = null;  // clear store filter
+  state.bulkTagDate = null;         // close any open bulk tag picker
+  state.bulkTagStore = '';
   scheduleRender();
 }
 
@@ -6101,6 +6277,11 @@ function migrateSchema(from) {
     if (w && loadWeightLog().length === 0) {
       saveWeightEntry(todayStr(), w);
     }
+  }
+  // v1 → v2: store field added to product objects — no data migration needed,
+  // store is optional and existing products without it are treated as store: null
+  if (from < 2) {
+    // intentionally empty — new field is backwards-compatible
   }
 }
 
